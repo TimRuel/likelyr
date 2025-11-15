@@ -1,8 +1,13 @@
-.Rproj.user
 .Rhistory
 .RData
 .Ruserdata
-.Rdata
-.httr-oauth
+.Rproj.user
 .DS_Store
-.quarto
+.Rproj.user/
+coverage/
+docs/
+pkgdown/
+inst/doc
+*.html
+*.png
+*.svg

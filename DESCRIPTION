@@ -1,18 +1,51 @@
 Package: likelyr
-Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Authors@R: c(
+Title: Modular Tools for Integrated Likelihood Inference
+Version: 0.0.0.9000
+Authors@R: 
     person(
-      "Jane", "Doe",
-      email = "jane@example.com",
-      role = c("aut", "cre")
+      given = "Timothy",
+      family = "Ruel",
+      email = "timruel88@gmail.com",
+      role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-1916-5003")
     )
-  )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: 
+    A modular, extensible framework for computing integrated likelihoods (IL) 
+    under a zero-score expectation (ZSE) parameterization for arbitrary statistical 
+    models and scalar parameters of interest. The package decomposes IL computation 
+    into reusable components: model specifications, parameter-of-interest (psi) mappings,
+    ZSE parameter sampling, expected log-likelihood closures, constrained nuisance parameter
+    optimization via augmented Lagrangians, branch maximization and expansion, and 
+    log-sum-exp averaging for Monte Carlo integral approximation. Includes a simulation 
+    engine for comparing IL and profile likelihood (PL) estimators. Designed for research, 
+    teaching, and reproducible statistical methodology development.
+License: MIT + file LICENSE
+URL: https://github.com/TimRuel/likelyr, https://TimRuel.github.io/likelyr/
+BugReports: https://github.com/TimRuel/likelyr/issues
+Depends:
+    R (>= 4.1)
+Imports:
+    stats,
+    dplyr,
+    tibble,
+    purrr,
+    ggplot2,
+    rlang,
+    nloptr,
+    foreach,
+    future,
+    matrixStats,
+    methods
+Suggests:
+    ggplot2,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    pkgdown,
+    parallel
+VignetteBuilder: knitr
 Encoding: UTF-8
 LazyData: true
-URL: https://github.com/TimRuel/likelyr
-BugReports: https://github.com/TimRuel/likelyr/issues
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Config/testthat/edition: 3

@@ -22,3 +22,4 @@ The goal is to make IL inference accessible, extensible, and reproducible.
 ```r
 # Development version
 devtools::install_github("TimRuel/likelyr")
+```

@@ -1,0 +1,108 @@
+# ======================================================================
+# Branch mode location (maximize branch log-likelihood over psi)
+# ======================================================================
+
+#' Locate the branch-specific psi mode
+#'
+#' @description
+#' Internal helper that maximizes the branch log-likelihood over psi for a
+#' single nuisance draw (omega_hat), using a 1D optimizer (optimize()) and a
+#' user-provided evaluator of the form:
+#'
+#'   eval_psi_fun(psi, theta_init) -> list(branch_val, theta_hat, ...)
+#'
+#' The function:
+#' \itemize{
+#'   \item Uses \code{stats::optimize()} to find psi_hat that maximizes the
+#'         branch log-likelihood (equivalently minimizes -branch_val).
+#'   \item Re-evaluates at psi_hat to obtain the corresponding theta_hat.
+#'   \item Aligns psi_hat to the global psi grid via [.get_adjacent_grid_points()].
+#' }
+#'
+#' No assumptions are made about the underlying model or estimand beyond
+#' what is encoded in \code{eval_psi_fun}.
+#'
+#' @param eval_psi_fun A function with signature
+#'   \code{eval_psi_fun(psi, theta_init)}, returning a list with at least:
+#'   \itemize{
+#'     \item \code{branch_val} numeric scalar log-likelihood value at psi
+#'     \item \code{theta_hat}  numeric parameter vector maximizing
+#'           E_loglik under psi(theta) = psi
+#'   }
+#'   This closure should already capture the calibrated model, data,
+#'   nuisance draw, optimizer_spec, etc.
+#'
+#' @param psi_MLE Numeric scalar. Global psi MLE used as the grid origin.
+#'
+#' @param increment Positive numeric scalar. Grid spacing for psi; used to
+#'   identify the nearest left/right grid points around the mode.
+#'
+#' @param search_interval Numeric length-2 vector \code{c(a, b)} giving the
+#'   psi range over which to search for the branch mode.
+#'
+#' @param theta_init Optional numeric vector. Initial guess for theta when
+#'   optimizing in psi. Defaults to \code{NULL}, in which case
+#'   \code{eval_psi_fun} must handle its own initialization.
+#'
+#' @return A named list with elements:
+#'   \itemize{
+#'     \item \code{psi_hat}    branch-specific psi mode
+#'     \item \code{theta_hat}  parameter vector at psi_hat
+#'     \item \code{value_max}  maximum branch log-likelihood value
+#'     \item \code{left_start} left psi grid point to seed leftward walk
+#'     \item \code{right_start} right psi grid point to seed rightward walk
+#'     \item \code{k_left}     integer index of left_start relative to psi_MLE
+#'     \item \code{k_right}    integer index of right_start relative to psi_MLE
+#'   }
+#'
+#' @keywords internal
+.find_branch_mode <- function(eval_psi_fun,
+                              psi_MLE,
+                              increment,
+                              search_interval,
+                              theta_init = NULL) {
+
+  if (length(search_interval) != 2L)
+    stop("`search_interval` must be a numeric vector of length 2.", call. = FALSE)
+
+  if (!is.numeric(increment) || length(increment) != 1L || increment <= 0)
+    stop("`increment` must be a single positive numeric value.", call. = FALSE)
+
+  # --------------------------------------------------------------------
+  # Objective for 1D optimizer: minimize -branch_val(psi)
+  # --------------------------------------------------------------------
+  obj <- function(psi) {
+    res <- eval_psi_fun(psi, theta_init)
+    -res$branch_val
+  }
+
+  opt <- stats::optimize(
+    f        = obj,
+    interval = search_interval
+  )
+
+  psi_hat <- opt$minimum
+
+  # Re-evaluate at psi_hat to obtain theta_hat and max value
+  at_mode <- eval_psi_fun(psi_hat, theta_init)
+
+  value_max <- at_mode$branch_val
+  theta_hat <- at_mode$theta_hat
+
+  # Align to nearest psi grid points on each side of psi_hat
+  adj <- .get_adjacent_grid_points(
+    psi_hat_branch = psi_hat,
+    psi_MLE        = psi_MLE,
+    increment      = increment
+  )
+
+  list(
+    psi_hat     = psi_hat,
+    theta_hat   = theta_hat,
+    value_max   = value_max,
+    left_start  = adj$left,
+    right_start = adj$right,
+    k_left      = adj$k_left,
+    k_right     = adj$k_right
+  )
+}

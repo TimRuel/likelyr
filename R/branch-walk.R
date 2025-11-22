@@ -1,8 +1,7 @@
-# Internal: walk one side of a branch
-# Notes:
-#  - eval_psi_fun must return list(branch_val, theta_hat)
-#  - branch_cutoff is raw-likelihood cutoff (not centered)
-#  - returns *raw* values only; centering done later
+# ======================================================================
+# INTERNAL: One-sided ψ sweep down to the cutoff
+# ======================================================================
+
 walk_branch_side <- function(
     increment,
     start,
@@ -16,34 +15,33 @@ walk_branch_side <- function(
   current_val <- Inf
   current_par <- init_guess
 
-  branch_df <- tibble::tibble(
-    psi   = numeric(0),
-    value = numeric(0)
-  )
+  df <- tibble::tibble(psi = numeric(), value = numeric())
 
   while (is.finite(current_val) && current_val >= branch_cutoff) {
 
-    retry <- 0
+    retry <- 0L
 
     repeat {
       eval <- eval_psi_fun(current_psi, current_par)
 
-      if (eval$branch_val <= current_val || retry >= max_retries)
-        break
+      # If the branch is dropping as expected or max retries hit → break
+      if (eval$branch_val <= current_val || retry >= max_retries) break
 
-      retry <- retry + 1
-      jitter_scale <- 0.1 * retry
-      current_par  <- current_par + stats::rnorm(
+      # Otherwise jitter the initial guess and re-evaluate
+      retry <- retry + 1L
+      scale <- 0.1 * retry
+
+      current_par <- current_par + stats::rnorm(
         n  = length(current_par),
-        sd = jitter_scale
+        sd = scale
       )
     }
 
-    # If still monotonicity-violating, accept but warn and re-evaluate
+    # If retries failed to restore monotonicity
     if (eval$branch_val > current_val) {
       warning(
         sprintf(
-          "Monotonicity violation at psi = %.4f after %d retries; using non-monotone value.",
+          "Monotonicity violation at psi=%.4f after %d retries; using fallback.",
           current_psi, retry
         ),
         call. = FALSE
@@ -51,21 +49,14 @@ walk_branch_side <- function(
       eval <- eval_psi_fun(current_psi, current_par)
     }
 
+    # Update branch progression
     current_val <- eval$branch_val
     current_par <- eval$theta_hat
 
-    branch_df <- dplyr::bind_rows(
-      branch_df,
-      tibble::tibble(
-        psi   = current_psi,
-        value = current_val
-      )
-    )
+    df <- dplyr::add_row(df, psi = current_psi, value = current_val)
 
     current_psi <- current_psi + increment
   }
 
-  branch_df |>
-    dplyr::distinct() |>
-    dplyr::arrange(.data$psi)
+  df |> dplyr::distinct() |> dplyr::arrange(.data$psi)
 }

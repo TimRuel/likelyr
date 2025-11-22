@@ -1,88 +1,133 @@
+# ======================================================================
+# Model specification for likelihood workflows
+# ======================================================================
+
 #' Model specification for likelihood workflows
 #'
 #' @description
-#' Defines a parametric likelihood model for use in likelihood workflows.
-#' Both `loglik` and `E_loglik` must be functions of only the parameter vector
-#' `theta`, with any observed data already embedded in their closures. This
-#' enables clean interoperable optimization for profiling and integrated
-#' likelihood branches.
-#'
-#' @param loglik Function `function(theta)` returning numeric scalar log-likelihood.
-#' @param E_loglik Function `function(theta, omega_hat)` returning expected log-likelihood
-#'        under a given element `omega_hat` of the ZSE nuisance parameter manifold .
-#' @param param_dim Integer > 0. Dimension of the free model parameter vector `theta`.
-#' @param grad Optional gradient function `function(theta, omega_hat)` giving the gradient
-#'        of `E_loglik` with respect to `theta`. Used only if the chosen optimizer requires it.
-#' @param theta_mle Optional numeric vector of length `param_dim` representing a known MLE
-#'        of the model parameter. If not supplied, optimizers may compute it, or error
-#'        depending on their configured strictness.
-#' @param name Optional descriptive model name.
-#' @param ... Additional user-defined named model elements, stored in `extra`.
-#'
-#' @return An S3 object of class `likelihood_model`.
+#' Defines a parametric likelihood model for use in profile/integrated
+#' likelihood workflows. `loglik` and `E_loglik` must accept only `theta`,
+#' with data embedded in closures. Optional box constraints and inequality
+#' constraints describe the parameter domain.
+#' @param loglik Function(theta, data) → log-likelihood
+#' @param E_loglik Function(theta, omega_hat, data) → expected log-likelihood
+#' @param param_dim Positive integer dimension of theta
+#' @param E_loglik_grad Optional gradient function(theta, omega_hat, data)
+#' @param theta_mle_fn Optional Function(data) ->theta_mle
+#' @param lower Optional numeric vector (length param_dim)
+#' @param upper Optional numeric vector (length param_dim)
+#' @param ineq Optional inequality function(theta) → vector <= 0
+#' @param ineq_jac Optional Jacobian of `ineq`
+#' @param name Optional label
+#' @param ... extra metadata stored under `extra`
+#' @return S3 object `likelihood_model`
 #' @export
 model_spec <- function(loglik,
                        E_loglik,
                        param_dim,
-                       grad = NULL,
-                       theta_mle = NULL,
+                       E_loglik_grad = NULL,
+                       theta_mle_fn = NULL,
+                       lower = NULL,
+                       upper = NULL,
+                       ineq = NULL,
+                       ineq_jac = NULL,
                        name = NULL,
                        ...) {
 
   x <- list(
-    name        = name %||% "<model>",
-    loglik      = loglik,
-    E_loglik    = E_loglik,
-    param_dim   = param_dim,
-    grad        = grad,
-    theta_mle   = theta_mle,
-    extra       = list(...)
+    name          = name %||% "<model>",
+    loglik        = loglik,
+    E_loglik      = E_loglik,
+    E_loglik_grad = E_loglik_grad,
+    param_dim     = param_dim,
+    theta_mle_fn  = theta_mle_fn,
+    lower         = lower,
+    upper         = upper,
+    ineq          = ineq,
+    ineq_jac      = ineq_jac,
+    extra         = list(...)
   )
-  class(x) <- "likelihood_model"
 
+  class(x) <- "likelihood_model"
   validate_model_spec(x)
   x
 }
 
-# --- Internal validation ------------------------------------------------------
-
+# ======================================================================
+# Validation
+# ======================================================================
 validate_model_spec <- function(x) {
 
-  # Function requirements
-  if (!is.function(x$loglik))
-    stop("`loglik` must be a function(theta).", call. = FALSE)
+  # Functions
+  stopifnot(is.function(x$loglik))
+  stopifnot(is.function(x$E_loglik))
 
-  if (!is.function(x$E_loglik))
-    stop("`E_loglik` must be a function(theta, omega_hat).", call. = FALSE)
+  if (!is.null(x$E_loglik_grad))
+    stopifnot(is.function(x$E_loglik_grad))
 
-  # Parameter dimension validation
-  if (!is.numeric(x$param_dim) || length(x$param_dim) != 1L || x$param_dim < 1)
-    stop("`param_dim` must be a positive integer.", call. = FALSE)
+  # Dimension
+  if (!is.numeric(x$param_dim) || x$param_dim < 1 || length(x$param_dim) != 1)
+    stop("`param_dim` must be a positive integer.", call.=FALSE)
 
-  # Gradient validation
-  if (!is.null(x$grad) && !is.function(x$grad))
-    stop("`grad` must be a function(theta, omega_hat)` when supplied.", call. = FALSE)
-
-  # MLE validation (optional but must match parameter dimension)
-  if (!is.null(x$theta_mle)) {
-    if (!is.numeric(x$theta_mle) || length(x$theta_mle) != x$param_dim) {
-      stop("`theta_mle` must be a numeric vector of length `param_dim`.", call. = FALSE)
-    }
+  # MLE function
+  if (!is.null(x$theta_mle_fn)) {
+    stopifnot(is.function(x$theta_mle_fn))
   }
+
+  # Box constraints
+  if (!is.null(x$lower)) {
+    if (!is.numeric(x$lower) || length(x$lower) != x$param_dim)
+      stop("`lower` must be numeric and match `param_dim`.", call.=FALSE)
+  }
+
+  if (!is.null(x$upper)) {
+    if (!is.numeric(x$upper) || length(x$upper) != x$param_dim)
+      stop("`upper` must be numeric and match `param_dim`.", call.=FALSE)
+  }
+
+  if (!is.null(x$lower) && !is.null(x$upper)) {
+    if (any(x$lower > x$upper))
+      stop("Each `lower[i]` must be <= `upper[i]`.", call.=FALSE)
+  }
+
+  # Inequality constraints
+  if (!is.null(x$ineq))
+    stopifnot(is.function(x$ineq))
+
+  if (!is.null(x$ineq_jac))
+    stopifnot(is.function(x$ineq_jac))
 
   invisible(x)
 }
 
-# --- Print method -------------------------------------------------------------
-
+# ======================================================================
+# Print
+# ======================================================================
 #' @export
 print.likelihood_model <- function(x, ...) {
   cat("# Model Specification\n")
-  cat("- Name:                      ", x$name, "\n", sep = "")
-  cat("- Log-Likelihood Provided:   ", isTRUE(!is.null(x$loglik)), "\n", sep = "")
-  cat("- Expected Log-Likelihood:   ", isTRUE(!is.null(x$E_loglik)), "\n", sep = "")
-  cat("- Parameter Dimension:       ", x$param_dim, "\n", sep = "")
-  cat("- Gradient Provided:         ", isTRUE(!is.null(x$grad)), "\n", sep = "")
-  cat("- MLE Provided:              ", isTRUE(!is.null(x$theta_mle)), "\n", sep = "")
+  cat("- Name:                ", x$name, "\n", sep="")
+  cat("- Parameter Dimension: ", x$param_dim, "\n", sep="")
+
+  cat("- theta_mle_fn:        "); print_fn(x$theta_mle_fn)
+  cat("- loglik:              "); print_fn(x$loglik)
+  cat("- E_loglik:            "); print_fn(x$E_loglik)
+  cat("- E_loglik_grad:       "); print_fn(x$E_loglik_grad)
+
+  cat("- lower bounds:        ", if(is.null(x$lower)) "NULL" else paste(x$lower, collapse=", "), "\n", sep="")
+  cat("- upper bounds:        ", if(is.null(x$upper)) "NULL" else paste(x$upper, collapse=", "), "\n", sep="")
+  cat("- inequality:          "); print_fn(x$ineq)
+  cat("- inequality jacobian: "); print_fn(x$ineq_jac)
+
   invisible(x)
+}
+
+# Helper
+print_fn <- function(f) {
+  if (is.null(f)) {
+    cat("NULL\n")
+  } else {
+    args <- tryCatch(names(formals(f)), error=function(e) "<unknown>")
+    cat(sprintf("function(%s)\n", paste(args, collapse=", ")))
+  }
 }

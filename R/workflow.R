@@ -112,8 +112,8 @@ identify_spec_type <- function(x) {
   if (inherits(x, "likelihood_estimand"))   return("estimand")
   if (inherits(x, "likelihood_nuisance"))   return("nuisance")
   if (inherits(x, "likelihood_optimizer"))  return("optimizer")
-  if (inherits(x, "likelihood_serial"))     return("execution")
-  if (inherits(x, "likelihood_parallel"))   return("execution")
+  if (inherits(x, "likelihood_execution_serial")) return("execution")
+  if (inherits(x, "likelihood_execution_parallel")) return("execution")
   stop("Object is not a recognized spec type.", call. = FALSE)
 }
 
@@ -147,14 +147,6 @@ validate_workflow <- function(wf) {
 
   if (!inherits(wf$execution, "likelihood_execution"))
     stop("workflow$execution must be a likelihood_execution.", call. = FALSE)
-
-  # Optimizer derivative compatibility
-  if (wf$optimizer$requires_gradient && is.null(wf$model$grad)) {
-    stop(
-      "Optimizer requires a gradient but model_spec() did not provide model$grad.",
-      call. = FALSE
-    )
-  }
 
   invisible(wf)
 }

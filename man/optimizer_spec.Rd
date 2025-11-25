@@ -2,30 +2,45 @@
 % Please edit documentation in R/spec-optimizer.R
 \name{optimizer_spec}
 \alias{optimizer_spec}
-\title{Optimizer specification}
+\title{Specify Optimizer Settings for Constrained Likelihood Problems}
 \usage{
 optimizer_spec(
-  method = c("nloptr", "optim", "none"),
+  localsolver = "SLSQP",
+  localtol = 1e-06,
   control = list(),
-  requires_gradient = FALSE,
+  max_retries = 10,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{method}{Character: "nloptr", "optim", "none".}
+\item{localsolver}{Character scalar. Local optimizer used by \code{auglag()}.
+Typically \code{"SLSQP"} (default) or \code{"NLOPT_LD_MMA"}, etc.}
 
-\item{control}{List of optimizer control parameters.}
+\item{localtol}{Numeric scalar. Tolerance for the local solver. Default \code{1e-6}.}
 
-\item{requires_gradient}{Logical; TRUE if gradient must be provided.}
+\item{control}{A named list of parameters passed directly to \code{nloptr::auglag()}.}
 
-\item{name}{Optional label.}
+\item{max_retries}{Integer. Maximum number of attempts to restore monotonic branch
+descent by jittering initial guesses during branch sweeps.}
 
-\item{...}{Extra fields.}
+\item{name}{Optional human-readable label.}
+
+\item{...}{Additional metadata stored under \verb{$extra}.}
 }
 \value{
-S3 object of class \code{likelihood_optimizer}.
+An S3 object of class \code{"likelihood_optimizer"}.
 }
 \description{
-Encapsulates the numerical optimizer backend and configuration.
+Defines configuration parameters for \code{nloptr::auglag()}, which is used
+internally to solve constrained optimization problems of the form
+\eqn{\thetâ(\psi, \omegâ)} during branch expansion and during ω̂ sampling.
+
+This object governs:
+\itemize{
+\item the local solver used by \code{nloptr},
+\item tolerance levels,
+\item control list passed to \code{auglag()},
+\item retry behavior when monotonicity fails in branch sweeps.
+}
 }

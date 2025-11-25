@@ -1,82 +1,159 @@
 # ======================================================================
-# INTERNAL UTILS: Branch Count + Alpha Allocation
-# File: R/utils-branch-params.R
+# Branch Utilities: R Count, Alpha Allocation, and ψ-Grid Helpers
+# File: R/branch-utils.R
 # ======================================================================
 
-#' Compute number of Monte Carlo branches (R)
+
+# ======================================================================
+# 1. Compute Number of Monte Carlo Branches
+# ======================================================================
+
+#' Compute Number of Monte Carlo Branches
 #'
 #' @description
-#' Determines how many nuisance-based branches should be drawn for
-#' Monte Carlo integrated likelihood, based on the execution specification.
+#' Determines the number of Monte Carlo branches `R` implied by an
+#' execution specification created with [serial_spec()] or [parallel_spec()].
 #'
-#' For:
-#'  * serial:   R is explicitly provided via `serial_spec(R = ...)`
-#'  * parallel: R = num_workers * chunk_size
+#' * **Serial execution:**
+#'   `R = execution$R`
 #'
-#' @param execution An execution spec object created by [serial_spec()] or [parallel_spec()]
+#' * **Parallel execution:**
+#'   `R = execution$num_workers * execution$chunk_size`
 #'
-#' @return Integer number of branches (R)
+#' @param execution Execution specification object.
 #'
+#' @return Integer number of branches `R`.
 #' @keywords internal
 compute_num_branches <- function(execution) {
 
   if (inherits(execution, "likelihood_execution_serial")) {
+
     R <- execution$R
 
   } else if (inherits(execution, "likelihood_execution_parallel")) {
+
     R <- execution$num_workers * execution$chunk_size
 
   } else {
-    stop("Invalid execution object: must be serial_spec() or parallel_spec().",
-         call. = FALSE)
+
+    stop(
+      "`execution` must be created via serial_spec() or parallel_spec().",
+      call. = FALSE
+    )
   }
 
   if (!is.numeric(R) || R < 1)
-    stop("Computed number of branches R must be a positive integer.", call. = FALSE)
+    stop("Computed number of branches R must be a positive integer.",
+         call. = FALSE)
 
   as.integer(R)
 }
 
+
+
+# ======================================================================
+# 2. Compute Required Per-Branch Alpha (Guarantee Global Alpha Cutoff)
 # ======================================================================
 
-#' Compute required per-branch alpha to guarantee global alpha cutoff
+#' Compute Required Per-Branch Alpha
 #'
 #' @description
-#' Given:
-#'   * a target global confidence level α (e.g., α = 0.01 for 99% CI)
-#'   * number of branches R
+#' Computes the per-branch tail probability `alpha_branch` such that
+#' each branch is extended far enough to guarantee the **global**
+#' integrated-likelihood cutoff for tail probability `alpha`.
 #'
-#' compute the per-branch alpha level required such that **each branch**
-#' is extended far enough to guarantee capturing the **integrated** cutoff
-#' after log-sum-exp averaging.
+#' The requirement is:
+#' \deqn{
+#'   \text{branch\_cutoff} \ge c_{\text{global}} + \log R
+#' }
 #'
-#' The derivation follows the established bound:
+#' where:
 #'
-#'   per_branch_cutoff ≥ global_cutoff + log(R)
+#' \deqn{c_{\text{global}} = \tfrac12 \chi^2_1(1 - \alpha)}
 #'
-#' @param R Integer number of branches
-#' @param alpha Global target tail probability (e.g., 0.01 for 99% CI)
+#' @param R Positive integer number of branches.
+#' @param alpha Global tail probability in `(0, 1)`.
 #'
-#' @return Numeric per-branch alpha to be used when determining branch depth
-#'
+#' @return Numeric scalar `alpha_branch`.
 #' @keywords internal
 compute_required_branch_alpha <- function(R, alpha) {
 
   if (!is.numeric(R) || R < 1)
-    stop("R must be a positive integer.", call. = FALSE)
+    stop("`R` must be a positive integer.", call. = FALSE)
 
   if (!is.numeric(alpha) || alpha <= 0 || alpha >= 1)
-    stop("alpha must be a number strictly between 0 and 1.", call. = FALSE)
+    stop("`alpha` must be strictly between 0 and 1.", call. = FALSE)
 
-  # Global cutoff
+  # global cutoff at desired CI depth
   c_global <- 0.5 * stats::qchisq(1 - alpha, df = 1)
 
-  # Required branch cutoff
+  # required branch cutoff to hit global shape after averaging
   c_branch <- c_global + log(R)
 
-  # Convert back from cutoff to tail prob
+  # convert back to tail probability
   alpha_branch <- 1 - stats::pchisq(2 * c_branch, df = 1)
 
   alpha_branch
 }
 
+
+
+# ======================================================================
+# 3. ψ-Grid Anchor (ψ_k = ψ_MLE + k * increment)
+# ======================================================================
+
+#' Create a ψ-Grid Anchor
+#'
+#' @description
+#' Constructs a lightweight, regular ψ-grid representation:
+#' \deqn{
+#'   \psi_k = \psi_{\text{MLE}} + k \cdot \text{increment}.
+#' }
+#'
+#' Used for branch sweeps where only relative grid indices matter.
+#'
+#' @param psi_mle Numeric: ψ_MLE.
+#' @param increment Positive numeric: grid spacing.
+#'
+#' @return An object of class `"psi_grid"`.
+#' @keywords internal
+psi_grid_anchor <- function(psi_mle, increment) {
+
+  if (!is.numeric(increment) || increment <= 0)
+    stop("`increment` must be a strictly positive scalar.", call. = FALSE)
+
+  structure(
+    list(
+      psi_mle   = psi_mle,
+      increment = increment
+    ),
+    class = "psi_grid"
+  )
+}
+
+
+
+# ======================================================================
+# 4. Snap ψ to Nearest Grid Point (rarely used)
+# ======================================================================
+
+#' Snap ψ to Nearest Grid Point
+#'
+#' @description
+#' Given a ψ value and a ψ-grid created by [psi_grid_anchor()],
+#' return the nearest ψ-grid point.
+#'
+#' @param psi Numeric scalar.
+#' @param grid A `"psi_grid"` object.
+#'
+#' @return Numeric: nearest ψ-grid point.
+#' @keywords internal
+snap_to_grid <- function(psi, grid) {
+
+  k_float <- (psi - grid$psi_mle) / grid$increment
+
+  # guard against floating point drift
+  k <- round(k_float)
+
+  grid$psi_mle + k * grid$increment
+}

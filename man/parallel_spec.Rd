@@ -2,7 +2,7 @@
 % Please edit documentation in R/spec-execution.R
 \name{parallel_spec}
 \alias{parallel_spec}
-\title{Parallel Execution Specification (foreach + \%dofuture\% backend)}
+\title{Parallel Execution Specification (foreach + \%dofuture\%)}
 \usage{
 parallel_spec(
   num_workers,
@@ -13,21 +13,26 @@ parallel_spec(
 )
 }
 \arguments{
-\item{num_workers}{Integer. Number of workers (e.g. CPU cores, cluster nodes).}
+\item{num_workers}{Positive integer. Number of workers.}
 
-\item{chunk_size}{Integer. Workload chunk size per worker, default = 1.}
+\item{chunk_size}{Positive integer. Batch size per worker.}
 
-\item{seed}{Logical or integer controlling reproducible RNG. Default = TRUE.}
+\item{seed}{Logical or integer. RNG configuration.}
 
-\item{packages}{Character vector of package names required on workers.}
+\item{packages}{Character vector.}
 
-\item{name}{Optional label, defaults to "parallel".}
+\item{name}{Optional label.}
 }
 \value{
-An execution-spec object of class \code{likelihood_execution_parallel}.
+An object of class \code{likelihood_execution_parallel}.
 }
 \description{
-Declares that branch computation should run in parallel via foreach with
-the \verb{\%dofuture\%} operator. The user \strong{must} set a future plan beforehand,
-e.g. \code{future::plan(multisession)} or \code{future::plan(cluster, workers = 8)}.
+Declares that Monte Carlo branches should run \strong{in parallel}, where
+users must configure a \code{future} backend before calling \code{generate()}.
+
+Total branches is:
+
+\deqn{
+R = \text{num\_workers} \times \text{chunk\_size}.
+}
 }

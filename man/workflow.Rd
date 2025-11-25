@@ -2,7 +2,7 @@
 % Please edit documentation in R/workflow.R
 \name{workflow}
 \alias{workflow}
-\title{Create a likelihood workflow}
+\title{Create a Likelihood Workflow}
 \usage{
 workflow(
   model = NULL,
@@ -13,30 +13,32 @@ workflow(
 )
 }
 \arguments{
-\item{model}{Optional object created by \code{\link[=model_spec]{model_spec()}}}
+\item{model}{Optional object from \code{\link[=model_spec]{model_spec()}}}
 
-\item{estimand}{Optional object created by \code{\link[=estimand_spec]{estimand_spec()}}}
+\item{estimand}{Optional object from \code{\link[=estimand_spec]{estimand_spec()}}}
 
-\item{nuisance}{Optional object created by \code{\link[=nuisance_spec]{nuisance_spec()}}}
+\item{nuisance}{Optional object from \code{\link[=nuisance_spec]{nuisance_spec()}}}
 
-\item{optimizer}{Optional object created by \code{\link[=optimizer_spec]{optimizer_spec()}}}
+\item{optimizer}{Optional object from \code{\link[=optimizer_spec]{optimizer_spec()}}}
 
-\item{execution}{Optional object created by \code{\link[=execution_spec]{execution_spec()}}}
+\item{execution}{Optional object from \code{\link[=serial_spec]{serial_spec()}} or \code{\link[=parallel_spec]{parallel_spec()}}}
 }
 \value{
-An S3 object of class \code{likelihood_workflow}
+A \code{likelihood_workflow} object.
 }
 \description{
-A workflow stores the configuration required to compute profile or
-integrated (pseudo-)likelihood function values for a statistical model.
+A workflow is a declarative container describing all components needed
+for generating profile or integrated likelihoods. No computation occurs
+here; calibration and generation are handled by \code{\link[=calibrate]{calibrate()}} and
+\code{\link[=generate]{generate()}}.
 
-You may construct it all at once:
+You may construct a workflow all at once:
 
-\code{workflow(model, estimand, nuisance, optimizer, execution)}
+workflow(model, estimand, nuisance, optimizer, execution)
 
 or incrementally using a pipe:
 
-\code{workflow() |> add(model_spec) |> add(estimand_spec) |> ...}
+workflow() |> add(model_spec(...)) |> add(estimand_spec(...)) |> ...
 
-No estimation is performed here — the workflow is declarative.
+Components are validated once all required slots are filled.
 }

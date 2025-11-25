@@ -12,22 +12,41 @@
 #   2. make_omega_hat_sampler(cal)
 #        → returns a function(init_guess) → omega_hat satisfying ψ(ω̂)=ψ_MLE
 #
-# These factories are used inside calibrate_IL().
+# These are created inside calibrate_IL() and stored under:
+#      cal$il$generate_init
+#      cal$il$sample_omega_hat
 #
 # ======================================================================
 
 
-# ======================================================================
-# 1. Good Initial-Guess Generator
-# ======================================================================
-# Produces starting points for auglag that:
-#   • Begin near θ_MLE
-#   • Are perturbed in directions *tangent* to the constraint manifold
-#   • Maintain positivity for rate/variance parameters
-#
-# This drastically improves auglag convergence and MC manifold sampling.
-# ======================================================================
-
+#' Initial-Guess Generator for ω̂ Manifold Solver (Internal)
+#'
+#' @description
+#' Constructs a function that generates **good initial guesses** for solving
+#' the constraint
+#'
+#' \deqn{\psi(\omega) = \psi_{\mathrm{MLE}}}
+#'
+#' via `nloptr::auglag()`.
+#' The generated initial guesses:
+#' * start near \eqn{\theta_{\mathrm{MLE}}},
+#' * are perturbed in directions **tangent** to the constraint manifold,
+#' * maintain **positivity**, important for Poisson/NB/GLM-rate models.
+#'
+#' This dramatically improves convergence and Monte Carlo sampling stability.
+#'
+#' @param cal A calibration list created by `calibrate_IL()`, containing
+#'   `theta_mle` and `psi_jac` (if provided by the estimand).
+#'
+#' @return
+#' A function of the form:
+#' \preformatted{
+#'   f(scale = 0.25) -> numeric vector (initial_guess)
+#' }
+#' where `scale` controls the magnitude of the perturbations.
+#'
+#' @keywords internal
+#' @noRd
 make_omega_hat_initgen <- function(cal) {
 
   theta_mle <- cal$theta_mle      # full parameter vector
@@ -77,87 +96,106 @@ make_omega_hat_initgen <- function(cal) {
 
 
 
-# ======================================================================
-# 2. Omega-hat Sampler
-# ======================================================================
-# Solves the constraint:
-#       ψ(ω̂) - ψ_MLE = 0
-# using NLOPTR::auglag with a dummy objective (always zero).
-#
-# Uses an eval_env holding all static + dynamic auglag arguments,
-# and zero-closure permanent fn/gr/heq for fastest inner-loop performance.
-# ======================================================================
-
+#' Omega-Hat Sampler for ψ(ω̂) = ψ_MLE (Internal)
+#'
+#' @description
+#' Constructs a **fast manifold sampler** that solves the constraint
+#'
+#' \deqn{\psi(\omega) - \psi_{\mathrm{MLE}} = 0}
+#'
+#' using `nloptr::auglag()` with a **dummy objective** (`0` everywhere).
+#'
+#' This produces nuisance-parameter draws ω̂ that lie **exactly on** the
+#' integrated-likelihood constraint manifold.
+#'
+#' Performance notes:
+#' * Uses a **zero-closure** design: objective, constraints, and their Jacobians
+#'   are stored permanently in `eval_env` for maximum speed.
+#' * Only the initial guess `x0` changes per call.
+#'
+#' @param cal A list returned by `calibrate_IL()`, containing:
+#'   `psi_fn`, `psi_mle`, and model/optimizer specifications.
+#'
+#' @return
+#' A function of the form:
+#' \preformatted{
+#'   f(init_guess) -> omega_hat
+#' }
+#' where the returned `omega_hat` satisfies \eqn{\psi(\omega)=\psi_{\mathrm{MLE}}}.
+#'
+#' @keywords internal
+#' @noRd
 make_omega_hat_sampler <- function(cal) {
+  # Force evaluation of cal so we close over its current value,
+  # not a lazy promise from calibrate_IL().
+  force(cal)
 
-  psi_fn   <- cal$psi_fn           # θ → ψ(θ)
-  psi_mle  <- cal$psi_mle
-  wf       <- cal$workflow
-  model    <- wf$model
-  optimizer <- wf$optimizer
-  estimand  <- wf$estimand
+  local({
 
-  # ------------------------------------------------------------
-  # Define objective and constraint
-  # ------------------------------------------------------------
-  fn0    <- function(theta) 0
-  heq_fn <- function(theta) psi_fn(theta) - psi_mle
+    psi_fn   <- cal$psi_fn          # θ -> ψ(θ)
+    psi_mle  <- cal$psi_mle
+    wf       <- cal$workflow
+    model    <- wf$model
+    optimizer <- wf$optimizer
+    estimand  <- wf$estimand
 
-  # ------------------------------------------------------------
-  # Build eval_env containing fixed + dynamic auglag arguments
-  # ------------------------------------------------------------
-  eval_env <- list2env(
-    list(
-      # Static model-level constraints
-      lower       = model$lower,
-      upper       = model$upper,
-      hin         = model$ineq,
-      hinjac      = model$ineq_jac,
+    # Dummy objective (we only care about the constraint)
+    fn0    <- function(theta) 0
+    heq_fn <- function(theta) psi_fn(theta) - psi_mle
 
-      # Equality constraint Jacobian (if provided)
-      heqjac      = estimand$psi_jac,
+    # Environment holding all auglag args (static + dynamic)
+    eval_env <- list2env(
+      list(
+        # Static model constraints
+        lower       = model$lower,
+        upper       = model$upper,
+        hin         = model$ineq,
+        hinjac      = model$ineq_jac,
 
-      # Optimizer configuration
-      localsolver = optimizer$localsolver,
-      localtol    = optimizer$localtol,
-      control     = optimizer$control,
-      deprecatedBehavior = FALSE,
+        # Equality constraint Jacobian, if present
+        heqjac      = cal$psi_jac,
 
-      # Dynamic argument updated per sample
-      x0          = NULL
-    ),
-    parent = emptyenv()
-  )
+        # Optimizer config
+        localsolver = optimizer$localsolver,
+        localtol    = optimizer$localtol,
+        control     = optimizer$control,
+        deprecatedBehavior = FALSE,
 
-  # Permanent zero-closure callbacks
-  eval_env$fn  <- fn0
-  eval_env$gr  <- NULL
-  eval_env$heq <- heq_fn
-
-  # ------------------------------------------------------------
-  # Return sampler: init_guess → omega_hat satisfying ψ(ω̂)=ψ_MLE
-  # ------------------------------------------------------------
-  function(init_guess, ...) {
-
-    eval_env$x0 <- init_guess
-
-    res <- nloptr::auglag(
-      x0          = eval_env$x0,
-      fn          = eval_env$fn,
-      gr          = eval_env$gr,
-      heq         = eval_env$heq,
-      heqjac      = eval_env$heqjac,
-      hin         = eval_env$hin,
-      hinjac      = eval_env$hinjac,
-      lower       = eval_env$lower,
-      upper       = eval_env$upper,
-      localsolver = eval_env$localsolver,
-      localtol    = eval_env$localtol,
-      control     = eval_env$control,
-      deprecatedBehavior = eval_env$deprecatedBehavior,
-      ...
+        # Dynamic: updated per call
+        x0          = NULL
+      ),
+      parent = emptyenv()
     )
 
-    res$par   # full parameter vector satisfying ψ(θ) = ψ_MLE
-  }
+    # Permanent, zero-closure callbacks
+    eval_env$fn  <- fn0
+    eval_env$gr  <- NULL
+    eval_env$heq <- heq_fn
+
+    # ----------------------------------------------------------
+    # Return sampler: init_guess -> omega_hat satisfying ψ(ω̂)=ψ_MLE
+    # ----------------------------------------------------------
+    function(init_guess) {
+
+      eval_env$x0 <- init_guess
+
+      res <- nloptr::auglag(
+        x0          = eval_env$x0,
+        fn          = eval_env$fn,
+        gr          = eval_env$gr,
+        heq         = eval_env$heq,
+        heqjac      = eval_env$heqjac,
+        hin         = eval_env$hin,
+        hinjac      = eval_env$hinjac,
+        lower       = eval_env$lower,
+        upper       = eval_env$upper,
+        localsolver = eval_env$localsolver,
+        localtol    = eval_env$localtol,
+        control     = eval_env$control,
+        deprecatedBehavior = eval_env$deprecatedBehavior
+      )
+
+      res$par
+    }
+  })
 }

@@ -1,8 +1,11 @@
 # Load package internals
+devtools::document()
+# devtools::install(force = TRUE, upgrade = "never")
 devtools::load_all()
 
 library(dplyr)
 library(foreach)
+library(likelyr)
 
 set.seed(1)
 
@@ -23,16 +26,18 @@ data <- tibble(process = factor(process_labels),
 
 loglik <- function(theta, data) sum(dpois(data$Y, data$t * theta, log = TRUE))
 E_loglik <- function(theta, omega_hat, data) sum(data$t * (omega_hat * log(theta) - theta))
-E_loglik_grad <- function(theta, omega_hat, data) sum(data$t * (omega_hat / theta - 1))
+E_loglik_grad <- function(theta, omega_hat, data) data$t * (omega_hat / theta - 1)
 theta_mle_fn <- function(data) data$Y / data$t
 
 psi_fn <- function(theta, data) sum(theta * data$weights)
+theta_mle <- theta_mle_fn(data)
 psi_mle <- psi_fn(theta_mle, data)
 psi_mle_se <- sqrt(sum(weights^2 * theta_mle / t))
 num_std_errors <- 6
 search_interval <- psi_mle + c(-1, 1) * num_std_errors * psi_mle_se
 increment <- 0.1
 psi_jac <- function(theta, data) data$weights
+confidence_levels <- 0.8
 
 xtol_rel <- 1e-8
 maxeval <- 1000
@@ -60,12 +65,12 @@ estimand <- estimand_spec(
   search_interval = search_interval,
   increment = increment,
   psi_jac = psi_jac,
+  confidence_levels = confidence_levels,
   name = "Weighted Sum (psi)"
 )
 
 nuisance <- nuisance_spec(
-  sampler = function(J) rgamma(J, 2, 1),
-  init_strategy = "random",
+  init_guess_sampler = function(J) rgamma(J, 2, 1),
   name = "omega_hat initial guess distribution"
 )
 
@@ -75,7 +80,7 @@ optimizer <- optimizer_spec(
 )
 
 execution <- serial_spec(
-  R = 2,
+  R = 10,
   seed = 7835,
   name = "Serial execution"
 )
@@ -91,17 +96,44 @@ wf <- workflow() |>
   add(optimizer) |>
   add(execution)
 
-print(wf)
-
 # ============================================================
 # CALIBRATE WORKFLOW
 # ============================================================
 
 cal <- calibrate(wf, data)
-print(cal)
 
-log_IL <- fit_integrated(cal)
+log_IL <- generate(cal)
+
+# -------------------------------------------------------------
+# 5. Attach diagnostics (separate file)
+# -------------------------------------------------------------
+diagnostics <- compute_branch_diagnostics(
+  branch_mat   = branch_mat,
+  log_mean_vec = log_mean
+)
+attr(out, "diagnostics") <- diagnostics
 
 # plan(callr, workers = wf$execution$num_workers)
 # fit  <- fit_integrated(cal)
 # plan(sequential)
+
+
+
+# FOR THURSDAY
+# Branch diagnostics
+# Desired pipeline:
+
+# cal_wf <- workflow() |>
+#   add(model) |>
+#   add(estimand) |>
+#   add(nuisance) |>
+#   add(optimizer) |>
+#   add(execution) |>
+#   calibrate(data)
+#
+# log_IL <- cal_wf |>
+#   generate()
+#
+# log_IL <- log_IL |>
+#   diagnose()
+

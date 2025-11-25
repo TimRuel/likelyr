@@ -8,38 +8,60 @@ model_spec(
   loglik,
   E_loglik,
   param_dim,
-  grad = NULL,
-  theta_mle = NULL,
+  E_loglik_grad = NULL,
+  theta_mle_fn = NULL,
+  lower = NULL,
+  upper = NULL,
+  ineq = NULL,
+  ineq_jac = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{loglik}{Function \verb{function(theta)} returning numeric scalar log-likelihood.}
+\item{loglik}{Function(theta, data) → numeric loglik}
 
-\item{E_loglik}{Function \verb{function(theta, omega_hat)} returning expected log-likelihood
-under a given element \code{omega_hat} of the ZSE nuisance parameter manifold .}
+\item{E_loglik}{Function(theta, omega_hat, data) → expected loglik}
 
-\item{param_dim}{Integer > 0. Dimension of the free model parameter vector \code{theta}.}
+\item{param_dim}{Positive integer giving dimension of theta}
 
-\item{grad}{Optional gradient function \verb{function(theta, omega_hat)} giving the gradient
-of \code{E_loglik} with respect to \code{theta}. Used only if the chosen optimizer requires it.}
+\item{E_loglik_grad}{Optional gradient(theta, omega_hat, data)}
 
-\item{theta_mle}{Optional numeric vector of length \code{param_dim} representing a known MLE
-of the model parameter. If not supplied, optimizers may compute it, or error
-depending on their configured strictness.}
+\item{theta_mle_fn}{Optional function(data) → theta_mle}
 
-\item{name}{Optional descriptive model name.}
+\item{lower}{Optional numeric vector of length \code{param_dim}}
 
-\item{...}{Additional user-defined named model elements, stored in \code{extra}.}
+\item{upper}{Optional numeric vector of length \code{param_dim}}
+
+\item{ineq}{Optional inequality function(theta) ≤ 0}
+
+\item{ineq_jac}{Optional jacobian of \code{ineq}}
+
+\item{name}{Optional descriptive string}
+
+\item{...}{Additional fields stored in \verb{$extra}}
 }
 \value{
-An S3 object of class \code{likelihood_model}.
+A validated \code{likelihood_model} object
 }
 \description{
-Defines a parametric likelihood model for use in likelihood workflows.
-Both \code{loglik} and \code{E_loglik} must be functions of only the parameter vector
-\code{theta}, with any observed data already embedded in their closures. This
-enables clean interoperable optimization for profiling and integrated
-likelihood branches.
+Defines a parametric likelihood model for profile or integrated
+likelihood workflows.
+
+A model must specify:
+\itemize{
+\item \code{loglik(theta, data)}
+\item \code{E_loglik(theta, omega_hat, data)}
+}
+
+Both functions must accept raw theta; any needed data is embedded
+via closures during workflow calibration.
+
+Optional:
+\itemize{
+\item gradient of expected loglik \code{E_loglik_grad()}
+\item custom MLE initializer \code{theta_mle_fn(data)}
+\item box constraints (\code{lower}, \code{upper})
+\item inequality constraints (\code{ineq}, \code{ineq_jac})
+}
 }

@@ -2,33 +2,48 @@
 % Please edit documentation in R/spec-estimand.R
 \name{estimand_spec}
 \alias{estimand_spec}
-\title{Estimand specification for likelihood workflows}
+\title{Specify an Estimand for Likelihood Workflows}
 \usage{
 estimand_spec(
-  psi,
-  dpsi = NULL,
+  psi_fn,
+  search_interval,
+  increment,
   confidence_levels = c(0.9, 0.95, 0.99),
+  psi_jac = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{psi}{Function(theta, ...) → numeric scalar representing ψ(θ).}
+\item{psi_fn}{Function(theta, data) → scalar ψ(θ)}
 
-\item{dpsi}{Optional gradient function(theta, ...) → numeric vector.}
+\item{search_interval}{Length-2 numeric vector c(lower, upper)}
 
-\item{confidence_levels}{Numeric vector of desired confidence levels
-(values must be strictly between 0 and 1). Default: c(0.90, 0.95).}
+\item{increment}{Positive scalar giving ψ-grid spacing}
 
-\item{name}{Optional label for printing.}
+\item{confidence_levels}{Numeric vector ⊂ (0,1)}
 
-\item{...}{Extra user-defined fields stored as metadata.}
+\item{psi_jac}{Optional gradient(theta, data)}
+
+\item{name}{Optional label}
+
+\item{...}{Additional metadata}
 }
 \value{
-S3 object of class \code{likelihood_estimand}.
+An S3 object of class \code{"likelihood_estimand"}
 }
 \description{
-Defines ψ(θ) and optional analytic derivative dψ/dθ, along with
-confidence levels used for plotting confidence bands of the
-integrated and profile likelihood curves.
+Defines the estimand \eqn{\psi(\theta)} and its optional gradient,
+together with the search grid and confidence-level structure used by
+both profile likelihood and Monte Carlo integrated likelihood.
+
+The estimand specification determines:
+\itemize{
+\item the scalar mapping \eqn{\theta \mapsto \psi(\theta)},
+\item the search interval in which branch modes are located,
+\item the grid spacing used for branch sweeps,
+\item the set of confidence levels used in summaries and plots,
+\item the corresponding global tail probability
+\eqn{\alpha_\mathrm{target} = \min(1 - \text{confidence\_levels})}.
+}
 }

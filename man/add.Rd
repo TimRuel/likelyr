@@ -2,22 +2,26 @@
 % Please edit documentation in R/workflow.R
 \name{add}
 \alias{add}
-\title{Add a specification component to a workflow}
+\title{Add a Specification Component to a Workflow}
 \usage{
 add(wf, spec, ...)
 }
 \arguments{
-\item{wf}{A workflow created by \code{\link[=workflow]{workflow()}}}
+\item{wf}{A \code{likelihood_workflow}}
 
-\item{spec}{A single object returned by a *_spec() constructor}
+\item{spec}{A spec object (model, estimand, nuisance, optimizer, execution)}
 
-\item{...}{Allows named usage: \code{add(wf, model = x)} or \code{add(model = x)}}
+\item{...}{Allows named usage in pipelines}
 }
 \value{
-Updated likelihood workflow
+Updated workflow
 }
 \description{
-Adds one specification element to an existing workflow. This function
-supports both positional usage (\code{add(wf, model_spec)}) and named usage
-inside pipes (\code{workflow() |> add(model = model_spec)}).
+Adds a single specification object to a workflow. Supports both:
+\itemize{
+\item positional usage: \code{add(wf, spec)}
+\item named usage inside pipes: \code{workflow() |> add(model = spec)}
+}
+
+All components must be created using *_spec() constructors.
 }

@@ -1,28 +1,67 @@
+# ======================================================================
+# Average Branches (Monte Carlo Integrated Likelihood)
+# ======================================================================
+
 #' Average Branches (Monte Carlo Integrated Likelihood)
 #'
 #' @description
-#' Computes the Monte Carlo estimate of the integrated likelihood by
-#' averaging exponentiated branch log-likelihoods and returning results
-#' on the log scale using a numerically stable log-sum-exp operation.
+#' Computes the Monte Carlo integrated likelihood curve by averaging
+#' branch-specific log-likelihood values using the numerically-stable
+#' log-mean-exp identity:
 #'
-#' @param branches A list of data.frames, each with columns `psi` and `value`
-#'   where `value` is log-likelihood evaluated at that psi.
+#'   log L̂(ψ_k) = log( (1/R) Σ exp(ℓ_{k,r}) )
 #'
-#' @return data.frame with columns `psi` and `value` (integrated LL on log scale)
+#' Diagnostics (ESS, MC variance, outlier rate, etc.) are computed in a
+#' separate function and attached as an attribute: `attr(out, "diagnostics")`.
+#'
+#' @param branches List of branch tibbles, each containing:
+#'   * k     — integer ψ-grid index
+#'   * psi   — ψ-grid value
+#'   * value — log-likelihood ℓ_{k,r}
+#'
+#' @return tibble(psi, value) with attribute `"diagnostics"`
+#'
 #' @export
 average_branches <- function(branches) {
-  # 1) merge by psi grid index k
-  merged <- Reduce(function(x, y) dplyr::inner_join(x, y, by = "k"), branches)
 
-  # 2) extract psi and value matrix
+  # -------------------------------------------------------------
+  # 1. Rename "value" columns: value1, value2, ...
+  # -------------------------------------------------------------
+  renamed <- Map(
+    f = function(br, i) dplyr::rename(br, !!paste0("value", i) := value),
+    br = branches,
+    i  = seq_along(branches)
+  )
+
+  # -------------------------------------------------------------
+  # 2. Merge on (k, psi)
+  # -------------------------------------------------------------
+  merged <- Reduce(
+    function(a, b) dplyr::inner_join(a, b, by = c("k", "psi")),
+    renamed
+  )
+
   psi <- merged$psi
+
+  # -------------------------------------------------------------
+  # 3. Extract matrix (K × R)
+  # -------------------------------------------------------------
   branch_mat <- merged |>
-    dplyr::select(dplyr::starts_with("value")) |>
+    dplyr::select(matches("^value\\d+$")) |>
     as.matrix()
 
-  # 3) log-mean-exp along rows
   R <- ncol(branch_mat)
+
+  # -------------------------------------------------------------
+  # 4. Compute log integrated likelihood via log-mean-exp
+  # -------------------------------------------------------------
   log_mean <- matrixStats::rowLogSumExps(branch_mat) - log(R)
 
-  tibble::tibble(psi = psi, value = as.numeric(log_mean))
+  df <- tibble::tibble(
+    psi   = psi,
+    value = as.numeric(log_mean)
+  )
+
+  list(df = df,
+       branch_mat = branch_mat)
 }

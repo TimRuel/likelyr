@@ -5,52 +5,59 @@
 #' Serial Execution Specification
 #'
 #' @description
-#' Declares that branch computation will run in serial using a single R process.
-#' Still uses foreach + %dofuture%, but no parallel workers are spawned.
+#' Declares that Monte Carlo branch computations should run **in serial**
+#' using a single R process. This mode still uses `foreach` internally,
+#' but no parallel workers are spawned.
 #'
-#' @param R Integer, required. Number of Monte Carlo branches to compute.
-#' @param seed Logical or integer. If TRUE (default), reproducible RNG is enabled.
-#' @param packages Character vector of package names required during computation.
-#' @param name Optional label, defaults to "serial".
+#' @param R Positive integer. Number of Monte Carlo branches.
+#' @param seed Logical or integer. Controls reproducible RNG.
+#' @param packages Character vector of packages needed during evaluation.
+#' @param name Optional label.
 #'
-#' @return An execution-spec object of class `likelihood_execution_serial`.
+#' @return An object of class `likelihood_execution_serial`.
 #' @export
 serial_spec <- function(R,
                         seed = TRUE,
                         packages = character(),
                         name = "serial") {
 
-  # ---- validation ----
-  if (missing(R) || !is.numeric(R) || R < 1)
-    stop("For serial execution, `R` must be a positive integer.", call. = FALSE)
-
   x <- list(
     name     = name,
     mode     = "serial",
-    R        = as.integer(R),
+    R        = R,
     seed     = seed,
     packages = packages
   )
 
   class(x) <- c("likelihood_execution_serial", "likelihood_execution")
+  .validate_execution_serial(x)
   x
 }
 
 
-#' Parallel Execution Specification (foreach + %dofuture% backend)
+# ======================================================================
+# Parallel Execution Specification
+# ======================================================================
+
+#' Parallel Execution Specification (foreach + %dofuture%)
 #'
 #' @description
-#' Declares that branch computation should run in parallel via foreach with
-#' the `%dofuture%` operator. The user **must** set a future plan beforehand,
-#' e.g. `future::plan(multisession)` or `future::plan(cluster, workers = 8)`.
+#' Declares that Monte Carlo branches should run **in parallel**, where
+#' users must configure a `future` backend before calling `generate()`.
 #'
-#' @param num_workers Integer. Number of workers (e.g. CPU cores, cluster nodes).
-#' @param chunk_size Integer. Workload chunk size per worker, default = 1.
-#' @param seed Logical or integer controlling reproducible RNG. Default = TRUE.
-#' @param packages Character vector of package names required on workers.
-#' @param name Optional label, defaults to "parallel".
+#' Total branches is:
 #'
-#' @return An execution-spec object of class `likelihood_execution_parallel`.
+#' \deqn{
+#' R = \text{num\_workers} \times \text{chunk\_size}.
+#' }
+#'
+#' @param num_workers Positive integer. Number of workers.
+#' @param chunk_size Positive integer. Batch size per worker.
+#' @param seed Logical or integer. RNG configuration.
+#' @param packages Character vector.
+#' @param name Optional label.
+#'
+#' @return An object of class `likelihood_execution_parallel`.
 #' @export
 parallel_spec <- function(num_workers,
                           chunk_size = 1L,
@@ -58,35 +65,73 @@ parallel_spec <- function(num_workers,
                           packages = character(),
                           name = "parallel") {
 
-  # ---- validation ----
-  if (missing(num_workers) || !is.numeric(num_workers) || num_workers < 1)
-    stop("`num_workers` must be a positive integer.", call. = FALSE)
-
-  if (!is.numeric(chunk_size) || chunk_size < 1)
-    stop("`chunk_size` must be >= 1.", call. = FALSE)
-
   x <- list(
     name        = name,
     mode        = "parallel",
-    num_workers = as.integer(num_workers),
-    chunk_size  = as.integer(chunk_size),
+    num_workers = num_workers,
+    chunk_size  = chunk_size,
     seed        = seed,
     packages    = packages
   )
 
   class(x) <- c("likelihood_execution_parallel", "likelihood_execution")
+  .validate_execution_parallel(x)
   x
 }
 
 
 # ======================================================================
-# Print Methods
+# INTERNAL VALIDATORS
+# ======================================================================
+
+#' @keywords internal
+.validate_execution_serial <- function(x) {
+
+  if (is.null(x$R) || !is.numeric(x$R) || length(x$R) != 1 || x$R < 1)
+    stop("`R` must be a positive integer for serial_spec().", call. = FALSE)
+
+  if (!is.logical(x$seed) && !is.numeric(x$seed))
+    stop("`seed` must be logical or numeric.", call. = FALSE)
+
+  if (!is.character(x$packages))
+    stop("`packages` must be a character vector.", call. = FALSE)
+
+  invisible(x)
+}
+
+#' @keywords internal
+.validate_execution_parallel <- function(x) {
+
+  if (is.null(x$num_workers) ||
+      !is.numeric(x$num_workers) ||
+      length(x$num_workers) != 1 ||
+      x$num_workers < 1)
+    stop("`num_workers` must be a positive integer.", call. = FALSE)
+
+  if (is.null(x$chunk_size) ||
+      !is.numeric(x$chunk_size) ||
+      length(x$chunk_size) != 1 ||
+      x$chunk_size < 1)
+    stop("`chunk_size` must be a positive integer.", call. = FALSE)
+
+  if (!is.logical(x$seed) && !is.numeric(x$seed))
+    stop("`seed` must be logical or numeric.", call. = FALSE)
+
+  if (!is.character(x$packages))
+    stop("`packages` must be a character vector.", call. = FALSE)
+
+  invisible(x)
+}
+
+
+# ======================================================================
+# PRINT METHODS
 # ======================================================================
 
 #' @export
 print.likelihood_execution_serial <- function(x, ...) {
   cat("# Execution Mode: SERIAL\n")
-  cat("- R (branches): ", x$R, "\n", sep = "")
+  cat("- Branches (R): ", x$R, "\n", sep = "")
   cat("- Seed:         ", x$seed, "\n", sep = "")
   cat("- Packages:     ", paste(x$packages, collapse = ", "), "\n", sep = "")
   invisible(x)
@@ -95,21 +140,12 @@ print.likelihood_execution_serial <- function(x, ...) {
 #' @export
 print.likelihood_execution_parallel <- function(x, ...) {
   cat("# Execution Mode: PARALLEL (foreach + %dofuture%)\n")
-  cat("- Workers:   ", x$num_workers, "\n", sep = "")
-  cat("- Chunk size:", x$chunk_size, "\n", sep = "")
-  cat("- Seed:      ", x$seed, "\n", sep = "")
-  cat("- Packages:  ", paste(x$packages, collapse = ", "), "\n", sep = "")
+  cat("- Workers:    ", x$num_workers, "\n", sep = "")
+  cat("- Chunk size: ", x$chunk_size, "\n", sep = "")
+  cat("- Seed:       ", x$seed, "\n", sep = "")
+  cat("- Packages:   ", paste(x$packages, collapse = ", "), "\n", sep = "")
   invisible(x)
 }
 
-#' @keywords internal
-compute_num_branches <- function(exec) {
-  if (inherits(exec, "likelihood_execution_serial"))
-    return(exec$R)
 
-  if (inherits(exec, "likelihood_execution_parallel"))
-    return(exec$num_workers * exec$chunk_size)
-
-  stop("Unknown execution specification.", call. = FALSE)
-}
 

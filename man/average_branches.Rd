@@ -7,14 +7,23 @@
 average_branches(branches)
 }
 \arguments{
-\item{branches}{A list of data.frames, each with columns \code{psi} and \code{value}
-where \code{value} is log-likelihood evaluated at that psi.}
+\item{branches}{List of branch tibbles, each containing:
+\itemize{
+\item k     — integer ψ-grid index
+\item psi   — ψ-grid value
+\item value — log-likelihood ℓ_{k,r}
+}}
 }
 \value{
-data.frame with columns \code{psi} and \code{value} (integrated LL on log scale)
+tibble(psi, value) with attribute \code{"diagnostics"}
 }
 \description{
-Computes the Monte Carlo estimate of the integrated likelihood by
-averaging exponentiated branch log-likelihoods and returning results
-on the log scale using a numerically stable log-sum-exp operation.
+Computes the Monte Carlo integrated likelihood curve by averaging
+branch-specific log-likelihood values using the numerically-stable
+log-mean-exp identity:
+
+log L̂(ψ_k) = log( (1/R) Σ exp(ℓ_{k,r}) )
+
+Diagnostics (ESS, MC variance, outlier rate, etc.) are computed in a
+separate function and attached as an attribute: \code{attr(out, "diagnostics")}.
 }

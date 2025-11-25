@@ -2,28 +2,36 @@
 % Please edit documentation in R/spec-nuisance.R
 \name{nuisance_spec}
 \alias{nuisance_spec}
-\title{Nuisance parameter specification}
+\title{Specify Nuisance Parameter Sampling Strategy}
 \usage{
-nuisance_spec(
-  sampler,
-  init_strategy = c("random", "user", "from_model", "custom"),
-  name = NULL,
-  ...
-)
+nuisance_spec(init_guess_sampler, name = NULL, ...)
 }
 \arguments{
-\item{sampler}{Function(n) → proposal vector.}
+\item{init_guess_sampler}{A function generating an initial guess vector for nuisance parameters.
+Typically something like:
+\code{function(scale = 0.25) { ... }}.}
 
-\item{init_strategy}{String: "random", "user", "from_model", "custom".}
+\item{name}{Optional character label.}
 
-\item{name}{Optional label.}
-
-\item{...}{Extra fields.}
+\item{...}{Additional metadata stored under \verb{$extra}.}
 }
 \value{
-S3 object of class \code{likelihood_nuisance}.
+An S3 object of class \code{"likelihood_nuisance"}.
 }
 \description{
-Defines how nuisance parameter proposals are drawn and then
-projected into the constraint set ψ(θ) = ψ̂.
+Defines how \strong{initial guesses} for nuisance parameters (ω̂) are sampled
+before projection onto the constraint manifold ψ(θ) = ψ̂.
+
+This specification provides:
+\itemize{
+\item a user-supplied sampler for initial guesses,
+\item a lightweight container for metadata,
+\item validation of the sampler interface.
+}
+
+It is used internally by \code{calibrate_IL()} via:
+\itemize{
+\item \code{make_omega_hat_initgen(cal)}
+\item \code{make_omega_hat_sampler(cal)}
+}
 }

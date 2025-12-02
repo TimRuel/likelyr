@@ -1,81 +1,62 @@
 # ======================================================================
-# Nuisance Parameter Specification
+# Nuisance Specification (v3.0)
 # ======================================================================
 
-#' Specify Nuisance Parameter Sampling Strategy
+#' Specify Nuisance Components for Integrated Likelihood
 #'
 #' @description
-#' Defines how **initial guesses** for nuisance parameters (ω̂) are sampled
-#' before projection onto the constraint manifold ψ(θ) = ψ̂.
+#' Defines the nuisance-parameter contribution to the *expected*
+#' log-likelihood under the distribution of Y indexed by ω̂:
 #'
-#' This specification provides:
+#'   E[ log p(Y | theta); ω̂  ]
 #'
-#' * a user-supplied sampler for initial guesses,
-#' * a lightweight container for metadata,
-#' * validation of the sampler interface.
+#' used in integrated likelihood calculations. This includes:
+#'   • expected log-likelihood E_loglik(theta, omega_hat, data)
+#'   • optional gradient wrt theta
 #'
-#' It is used internally by `calibrate_IL()` via:
-#' * `make_omega_hat_initgen(cal)`
-#' * `make_omega_hat_sampler(cal)`
+#' Omega-hat sampling and initialization are handled separately
+#' (see eval-omega-hat.R).
 #'
-#' @param init_guess_sampler
-#'   A function generating an initial guess vector for nuisance parameters.
-#'   Typically something like:
-#'   \code{function(scale = 0.25) { ... }}.
+#' @param E_loglik      Function(theta, omega_hat, data) → numeric.
+#' @param E_loglik_grad Optional gradient wrt theta:
+#'                        function(theta, omega_hat, data) → vector.
+#' @param name          Optional name for display.
+#' @param ...           Additional fields stored under `$extra`.
 #'
-#' @param name
-#'   Optional character label.
-#'
-#' @param ...
-#'   Additional metadata stored under `$extra`.
-#'
-#' @return
-#' An S3 object of class `"likelihood_nuisance"`.
-#'
+#' @return A `nuisance_spec` object.
 #' @export
-nuisance_spec <- function(
-    init_guess_sampler,
-    name = NULL,
-    ...
-) {
-  # Construct object
+nuisance_spec <- function(E_loglik,
+                          E_loglik_grad = NULL,
+                          name = NULL,
+                          ...) {
+
   x <- list(
-    name               = name %||% "<nuisance>",
-    init_guess_sampler = init_guess_sampler,
-    extra              = list(...)
+    name          = name %||% "<nuisance>",
+    E_loglik      = E_loglik,
+    E_loglik_grad = E_loglik_grad,
+    extra         = list(...)
   )
 
-  # Assign class then validate
-  class(x) <- "likelihood_nuisance"
+  class(x) <- "nuisance_spec"
   .validate_nuisance_spec(x)
   x
 }
 
+# ----------------------------------------------------------------------
+# INTERNAL VALIDATOR
+# ----------------------------------------------------------------------
 
-# ======================================================================
-# INTERNAL VALIDATOR (not exported)
-# ======================================================================
-
-#' @keywords internal
 .validate_nuisance_spec <- function(x) {
 
-  # init_guess_sampler must be a function
-  if (!is.function(x$init_guess_sampler))
-    stop("`init_guess_sampler` must be a function.", call. = FALSE)
+  # E_loglik (required)
+  if (!is.function(x$E_loglik))
+    stop("E_loglik must be a function(theta, omega_hat, data).",
+         call. = FALSE)
 
-  # You may later check dimensions, positivity, etc.
-  invisible(x)
-}
+  # E_loglik_grad (optional)
+  if (!is.null(x$E_loglik_grad) && !is.function(x$E_loglik_grad))
+    stop("E_loglik_grad must be NULL or a function(theta, omega_hat, data).",
+         call. = FALSE)
 
-
-# ======================================================================
-# Print method
-# ======================================================================
-
-#' @export
-print.likelihood_nuisance <- function(x, ...) {
-  cat("# Nuisance Specification\n")
-  cat("- Name:                ", x$name, "\n", sep = "")
-  cat("- Has init sampler:    ", is.function(x$init_guess_sampler), "\n", sep = "")
   invisible(x)
 }

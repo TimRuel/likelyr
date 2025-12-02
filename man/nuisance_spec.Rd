@@ -2,36 +2,33 @@
 % Please edit documentation in R/spec-nuisance.R
 \name{nuisance_spec}
 \alias{nuisance_spec}
-\title{Specify Nuisance Parameter Sampling Strategy}
+\title{Specify Nuisance Components for Integrated Likelihood}
 \usage{
-nuisance_spec(init_guess_sampler, name = NULL, ...)
+nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 }
 \arguments{
-\item{init_guess_sampler}{A function generating an initial guess vector for nuisance parameters.
-Typically something like:
-\code{function(scale = 0.25) { ... }}.}
+\item{E_loglik}{Function(theta, omega_hat, data) → numeric.}
 
-\item{name}{Optional character label.}
+\item{E_loglik_grad}{Optional gradient wrt theta:
+function(theta, omega_hat, data) → vector.}
 
-\item{...}{Additional metadata stored under \verb{$extra}.}
+\item{name}{Optional name for display.}
+
+\item{...}{Additional fields stored under \verb{$extra}.}
 }
 \value{
-An S3 object of class \code{"likelihood_nuisance"}.
+A \code{nuisance_spec} object.
 }
 \description{
-Defines how \strong{initial guesses} for nuisance parameters (ω̂) are sampled
-before projection onto the constraint manifold ψ(θ) = ψ̂.
+Defines the nuisance-parameter contribution to the \emph{expected}
+log-likelihood under the distribution of Y indexed by ω̂:
 
-This specification provides:
-\itemize{
-\item a user-supplied sampler for initial guesses,
-\item a lightweight container for metadata,
-\item validation of the sampler interface.
-}
+E\link{ log p(Y | theta); ω̂  }
 
-It is used internally by \code{calibrate_IL()} via:
-\itemize{
-\item \code{make_omega_hat_initgen(cal)}
-\item \code{make_omega_hat_sampler(cal)}
-}
+used in integrated likelihood calculations. This includes:
+• expected log-likelihood E_loglik(theta, omega_hat, data)
+• optional gradient wrt theta
+
+Omega-hat sampling and initialization are handled separately
+(see eval-omega-hat.R).
 }

@@ -1,117 +1,98 @@
+# ======================================================================
+# eval-psi.R (v4.1)
+#
+# Fast evaluator for:
+#   θ*(ψ, ω̂) = argmax_θ E_{ω̂}[ log L(θ) ]
+#               subject to ψ(θ) = ψ_target
+#
+# Fully aligned with new API:
+#   • likelihood_spec() owns constraints:
+#         theta_lower, theta_upper, ineq, ineq_jac
+#   • optimizer_spec() owns solver settings
+#   • calibrate() binds data
+#
+# ======================================================================
+
+
 #' Build Fast ψ-Conditional Optimizer for Branch Evaluation (Internal)
 #'
 #' @description
-#' Constructs a **two-stage factory** used in integrated-likelihood
-#' branch evaluation.
-#'
-#' The returned function enables extremely fast repeated solutions of
+#' Returns a **two-stage factory** for extremely fast repeated solutions:
 #'
 #' \deqn{
 #'   \theta^{\*}(\psi, \omega)
-#'     = \arg\max_{\theta}
-#'         E\_{\omega}\big[\log L(\theta)\big]
+#'     = \arg\max_{\theta} E_{\omega}[ \log L(\theta) ]
 #'     \quad\text{s.t.}\quad
-#'       \psi(\theta) = \psi\_{\text{target}},
+#'       \psi(\theta)=\psi_{\mathrm{target}}.
 #' }
 #'
-#' where:
-#' * \eqn{\omega} is a nuisance draw on the ψ-constraint manifold,
-#' * the optimization is done with `nloptr::auglag()`,
-#' * only dynamic quantities change per evaluation (ψ_target, theta_init, ω̂),
-#' * **all static model components are captured once** in a locked environment.
-#'
-#' This produces a high-performance evaluator used by:
-#' * `branch_mode_solve()`
-#' * `walk_branch_side()`
-#' * `generate_branches()`
-#'
-#' and is central to the new IL API.
-#'
-#' ## Architecture
-#'
-#' `build_eval_psi_fun(cal)` returns:
+#' The returned object enables:
 #'
 #' \preformatted{
 #'   f1 <- build_eval_psi_fun(cal)
-#'   f2 <- f1(omega_hat)                  # fixes nuisance parameters
-#'   out <- f2(psi_target, theta_init)   # solves equality-constrained θ̂
+#'   f2 <- f1(omega_hat)
+#'   out <- f2(psi_target, theta_init)
 #' }
 #'
-#' The inner evaluator returns:
+#' @param cal A `calibrated_model` returned by `calibrate()`.
 #'
-#' \preformatted{
-#' list(
-#'   theta_hat  = solution vector,
-#'   branch_val = loglik(theta_hat)
-#' )
-#' }
-#'
-#' @param cal A list produced by `calibrate_IL()` containing:
-#'   * likelihood functions (`loglik`, `E_loglik`, `E_loglik_grad`)
-#'   * estimand functions (`psi_fn`, `psi_jac`)
-#'   * model constraints
-#'   * optimizer specification
-#'
-#' @details
-#' All static arguments to `nloptr::auglag()` (bounds, Jacobians,
-#' inequality constraints, solver settings) are stored in a private
-#' environment (`eval_env`).
-#'
-#' The environment also stores dynamic fields that update on each call:
-#' * `omega_hat`
-#' * `psi_target`
-#' * `x0`
-#'
-#' Permanent closures (`fn`, `gr`, `heq`) read from this environment,
-#' giving near-zero allocation overhead per optimization.
-#'
-#' @return
-#' A function:
+#' @return A nested function:
 #'
 #' \preformatted{
 #'   function(omega_hat) {
-#'       function(psi_target, theta_init) { ... }
+#'     function(psi_target, theta_init) { ... }
 #'   }
 #' }
-#'
-#' The inner function performs the constrained optimization and returns
-#' `list(theta_hat, branch_val)`.
 #'
 #' @keywords internal
 #' @noRd
 build_eval_psi_fun <- function(cal) {
 
   # ---------------------------------------------------------------
-  # Unpack workflow components
+  # Unpack model components
   # ---------------------------------------------------------------
-  model     <- cal$workflow$model
-  estimand  <- cal$workflow$estimand
-  optimizer <- cal$workflow$optimizer
+  lik      <- cal$likelihood
+  opt      <- cal$optimizer
 
   loglik        <- cal$loglik
   E_loglik      <- cal$E_loglik
   E_loglik_grad <- cal$E_loglik_grad
   psi_fn        <- cal$psi_fn
+  psi_jac       <- cal$psi_jac
 
   has_grad <- !is.null(E_loglik_grad)
 
   # ---------------------------------------------------------------
-  # eval_env: stores static + dynamic auglag arguments
+  # Likelihood-level constraints (correct names!)
+  # ---------------------------------------------------------------
+  theta_lower <- lik$theta_lower   # may be NULL
+  theta_upper <- lik$theta_upper   # may be NULL
+  ineq_fn     <- lik$ineq
+  ineq_jac_fn <- lik$ineq_jac
+
+  J <- lik$theta_dim
+
+  # Expand NULL bounds to ±Inf
+  if (is.null(theta_lower)) theta_lower <- rep(-Inf, J)
+  if (is.null(theta_upper)) theta_upper <- rep( Inf, J)
+
+  # ---------------------------------------------------------------
+  # Create closed-over environment for auglag()
   # ---------------------------------------------------------------
   eval_env <- list2env(
     list(
-      # Static auglag components
-      lower       = model$lower,
-      upper       = model$upper,
-      hin         = model$ineq,
-      hinjac      = model$ineq_jac,
-      heqjac      = cal$psi_jac,
-      localsolver = optimizer$localsolver,
-      localtol    = optimizer$localtol,
-      control     = optimizer$control,
+      # Static model constraints
+      lower       = theta_lower,
+      upper       = theta_upper,
+      hin         = ineq_fn,
+      hinjac      = ineq_jac_fn,
+      heqjac      = psi_jac,
+      localsolver = opt$localsolver,
+      localtol    = opt$localtol,
+      control     = opt$control,
       deprecatedBehavior = FALSE,
 
-      # Dynamic state
+      # Dynamic fields
       omega_hat   = NULL,
       psi_target  = NULL,
       x0          = NULL
@@ -120,33 +101,29 @@ build_eval_psi_fun <- function(cal) {
   )
 
   # ---------------------------------------------------------------
-  # Permanent closures (read dynamic values from eval_env)
+  # Permanent, minimal-overhead closures
   # ---------------------------------------------------------------
-
   eval_env$fn <- function(theta) {
     -E_loglik(theta, eval_env$omega_hat)
   }
 
   eval_env$gr <- if (has_grad) {
     function(theta) -E_loglik_grad(theta, eval_env$omega_hat)
-  } else {
-    NULL
-  }
+  } else NULL
 
   eval_env$heq <- function(theta) {
     psi_fn(theta) - eval_env$psi_target
   }
 
   # ---------------------------------------------------------------
-  # Return ω̂ → ψ-evaluation factory
+  # First stage: fix nuisance ω̂
   # ---------------------------------------------------------------
   function(omega_hat) {
 
-    # update dynamic value used by fn & gr
     eval_env$omega_hat <- omega_hat
 
     # -------------------------------------------------------------
-    # Return ψ_target → θ̂(ψ_target, ω̂) evaluator
+    # Second stage: solve θ*(ψ_target, ω̂)
     # -------------------------------------------------------------
     function(psi_target, theta_init) {
 

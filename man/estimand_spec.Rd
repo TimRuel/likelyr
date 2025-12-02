@@ -2,48 +2,44 @@
 % Please edit documentation in R/spec-estimand.R
 \name{estimand_spec}
 \alias{estimand_spec}
-\title{Specify an Estimand for Likelihood Workflows}
+\title{Specify an Estimand ψ(θ) for Profile / Integrated Likelihood}
 \usage{
 estimand_spec(
   psi_fn,
-  search_interval,
-  increment,
-  confidence_levels = c(0.9, 0.95, 0.99),
   psi_jac = NULL,
+  search_interval_fn,
+  increment,
+  confidence_levels,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{psi_fn}{Function(theta, data) → scalar ψ(θ)}
+\item{psi_fn}{function(theta, data) → numeric scalar ψ}
 
-\item{search_interval}{Length-2 numeric vector c(lower, upper)}
+\item{psi_jac}{Optional function(theta, data) → gradient vector}
 
-\item{increment}{Positive scalar giving ψ-grid spacing}
+\item{search_interval_fn}{function(data) → numeric vector length 2}
 
-\item{confidence_levels}{Numeric vector ⊂ (0,1)}
+\item{increment}{Positive numeric scalar}
 
-\item{psi_jac}{Optional gradient(theta, data)}
+\item{confidence_levels}{Numeric vector in (0, 1)}
 
-\item{name}{Optional label}
+\item{name}{Optional descriptive name}
 
-\item{...}{Additional metadata}
+\item{...}{Extra fields}
 }
 \value{
-An S3 object of class \code{"likelihood_estimand"}
+An \code{estimand_spec} object
 }
 \description{
-Defines the estimand \eqn{\psi(\theta)} and its optional gradient,
-together with the search grid and confidence-level structure used by
-both profile likelihood and Monte Carlo integrated likelihood.
+Defines:
+• ψ(θ)       — the estimand of interest
+• ∂ψ/∂θ      — optional analytic jacobian
+• search_interval_fn(data) → c(a, b)
+• increment  — step size for ψ grid during branch exploration
+• confidence_levels — confidence levels (0 < c < 1)
 
-The estimand specification determines:
-\itemize{
-\item the scalar mapping \eqn{\theta \mapsto \psi(\theta)},
-\item the search interval in which branch modes are located,
-\item the grid spacing used for branch sweeps,
-\item the set of confidence levels used in summaries and plots,
-\item the corresponding global tail probability
-\eqn{\alpha_\mathrm{target} = \min(1 - \text{confidence\_levels})}.
-}
+The interval function is a \emph{function of the data only}. If users want
+θ_MLE inside it, they must recompute θ_MLE internally from the data.
 }

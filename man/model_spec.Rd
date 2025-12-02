@@ -2,66 +2,61 @@
 % Please edit documentation in R/spec-model.R
 \name{model_spec}
 \alias{model_spec}
-\title{Model specification for likelihood workflows}
+\title{Create a Model Specification}
 \usage{
 model_spec(
-  loglik,
-  E_loglik,
-  param_dim,
-  E_loglik_grad = NULL,
-  theta_mle_fn = NULL,
-  lower = NULL,
-  upper = NULL,
-  ineq = NULL,
-  ineq_jac = NULL,
+  likelihood = NULL,
+  estimand = NULL,
+  nuisance = NULL,
+  optimizer = NULL,
+  execution = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{loglik}{Function(theta, data) → numeric loglik}
+\item{likelihood}{Optional likelihood_spec().}
 
-\item{E_loglik}{Function(theta, omega_hat, data) → expected loglik}
+\item{estimand}{Optional estimand_spec().}
 
-\item{param_dim}{Positive integer giving dimension of theta}
+\item{nuisance}{Optional nuisance_spec().}
 
-\item{E_loglik_grad}{Optional gradient(theta, omega_hat, data)}
+\item{optimizer}{Optional optimizer_spec().}
 
-\item{theta_mle_fn}{Optional function(data) → theta_mle}
+\item{execution}{Optional execution_spec().}
 
-\item{lower}{Optional numeric vector of length \code{param_dim}}
+\item{name}{Optional name for the model.}
 
-\item{upper}{Optional numeric vector of length \code{param_dim}}
-
-\item{ineq}{Optional inequality function(theta) ≤ 0}
-
-\item{ineq_jac}{Optional jacobian of \code{ineq}}
-
-\item{name}{Optional descriptive string}
-
-\item{...}{Additional fields stored in \verb{$extra}}
+\item{...}{Additional fields stored in \verb{$extra}.}
 }
 \value{
-A validated \code{likelihood_model} object
+A \code{model_spec} object.
 }
 \description{
-Defines a parametric likelihood model for profile or integrated
-likelihood workflows.
+A \code{model_spec} is a declarative container describing the 5 components
+required to compute profile or integrated likelihoods:
 
-A model must specify:
-\itemize{
-\item \code{loglik(theta, data)}
-\item \code{E_loglik(theta, omega_hat, data)}
-}
+• likelihood_spec()
+• estimand_spec()
+• nuisance_spec()   (optional for PL)
+• optimizer_spec()
+• execution_spec()
 
-Both functions must accept raw theta; any needed data is embedded
-via closures during workflow calibration.
+No computation occurs here. Calibration and likelihood generation are
+handled by \code{\link[=calibrate]{calibrate()}}, \code{\link[=integrate]{integrate()}}, and \code{\link[=profile]{profile()}}.
 
-Optional:
-\itemize{
-\item gradient of expected loglik \code{E_loglik_grad()}
-\item custom MLE initializer \code{theta_mle_fn(data)}
-\item box constraints (\code{lower}, \code{upper})
-\item inequality constraints (\code{ineq}, \code{ineq_jac})
-}
+You may construct a model all at once:
+
+model_spec(likelihood, estimand, nuisance, optimizer, execution)
+
+or incrementally using pipes:
+
+model_spec() |>
+add(likelihood_spec(...)) |>
+add(estimand_spec(...))   |>
+add(nuisance_spec(...))   |>
+add(optimizer_spec(...))  |>
+add(execution_spec(...))
+
+Validation occurs only when all required slots are filled.
 }

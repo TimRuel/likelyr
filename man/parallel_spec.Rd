@@ -13,26 +13,20 @@ parallel_spec(
 )
 }
 \arguments{
-\item{num_workers}{Positive integer. Number of workers.}
+\item{num_workers}{Positive integer number of workers.}
 
-\item{chunk_size}{Positive integer. Batch size per worker.}
+\item{chunk_size}{Positive integer chunk size per worker.}
 
-\item{seed}{Logical or integer. RNG configuration.}
+\item{seed}{Logical or integer.}
 
 \item{packages}{Character vector.}
 
 \item{name}{Optional label.}
 }
 \value{
-An object of class \code{likelihood_execution_parallel}.
+A \code{parallel_spec} (also inherits \code{execution_spec}).
 }
 \description{
-Declares that Monte Carlo branches should run \strong{in parallel}, where
-users must configure a \code{future} backend before calling \code{generate()}.
-
-Total branches is:
-
-\deqn{
-R = \text{num\_workers} \times \text{chunk\_size}.
-}
+Runs Monte Carlo computation \strong{in parallel} using a configured
+future backend. Total branches = num_workers * chunk_size.
 }

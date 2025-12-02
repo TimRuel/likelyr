@@ -2,45 +2,39 @@
 % Please edit documentation in R/spec-optimizer.R
 \name{optimizer_spec}
 \alias{optimizer_spec}
-\title{Specify Optimizer Settings for Constrained Likelihood Problems}
+\title{Specify Optimization Settings for nloptr::auglag}
 \usage{
 optimizer_spec(
   localsolver = "SLSQP",
-  localtol = 1e-06,
   control = list(),
+  box = list(lower = NULL, upper = NULL),
+  localtol = 1e-06,
   max_retries = 10,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{localsolver}{Character scalar. Local optimizer used by \code{auglag()}.
-Typically \code{"SLSQP"} (default) or \code{"NLOPT_LD_MMA"}, etc.}
+\item{localsolver}{Solver method used inside auglag (default: "SLSQP").}
 
-\item{localtol}{Numeric scalar. Tolerance for the local solver. Default \code{1e-6}.}
+\item{control}{List of nloptr options (passed to auglag).}
 
-\item{control}{A named list of parameters passed directly to \code{nloptr::auglag()}.}
+\item{box}{List(lower, upper) box constraints.}
 
-\item{max_retries}{Integer. Maximum number of attempts to restore monotonic branch
-descent by jittering initial guesses during branch sweeps.}
+\item{localtol}{Tolerance for local solver.}
 
-\item{name}{Optional human-readable label.}
+\item{max_retries}{Number of retries for the local solver.}
 
-\item{...}{Additional metadata stored under \verb{$extra}.}
+\item{name}{Optional descriptive name.}
+
+\item{...}{Extra fields.}
 }
 \value{
-An S3 object of class \code{"likelihood_optimizer"}.
+An \code{optimizer_spec} object.
 }
 \description{
-Defines configuration parameters for \code{nloptr::auglag()}, which is used
-internally to solve constrained optimization problems of the form
-\eqn{\thetâ(\psi, \omegâ)} during branch expansion and during ω̂ sampling.
-
-This object governs:
-\itemize{
-\item the local solver used by \code{nloptr},
-\item tolerance levels,
-\item control list passed to \code{auglag()},
-\item retry behavior when monotonicity fails in branch sweeps.
-}
+Defines the optimization policy for theta, specifically targeting
+\code{nloptr::auglag()}. The arguments are ordered to match the typical
+workflow: solver choice → control options → constraints →
+initialization → retry behavior → naming.
 }

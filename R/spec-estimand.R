@@ -1,117 +1,86 @@
 # ======================================================================
-# Estimand Specification
+# Estimand Specification (v3.0)
 # ======================================================================
 
-#' Specify an Estimand for Likelihood Workflows
+#' Specify an Estimand ψ(θ) for Profile / Integrated Likelihood
 #'
 #' @description
-#' Defines the estimand \eqn{\psi(\theta)} and its optional gradient,
-#' together with the search grid and confidence-level structure used by
-#' both profile likelihood and Monte Carlo integrated likelihood.
+#' Defines:
+#'   • ψ(θ)       — the estimand of interest
+#'   • ∂ψ/∂θ      — optional analytic jacobian
+#'   • search_interval_fn(data) → c(a, b)
+#'   • increment  — step size for ψ grid during branch exploration
+#'   • confidence_levels — confidence levels (0 < c < 1)
 #'
-#' The estimand specification determines:
+#' The interval function is a *function of the data only*. If users want
+#' θ_MLE inside it, they must recompute θ_MLE internally from the data.
 #'
-#' * the scalar mapping \eqn{\theta \mapsto \psi(\theta)},
-#' * the search interval in which branch modes are located,
-#' * the grid spacing used for branch sweeps,
-#' * the set of confidence levels used in summaries and plots,
-#' * the corresponding global tail probability
-#'   \eqn{\alpha_\mathrm{target} = \min(1 - \text{confidence\_levels})}.
+#' @param psi_fn             function(theta, data) → numeric scalar ψ
+#' @param psi_jac            Optional function(theta, data) → gradient vector
+#' @param search_interval_fn function(data) → numeric vector length 2
+#' @param increment          Positive numeric scalar
+#' @param confidence_levels  Numeric vector in (0, 1)
+#' @param name               Optional descriptive name
+#' @param ...                Extra fields
 #'
-#' @param psi_fn Function(theta, data) → scalar ψ(θ)
-#' @param search_interval Length-2 numeric vector c(lower, upper)
-#' @param increment Positive scalar giving ψ-grid spacing
-#' @param confidence_levels Numeric vector ⊂ (0,1)
-#' @param psi_jac Optional gradient(theta, data)
-#' @param name Optional label
-#' @param ... Additional metadata
-#'
-#' @return An S3 object of class `"likelihood_estimand"`
+#' @return An `estimand_spec` object
 #' @export
-estimand_spec <- function(
-    psi_fn,
-    search_interval,
-    increment,
-    confidence_levels = c(0.90, 0.95, 0.99),
-    psi_jac = NULL,
-    name = NULL,
-    ...
-) {
-  # Construct list
+estimand_spec <- function(psi_fn,
+                          psi_jac = NULL,
+                          search_interval_fn,
+                          increment,
+                          confidence_levels,
+                          name = NULL,
+                          ...) {
+
   x <- list(
-    name              = name %||% "<estimand>",
-    psi_fn            = psi_fn,
-    psi_jac           = psi_jac,
-    search_interval   = search_interval,
-    increment         = increment,
-    confidence_levels = confidence_levels,
-    alpha_target      = min(1 - confidence_levels),
-    extra             = list(...)
+    name               = name %||% "<estimand>",
+    psi_fn             = psi_fn,
+    psi_jac            = psi_jac,
+    search_interval_fn = search_interval_fn,
+    increment          = increment,
+    confidence_levels  = confidence_levels,
+    extra              = list(...)
   )
 
-  # Assign class then validate
-  class(x) <- "likelihood_estimand"
+  class(x) <- "estimand_spec"
   .validate_estimand_spec(x)
   x
 }
 
+# ----------------------------------------------------------------------
+# INTERNAL VALIDATOR
+# ----------------------------------------------------------------------
 
-# ======================================================================
-# INTERNAL VALIDATOR (not exported)
-# ======================================================================
-
-#' @keywords internal
 .validate_estimand_spec <- function(x) {
 
-  # ψ function
+  # ψ(θ)
   if (!is.function(x$psi_fn))
-    stop("`psi_fn` must be a function(theta, data).", call. = FALSE)
+    stop("psi_fn must be a function(theta, data).", call. = FALSE)
 
-  # Search interval
-  si <- x$search_interval
-  if (!is.numeric(si) || length(si) != 2 || any(!is.finite(si)))
-    stop("`search_interval` must be a finite numeric vector of length 2.",
-         call. = FALSE)
-  if (si[1] >= si[2])
-    stop("`search_interval` must satisfy lower < upper.", call. = FALSE)
-
-  # Increment
-  if (!is.numeric(x$increment) ||
-      length(x$increment) != 1 ||
-      x$increment <= 0)
-    stop("`increment` must be a strictly positive scalar.", call. = FALSE)
-
-  # psi_jac
+  # jacobian
   if (!is.null(x$psi_jac) && !is.function(x$psi_jac))
-    stop("`psi_jac` must be a function(theta, data) if supplied.",
-         call. = FALSE)
+    stop("psi_jac must be NULL or a function(theta, data).", call. = FALSE)
 
-  # Confidence levels
+  # interval: must be a *function(data)*, cannot validate contents here
+  if (!is.function(x$search_interval_fn))
+    stop("search_interval_fn must be a function(data).", call. = FALSE)
+
+  # increment
+  inc <- x$increment
+  if (!is.numeric(inc) || length(inc) != 1 || inc <= 0)
+    stop("increment must be a positive numeric scalar.", call. = FALSE)
+
+  # confidence levels
   cl <- x$confidence_levels
-  if (!is.numeric(cl) ||
-      any(cl <= 0 | cl >= 1))
-    stop("`confidence_levels` must be strictly inside (0,1).",
-         call. = FALSE)
+  if (!is.numeric(cl))
+    stop("confidence_levels must be numeric.", call. = FALSE)
 
-  invisible(x)
-}
+  if (any(cl <= 0 | cl >= 1))
+    stop("All confidence_levels must lie strictly between 0 and 1.", call. = FALSE)
 
+  if (anyDuplicated(cl))
+    stop("confidence_levels must not contain duplicates.", call. = FALSE)
 
-# ======================================================================
-# Print method
-# ======================================================================
-
-#' @export
-print.likelihood_estimand <- function(x, ...) {
-  cat("# Estimand Specification\n")
-  cat("- Name:                ", x$name, "\n", sep = "")
-  cat("- Confidence levels:   ",
-      paste0(100 * x$confidence_levels, "%", collapse = ", "),
-      "\n", sep = "")
-  cat("- alpha_target:        ", x$alpha_target, "\n", sep = "")
-  cat("- search_interval:     ",
-      paste(x$search_interval, collapse = "  "), "\n", sep = "")
-  cat("- increment:           ", x$increment, "\n", sep = "")
-  cat("- Has psi_jac:         ", !is.null(x$psi_jac), "\n", sep = "")
   invisible(x)
 }

@@ -2,51 +2,26 @@
 % Please edit documentation in R/likelihood-generate.R
 \name{generate}
 \alias{generate}
-\alias{generate.default}
-\title{Generate Integrated or Profile Likelihood}
+\title{Generate Likelihood Output (Profile or Integrated)}
 \usage{
 generate(cal, ...)
-
-\method{generate}{default}(cal, ...)
 }
 \arguments{
-\item{cal}{A calibration object produced by \code{\link[=calibrate]{calibrate()}}, with class
-\code{"IL_calibration"} or \code{"PL_calibration"}.}
+\item{cal}{A calibrated_model.}
 
-\item{...}{Additional arguments passed to methods.}
+\item{...}{Additional arguments passed to lower-level engines.}
 }
 \value{
-A likelihood object of class:
-\itemize{
-\item \code{"likelihood_integrated"} for IL
-\item \code{"likelihood_profile"} for PL
-}
-
-containing:
-\describe{
-\item{il_curve / pl_curve}{A data frame of ψ vs. log-likelihood}
-\item{branches}{List of branch data frames}
-\item{omega_draws}{For IL only: nuisance draws ω̂}
-\item{theta_mle}{Global MLE of the model parameters}
-\item{psi_mle}{MLE of the estimand ψ}
-\item{workflow}{Original workflow}
-\item{calibration}{Calibration object \code{cal}}
-}
+An integrated_likelihood or profile_likelihood object.
 }
 \description{
-Generic user-facing entry point for likelihood generation.
+After running:
+cal <- calibrate(model, data)
 
-After a workflow has been calibrated with \code{\link[=calibrate]{calibrate()}}, calling:
+the user calls:
+out <- generate(cal)
 
-\preformatted{
-  out <- generate(cal)
-}
-
-will dispatch to:
-\itemize{
-\item \code{\link[=generate.IL_calibration]{generate.IL_calibration()}} for integrated likelihood
-\item \code{\link[=generate.PL_calibration]{generate.PL_calibration()}} for profile likelihood
-}
-
-depending on the class of \code{cal}.
+which dispatches based on \code{cal$type}:
+• "IL" → integrated likelihood
+• "PL" → profile likelihood
 }

@@ -7,19 +7,17 @@
 serial_spec(R, seed = TRUE, packages = character(), name = "serial")
 }
 \arguments{
-\item{R}{Positive integer. Number of Monte Carlo branches.}
+\item{R}{Positive integer: number of Monte Carlo branches.}
 
-\item{seed}{Logical or integer. Controls reproducible RNG.}
+\item{seed}{Logical or integer seed.}
 
-\item{packages}{Character vector of packages needed during evaluation.}
+\item{packages}{Character vector of required packages.}
 
-\item{name}{Optional label.}
+\item{name}{Optional name/label.}
 }
 \value{
-An object of class \code{likelihood_execution_serial}.
+A \code{serial_spec} (also inherits \code{execution_spec}).
 }
 \description{
-Declares that Monte Carlo branch computations should run \strong{in serial}
-using a single R process. This mode still uses \code{foreach} internally,
-but no parallel workers are spawned.
+Runs Monte Carlo computation \strong{in serial}. No parallel workers are used.
 }

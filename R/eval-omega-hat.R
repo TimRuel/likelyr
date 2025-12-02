@@ -1,201 +1,208 @@
 # ======================================================================
-# eval-omega-hat.R
+# eval-omega-hat.R (v5.0)
 #
-# Utilities for sampling nuisance parameters ω̂ that satisfy the
-# integrated-likelihood constraint ψ(ω̂) = ψ_MLE.
+# Improvements:
+#   • Multi-scale perturbations (local + global)
+#   • Tangent-space dispersion using an orthonormal basis
+#   • Optional recentering around previous ω̂ samples
+#   • Full likelihood_spec() constraint support (bounds + ineq)
 #
-# This file exports two factories:
-#
-#   1. make_omega_hat_initgen(cal)
-#        → returns a function(scale) → initial_guess
-#
-#   2. make_omega_hat_sampler(cal)
-#        → returns a function(init_guess) → omega_hat satisfying ψ(ω̂)=ψ_MLE
-#
-# These are created inside calibrate_IL() and stored under:
-#      cal$il$generate_init
-#      cal$il$sample_omega_hat
-#
+# This dramatically improves geometric coverage of the manifold
+# ψ(ω̂) = ψ_MLE before solving with nloptr::auglag().
 # ======================================================================
 
 
-#' Initial-Guess Generator for ω̂ Manifold Solver (Internal)
+# ======================================================================
+# Helper: Build Tangent-Space Basis
+# ======================================================================
+
+#' Compute an orthonormal basis for the tangent space at theta_mle
 #'
 #' @description
-#' Constructs a function that generates **good initial guesses** for solving
-#' the constraint
+#' Given a gradient g = ∇ψ(θ_MLE), we find an orthonormal basis B
+#' for the subspace:
+#'     { v ∈ R^J : gᵀ v = 0 }
 #'
-#' \deqn{\psi(\omega) = \psi_{\mathrm{MLE}}}
-#'
-#' via `nloptr::auglag()`.
-#' The generated initial guesses:
-#' * start near \eqn{\theta_{\mathrm{MLE}}},
-#' * are perturbed in directions **tangent** to the constraint manifold,
-#' * maintain **positivity**, important for Poisson/NB/GLM-rate models.
-#'
-#' This dramatically improves convergence and Monte Carlo sampling stability.
-#'
-#' @param cal A calibration list created by `calibrate_IL()`, containing
-#'   `theta_mle` and `psi_jac` (if provided by the estimand).
-#'
-#' @return
-#' A function of the form:
-#' \preformatted{
-#'   f(scale = 0.25) -> numeric vector (initial_guess)
-#' }
-#' where `scale` controls the magnitude of the perturbations.
+#' If no ψ_jac exists, returns NULL.
 #'
 #' @keywords internal
 #' @noRd
+.tangent_basis <- function(theta_mle, psi_jac) {
+
+  if (is.null(psi_jac)) return(NULL)
+
+  g <- psi_jac(theta_mle)
+  if (!is.numeric(g)) return(NULL)
+
+  g <- as.numeric(g)
+  J <- length(g)
+
+  if (!all(is.finite(g)) || sqrt(sum(g * g)) == 0) return(NULL)
+
+  # normalize gradient
+  g <- g / sqrt(sum(g * g))
+
+  # Build J x J matrix whose first column is g, others standard basis
+  M <- cbind(g, diag(J)[, -1, drop = FALSE])   # J x J
+
+  # QR decomposition: Q = [g | tangent basis]
+  Q <- qr.Q(qr(M), complete = TRUE)            # J x J
+
+  # Tangent basis = all columns except the first
+  B <- Q[, -1, drop = FALSE]                   # J x (J-1)
+
+  B
+}
+
+
+# ======================================================================
+# 1. Initial-Guess Generator
+# ======================================================================
+
+#' Construct Advanced Initial-Guess Generator for ω̂ Sampling
+#'
+#' @description
+#' This generator provides **geometrically diverse** initial guesses by:
+#'
+#'   • Combining *local* and *global* tangent-space perturbations
+#'   • Using an orthonormal tangent basis at θ_MLE
+#'   • Occasionally recentering around a previously sampled ω̂
+#'   • Respecting model bounds (θ_lower, θ_upper)
+#'
+#' The result is far more uniform exploration of the manifold
+#' ψ(ω̂) = ψ_MLE before projecting with auglag().
+#'
+#' @param cal A `calibrated_model`.
+#'
+#' @return A function \code{f(history, p_recenter = 0.1)} returning
+#'         high-dispersion initial guesses.
+#' @export
 make_omega_hat_initgen <- function(cal) {
 
-  theta_mle <- cal$theta_mle      # full parameter vector
-  psi_jac   <- cal$psi_jac        # possibly NULL
-  has_jac   <- !is.null(psi_jac)
+  theta_mle <- cal$theta_mle
+  psi_jac   <- cal$psi_jac
+  lik       <- cal$likelihood
 
-  function(scale = 0.25) {
+  J      <- lik$theta_dim
+  lower  <- lik$theta_lower %||% rep(-Inf, J)
+  upper  <- lik$theta_upper %||% rep( Inf,  J)
 
-    P <- length(theta_mle)
+  # Build tangent-space basis at θ_MLE (may be NULL)
+  B <- .tangent_basis(theta_mle, psi_jac)
 
-    # -------- Base perturbation: log-normal jitter --------------------
-    jitter <- rlnorm(P, meanlog = 0, sdlog = scale) - 1
-    candidate <- theta_mle * (1 + jitter)
+  # scales for multi-scale perturbations
+  local_scale  <- 0.15
+  global_scale <- 0.60
 
-    # -------- Tangential perturbation via ψ-gradient projection -------
-    if (has_jac) {
+  function(history = NULL, p_recenter = 0.10) {
 
-      g <- psi_jac(theta_mle)  # gradient of ψ wrt θ at θ_MLE
-
-      # Only proceed if jacobian dimension matches parameter dimension
-      if (is.numeric(g) && length(g) == P) {
-
-        g_norm <- sqrt(sum(g^2))
-
-        if (is.finite(g_norm) && g_norm > 0) {
-
-          g <- g / g_norm      # normalize
-
-          # random direction
-          r <- rnorm(P)
-
-          # remove component along ψ-gradient
-          r <- r - sum(r * g) * g
-
-          # small tangent-space displacement
-          candidate <- candidate + scale * 0.2 * r
-        }
-      }
+    # ----------------------------------------------------------
+    # 1. Choose center: θ_MLE OR a previous ω̂
+    # ----------------------------------------------------------
+    if (!is.null(history) && runif(1) < p_recenter) {
+      center <- history[[sample.int(length(history), 1)]]
+    } else {
+      center <- theta_mle
     }
 
-    # -------- Positivity enforcement (safe default for GLM families) ---
-    candidate[candidate <= 1e-12] <- 1e-6
+    # ----------------------------------------------------------
+    # 2. Base perturbation in tangent directions (if B exists)
+    # ----------------------------------------------------------
+    if (!is.null(B)) {
 
-    candidate
+      # choose local vs global
+      if (runif(1) < 0.70) {
+        s <- local_scale
+      } else {
+        s <- global_scale
+      }
+
+      # tangent coefficients ~ Normal(0, s^2 I)
+      a <- rnorm(ncol(B), sd = s)
+
+      candidate <- center + c(B %*% a)
+
+    } else {
+
+      # fallback: multiplicative jitter if tangent info unavailable
+      jitter    <- rlnorm(J, meanlog = 0, sdlog = 0.25) - 1
+      candidate <- center * (1 + jitter)
+    }
+
+    # ----------------------------------------------------------
+    # 3. Clip to model bounds
+    # ----------------------------------------------------------
+    candidate <- pmin(pmax(candidate, lower), upper)
+
+    as.numeric(candidate)
   }
 }
 
 
+# ======================================================================
+# 2. Omega-Hat Sampler
+# ======================================================================
 
-#' Omega-Hat Sampler for ψ(ω̂) = ψ_MLE (Internal)
+#' Construct ω̂ Sampler for ψ(ω̂) = ψ_MLE
 #'
 #' @description
-#' Constructs a **fast manifold sampler** that solves the constraint
+#' Solves the manifold equation:
+#'      ψ(ω̂) - ψ_MLE = 0
+#' using `nloptr::auglag()` and incorporating:
 #'
-#' \deqn{\psi(\omega) - \psi_{\mathrm{MLE}} = 0}
+#'   • θ_lower / θ_upper bounds
+#'   • inequality constraints h(θ) ≤ 0
+#'   • Jacobians for constraints (if supplied)
+#'   • optimizer_spec settings only for SLSQP/local solver
 #'
-#' using `nloptr::auglag()` with a **dummy objective** (`0` everywhere).
+#' @param cal A `calibrated_model`.
 #'
-#' This produces nuisance-parameter draws ω̂ that lie **exactly on** the
-#' integrated-likelihood constraint manifold.
-#'
-#' Performance notes:
-#' * Uses a **zero-closure** design: objective, constraints, and their Jacobians
-#'   are stored permanently in `eval_env` for maximum speed.
-#' * Only the initial guess `x0` changes per call.
-#'
-#' @param cal A list returned by `calibrate_IL()`, containing:
-#'   `psi_fn`, `psi_mle`, and model/optimizer specifications.
-#'
-#' @return
-#' A function of the form:
-#' \preformatted{
-#'   f(init_guess) -> omega_hat
-#' }
-#' where the returned `omega_hat` satisfies \eqn{\psi(\omega)=\psi_{\mathrm{MLE}}}.
-#'
-#' @keywords internal
-#' @noRd
+#' @return A function \code{f(init_guess)} returning ω̂.
+#' @export
 make_omega_hat_sampler <- function(cal) {
-  # Force evaluation of cal so we close over its current value,
-  # not a lazy promise from calibrate_IL().
   force(cal)
 
   local({
 
-    psi_fn   <- cal$psi_fn          # θ -> ψ(θ)
-    psi_mle  <- cal$psi_mle
-    wf       <- cal$workflow
-    model    <- wf$model
-    optimizer <- wf$optimizer
-    estimand  <- wf$estimand
+    lik     <- cal$likelihood
+    psi_fn  <- cal$psi_fn
+    psi_mle <- cal$psi_mle
+    opt     <- cal$optimizer
 
-    # Dummy objective (we only care about the constraint)
-    fn0    <- function(theta) 0
+    J <- lik$theta_dim
+
+    lower <- lik$theta_lower %||% rep(-Inf, J)
+    upper <- lik$theta_upper %||% rep( Inf, J)
+
+    hin_fn    <- lik$ineq
+    hinjac_fn <- lik$ineq_jac
+
+    fn0 <- function(theta) 0
     heq_fn <- function(theta) psi_fn(theta) - psi_mle
+    heqjac <- cal$psi_jac
 
-    # Environment holding all auglag args (static + dynamic)
-    eval_env <- list2env(
-      list(
-        # Static model constraints
-        lower       = model$lower,
-        upper       = model$upper,
-        hin         = model$ineq,
-        hinjac      = model$ineq_jac,
-
-        # Equality constraint Jacobian, if present
-        heqjac      = cal$psi_jac,
-
-        # Optimizer config
-        localsolver = optimizer$localsolver,
-        localtol    = optimizer$localtol,
-        control     = optimizer$control,
-        deprecatedBehavior = FALSE,
-
-        # Dynamic: updated per call
-        x0          = NULL
-      ),
-      parent = emptyenv()
-    )
-
-    # Permanent, zero-closure callbacks
-    eval_env$fn  <- fn0
-    eval_env$gr  <- NULL
-    eval_env$heq <- heq_fn
-
-    # ----------------------------------------------------------
-    # Return sampler: init_guess -> omega_hat satisfying ψ(ω̂)=ψ_MLE
-    # ----------------------------------------------------------
     function(init_guess) {
 
-      eval_env$x0 <- init_guess
-
       res <- nloptr::auglag(
-        x0          = eval_env$x0,
-        fn          = eval_env$fn,
-        gr          = eval_env$gr,
-        heq         = eval_env$heq,
-        heqjac      = eval_env$heqjac,
-        hin         = eval_env$hin,
-        hinjac      = eval_env$hinjac,
-        lower       = eval_env$lower,
-        upper       = eval_env$upper,
-        localsolver = eval_env$localsolver,
-        localtol    = eval_env$localtol,
-        control     = eval_env$control,
-        deprecatedBehavior = eval_env$deprecatedBehavior
+        x0          = init_guess,
+        fn          = fn0,
+        heq         = heq_fn,
+        heqjac      = heqjac,
+        hin         = hin_fn,
+        hinjac      = hinjac_fn,
+        lower       = lower,
+        upper       = upper,
+        localsolver = opt$localsolver,
+        localtol    = opt$localtol,
+        control     = opt$control,
+        deprecatedBehavior = FALSE
       )
 
       res$par
     }
   })
 }
+
+# ======================================================================
+# END
+# ======================================================================

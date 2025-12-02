@@ -26,11 +26,11 @@
 #' @keywords internal
 compute_num_branches <- function(execution) {
 
-  if (inherits(execution, "likelihood_execution_serial")) {
+  if (inherits(execution, "serial_spec")) {
 
     R <- execution$R
 
-  } else if (inherits(execution, "likelihood_execution_parallel")) {
+  } else if (inherits(execution, "parallel_spec")) {
 
     R <- execution$num_workers * execution$chunk_size
 
@@ -48,7 +48,6 @@ compute_num_branches <- function(execution) {
 
   as.integer(R)
 }
-
 
 
 # ======================================================================

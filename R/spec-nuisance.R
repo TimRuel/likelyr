@@ -8,22 +8,19 @@
 #' Defines the nuisance-parameter contribution to the *expected*
 #' log-likelihood under the distribution of Y indexed by ω̂:
 #'
-#'   E[ log p(Y | theta); ω̂  ]
+#'   E[ log p(Y | theta); ω̂ ]
 #'
-#' used in integrated likelihood calculations. This includes:
+#' Required for integrated likelihood calculations. Includes:
 #'   • expected log-likelihood E_loglik(theta, omega_hat, data)
 #'   • optional gradient wrt theta
 #'
-#' Omega-hat sampling and initialization are handled separately
-#' (see eval-omega-hat.R).
+#' @param E_loglik      Function(theta, omega_hat, data) → numeric
+#' @param E_loglik_grad Optional gradient function(theta, omega_hat, data)
+#' @param name          Optional descriptive name
+#' @param ...           Extra stored fields
 #'
-#' @param E_loglik      Function(theta, omega_hat, data) → numeric.
-#' @param E_loglik_grad Optional gradient wrt theta:
-#'                        function(theta, omega_hat, data) → vector.
-#' @param name          Optional name for display.
-#' @param ...           Additional fields stored under `$extra`.
-#'
-#' @return A `nuisance_spec` object.
+#' @return A `nuisance_spec` object with classes:
+#'         c("nuisance_spec", "likelyr_spec")
 #' @export
 nuisance_spec <- function(E_loglik,
                           E_loglik_grad = NULL,
@@ -37,7 +34,10 @@ nuisance_spec <- function(E_loglik,
     extra         = list(...)
   )
 
-  class(x) <- "nuisance_spec"
+  # unified class constructor
+  x <- new_nuisance_spec(x)
+
+  # validate and return
   .validate_nuisance_spec(x)
   x
 }
@@ -48,15 +48,27 @@ nuisance_spec <- function(E_loglik,
 
 .validate_nuisance_spec <- function(x) {
 
-  # E_loglik (required)
+  # E_loglik required
   if (!is.function(x$E_loglik))
     stop("E_loglik must be a function(theta, omega_hat, data).",
          call. = FALSE)
 
-  # E_loglik_grad (optional)
+  # optional gradient
   if (!is.null(x$E_loglik_grad) && !is.function(x$E_loglik_grad))
     stop("E_loglik_grad must be NULL or a function(theta, omega_hat, data).",
          call. = FALSE)
 
   invisible(x)
 }
+
+# ------------------------------------------------------
+# PRINT METHOD
+# ------------------------------------------------------
+
+#' @export
+print.nuisance_spec <- function(x, ...) {
+  cat("# Nuisance Specification\n")
+  cat("- Name: ", x$name, "\n", sep = "")
+  invisible(x)
+}
+

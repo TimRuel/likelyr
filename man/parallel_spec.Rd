@@ -12,21 +12,9 @@ parallel_spec(
   name = "parallel"
 )
 }
-\arguments{
-\item{num_workers}{Positive integer number of workers.}
-
-\item{chunk_size}{Positive integer chunk size per worker.}
-
-\item{seed}{Logical or integer.}
-
-\item{packages}{Character vector.}
-
-\item{name}{Optional label.}
-}
 \value{
-A \code{parallel_spec} (also inherits \code{execution_spec}).
+A \code{parallel_spec} object.
 }
 \description{
-Runs Monte Carlo computation \strong{in parallel} using a configured
-future backend. Total branches = num_workers * chunk_size.
+Parallel Execution Specification (foreach + \%dofuture\%)
 }

@@ -7,28 +7,25 @@
 nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 }
 \arguments{
-\item{E_loglik}{Function(theta, omega_hat, data) → numeric.}
+\item{E_loglik}{Function(theta, omega_hat, data) → numeric}
 
-\item{E_loglik_grad}{Optional gradient wrt theta:
-function(theta, omega_hat, data) → vector.}
+\item{E_loglik_grad}{Optional gradient function(theta, omega_hat, data)}
 
-\item{name}{Optional name for display.}
+\item{name}{Optional descriptive name}
 
-\item{...}{Additional fields stored under \verb{$extra}.}
+\item{...}{Extra stored fields}
 }
 \value{
-A \code{nuisance_spec} object.
+A \code{nuisance_spec} object with classes:
+c("nuisance_spec", "likelyr_spec")
 }
 \description{
 Defines the nuisance-parameter contribution to the \emph{expected}
 log-likelihood under the distribution of Y indexed by ω̂:
 
-E\link{ log p(Y | theta); ω̂  }
+E\link{ log p(Y | theta); ω̂ }
 
-used in integrated likelihood calculations. This includes:
+Required for integrated likelihood calculations. Includes:
 • expected log-likelihood E_loglik(theta, omega_hat, data)
 • optional gradient wrt theta
-
-Omega-hat sampling and initialization are handled separately
-(see eval-omega-hat.R).
 }

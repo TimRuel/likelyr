@@ -1,5 +1,5 @@
 # ======================================================================
-# eval-omega-hat.R (v5.0)
+# eval-omega-hat.R (v5.1)
 #
 # Improvements:
 #   • Multi-scale perturbations (local + global)
@@ -7,8 +7,10 @@
 #   • Optional recentering around previous ω̂ samples
 #   • Full likelihood_spec() constraint support (bounds + ineq)
 #
-# This dramatically improves geometric coverage of the manifold
-# ψ(ω̂) = ψ_MLE before solving with nloptr::auglag().
+# This is now fully aligned with the calibrated model layout:
+#   - theta_mle       in cal$likelihood$theta_mle
+#   - psi_fn, psi_jac in cal$estimand$psi_fn / $psi_jac
+#   - psi_mle         in cal$estimand$psi_mle
 # ======================================================================
 
 
@@ -79,9 +81,11 @@
 #' @export
 make_omega_hat_initgen <- function(cal) {
 
-  theta_mle <- cal$theta_mle
-  psi_jac   <- cal$psi_jac
   lik       <- cal$likelihood
+  estimand  <- cal$estimand
+
+  theta_mle <- lik$theta_mle
+  psi_jac   <- estimand$psi_jac
 
   J      <- lik$theta_dim
   lower  <- lik$theta_lower %||% rep(-Inf, J)
@@ -99,7 +103,7 @@ make_omega_hat_initgen <- function(cal) {
     # ----------------------------------------------------------
     # 1. Choose center: θ_MLE OR a previous ω̂
     # ----------------------------------------------------------
-    if (!is.null(history) && runif(1) < p_recenter) {
+    if (!is.null(history) && length(history) > 0 && runif(1) < p_recenter) {
       center <- history[[sample.int(length(history), 1)]]
     } else {
       center <- theta_mle
@@ -111,11 +115,7 @@ make_omega_hat_initgen <- function(cal) {
     if (!is.null(B)) {
 
       # choose local vs global
-      if (runif(1) < 0.70) {
-        s <- local_scale
-      } else {
-        s <- global_scale
-      }
+      s <- if (runif(1) < 0.70) local_scale else global_scale
 
       # tangent coefficients ~ Normal(0, s^2 I)
       a <- rnorm(ncol(B), sd = s)
@@ -130,7 +130,7 @@ make_omega_hat_initgen <- function(cal) {
     }
 
     # ----------------------------------------------------------
-    # 3. Clip to model bounds
+    # 3. Clip to model bounds (prevent x0 < lb / x0 > ub)
     # ----------------------------------------------------------
     candidate <- pmin(pmax(candidate, lower), upper)
 
@@ -164,27 +164,47 @@ make_omega_hat_sampler <- function(cal) {
 
   local({
 
-    lik     <- cal$likelihood
-    psi_fn  <- cal$psi_fn
-    psi_mle <- cal$psi_mle
-    opt     <- cal$optimizer
+    lik      <- cal$likelihood
+    estimand <- cal$estimand
+    opt      <- cal$optimizer
+
+    psi_fn   <- estimand$psi_fn
+    psi_mle  <- estimand$psi_mle
+    psi_jac  <- estimand$psi_jac
 
     J <- lik$theta_dim
 
     lower <- lik$theta_lower %||% rep(-Inf, J)
-    upper <- lik$theta_upper %||% rep( Inf, J)
+    upper <- lik$theta_upper %||% rep( Inf,  J)
 
+    # Inequality constraints (may be NULL)
     hin_fn    <- lik$ineq
     hinjac_fn <- lik$ineq_jac
 
-    fn0 <- function(theta) 0
+    # Objective is zero — pure feasibility problem on the manifold
+    fn0    <- function(theta) 0
     heq_fn <- function(theta) psi_fn(theta) - psi_mle
-    heqjac <- cal$psi_jac
+    heqjac <- psi_jac
 
     function(init_guess) {
 
+      # ------------------------------------------------------
+      # 0. Ensure initial guess respects bounds
+      #    (prevents "at least one element in x0 < lb")
+      # ------------------------------------------------------
+      x0 <- as.numeric(init_guess)
+
+      # Clamp to bounds; note that -Inf / +Inf leave components unchanged
+      x0 <- pmax(x0, lower)
+      x0 <- pmin(x0, upper)
+
+      # Optional sanity check (can be commented out for speed)
+      # if (any(x0 < lower) || any(x0 > upper)) {
+      #   stop("Initial ω̂ guess violates bounds even after clamping.", call. = FALSE)
+      # }
+
       res <- nloptr::auglag(
-        x0          = init_guess,
+        x0          = x0,
         fn          = fn0,
         heq         = heq_fn,
         heqjac      = heqjac,

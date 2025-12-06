@@ -15,22 +15,23 @@ estimand_spec(
 )
 }
 \arguments{
-\item{psi_fn}{function(theta, data) → numeric scalar ψ}
+\item{psi_fn}{function(theta, data) → scalar ψ}
 
-\item{psi_jac}{Optional function(theta, data) → gradient vector}
+\item{psi_jac}{optional gradient function(theta, data)}
 
 \item{search_interval_fn}{function(data) → numeric vector length 2}
 
-\item{increment}{Positive numeric scalar}
+\item{increment}{positive numeric scalar}
 
-\item{confidence_levels}{Numeric vector in (0, 1)}
+\item{confidence_levels}{numeric vector in (0, 1)}
 
-\item{name}{Optional descriptive name}
+\item{name}{optional descriptive name}
 
-\item{...}{Extra fields}
+\item{...}{extra stored fields}
 }
 \value{
-An \code{estimand_spec} object
+An \code{estimand_spec} object with classes
+c("estimand_spec", "likelyr_spec")
 }
 \description{
 Defines:
@@ -40,6 +41,6 @@ Defines:
 • increment  — step size for ψ grid during branch exploration
 • confidence_levels — confidence levels (0 < c < 1)
 
-The interval function is a \emph{function of the data only}. If users want
-θ_MLE inside it, they must recompute θ_MLE internally from the data.
+The interval is a \emph{function of the data only}.
+If users want θ_MLE included, they must recompute θ_MLE inside it.
 }

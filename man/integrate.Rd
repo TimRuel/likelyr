@@ -7,17 +7,21 @@
 integrate(cal, ...)
 }
 \arguments{
-\item{cal}{A calibrated_model produced by \code{calibrate()}.}
+\item{cal}{A calibrated_model.}
 
-\item{...}{Additional arguments.}
+\item{...}{Additional arguments passed to \code{generate_branches()}.}
 
-\item{verbose}{Logical.}
+\item{verbose}{Logical; print diagnostics. Default: FALSE.}
 }
 \value{
-An \code{integrated_likelihood} object.
+The SAME calibrated_model object, augmented with:
+• class \code{"likelyr_integrated"}
+• \verb{$results$IL} — a \code{likelyr_il_result} object
 }
 \description{
-Computes the integrated likelihood (IL) after calibration with
-\code{calibrate()}. The method attaches IL-specific components to \code{cal}
-and then runs the Monte Carlo branch engine.
+Computes the integrated likelihood (IL) and attaches it to the input
+\code{calibrated_model} under \verb{$results$IL}. The updated object is returned.
+
+This function is \strong{silent by default} for pipe-friendly workflows.
+Set \code{verbose = TRUE} to display diagnostic messages.
 }

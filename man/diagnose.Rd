@@ -2,32 +2,28 @@
 % Please edit documentation in R/likelihood-diagnose.R
 \name{diagnose}
 \alias{diagnose}
-\title{Compute Diagnostics for Branch-Averaged Integrated Likelihood}
+\title{Diagnostics for Likelyr Results (IL or PL)}
 \usage{
-diagnose(log_IL)
+diagnose(cal, verbose = TRUE)
 }
 \arguments{
-\item{log_IL}{A list containing at minimum branch_mat (K × R).
-Optionally contains \code{omega_hats}, a list of length R
-giving ω̂ for each Monte Carlo branch.}
+\item{cal}{A \code{calibrated_model} that has undergone integrate() or
+profile().}
+
+\item{verbose}{Logical; print diagnostic summaries.}
 }
 \value{
-Named list of diagnostics.
+The same calibrated model, with class \code{"likelyr_diagnosed"}
+and diagnostics added to each result.
 }
 \description{
-Computes:
-• Monte Carlo variance and relative error
-• log-scale MC SE (delta)
-• outlier fractions
-• coefficient of variation squared
-• effective sample size (ESS)
-• \strong{NEW:} manifold-dispersion diagnostics for omega_hat samples
+Scans all entries of \code{cal$results}, attaching a diagnostics object to
+each likelihood result (Integrated or Profile). Integrated Likelihood
+(IL) receives full Monte Carlo diagnostics; Profile Likelihood (PL)
+receives a placeholder for now.
 
-If \code{log_IL$omega_hats} is present, geometric coverage of the
-ψ-constraint manifold is analyzed via:
-• pairwise distances
-• covariance eigenvalues
-• effective rank
-• manifold collapse warnings
+Diagnostics are stored under:
+\preformatted{
+  cal$results[[name]]$diagnostics
 }
-\keyword{internal}
+}

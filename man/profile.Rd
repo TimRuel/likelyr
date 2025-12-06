@@ -7,9 +7,21 @@
 profile(cal, ...)
 }
 \arguments{
-\item{cal}{A calibrated_model.}
+\item{cal}{A calibrated_model object}
+
+\item{...}{Additional arguments passed to build_one_branch()}
+
+\item{verbose}{Logical; print diagnostics}
+}
+\value{
+The SAME calibrated_model, augmented with:
+\itemize{
+\item class "likelyr_profile"
+\item results$PL — a likelyr_profile_result object
+}
 }
 \description{
-Placeholder function. The profile likelihood engine is not yet
-implemented. Calling this function will throw an informative error.
+Computes the profile likelihood (PL) and attaches it to \verb{$results$PL}
+inside the calibrated_model. The PL is a \emph{single branch} of the IL with
+nuisance parameters fixed at their MLE (i.e., omega_hat = theta_MLE).
 }

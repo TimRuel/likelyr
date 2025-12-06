@@ -97,7 +97,7 @@ model <- model_spec(name = "Poisson - Naive Rates") |>
   add(execution)
 
 # ============================================================
-# Calibrate model to data
+# Calibrate model to data and integrate
 # ============================================================
 set.seed(seed)
 process_labels <- LETTERS[1:J]
@@ -112,12 +112,14 @@ data <- tibble(process = factor(process_labels),
                weights = weights) |>
   group_by(process)
 
-cal <- calibrate(model, data)
+fit <- model |>
+  calibrate(data) |>
+  integrate() |>
+  diagnose() |>
+  infer(alpha = c(0.21, 0.22))
 
-# ===================================================================
-# Integrate likelihood of calibrated model w.r.t. nuisance parameter
-# ===================================================================
-log_IL <- integrate(cal)
+plot(fit$results$IL$diagnostics)
+plot(fit$results$IL$inference)
 
 # -------------------------------------------------------------
 # 5. Attach diagnostics (separate file)

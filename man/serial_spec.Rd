@@ -6,18 +6,9 @@
 \usage{
 serial_spec(R, seed = TRUE, packages = character(), name = "serial")
 }
-\arguments{
-\item{R}{Positive integer: number of Monte Carlo branches.}
-
-\item{seed}{Logical or integer seed.}
-
-\item{packages}{Character vector of required packages.}
-
-\item{name}{Optional name/label.}
-}
 \value{
-A \code{serial_spec} (also inherits \code{execution_spec}).
+A \code{serial_spec} object.
 }
 \description{
-Runs Monte Carlo computation \strong{in serial}. No parallel workers are used.
+Runs Monte Carlo computation \strong{in serial}. No parallel workers.
 }

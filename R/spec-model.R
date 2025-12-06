@@ -1,46 +1,42 @@
 # ======================================================================
-# Model Specification API (constructor + incremental add() builder)
+# spec-model.R — Model Specification Logic
+# ======================================================================
+
+# This file depends on constructor functions defined in class-system.R:
+#   new_model_spec(), new_likelihood_spec(), new_estimand_spec(),
+#   new_nuisance_spec(), new_optimizer_spec(), new_execution_spec()
+
+# ======================================================================
+# INTERNAL: Calibration Lock Helpers
+# ======================================================================
+
+# Check if the model_spec has been calibrated
+.model_is_locked <- function(model) {
+  isTRUE(model$.__calibrated__)
+}
+
+# Structural specs cannot be modified post-calibration
+.slot_is_structural <- function(slot) {
+  slot %in% c("likelihood", "estimand", "nuisance")
+}
+
+# ======================================================================
+# MODEL SPECIFICATION CONSTRUCTOR (high-level wrapper)
 # ======================================================================
 
 #' Create a Model Specification
 #'
 #' @description
-#' A `model_spec` is a declarative container describing the 5 components
-#' required to compute profile or integrated likelihoods:
+#' Declares:
+#'   • likelihood_spec()  (required before calibration)
+#'   • estimand_spec()    (required before calibration)
+#'   • nuisance_spec()    (required before calibration)
+#'   • optimizer_spec()   (required before integrate/profile)
+#'   • execution_spec()   (required before integrate/profile)
 #'
-#'   • likelihood_spec()
-#'   • estimand_spec()
-#'   • nuisance_spec()   (optional for PL)
-#'   • optimizer_spec()
-#'   • execution_spec()
+#' Structural specs must be present before calibration. Execution specs
+#' may be added later.
 #'
-#' No computation occurs here. Calibration and likelihood generation are
-#' handled by [calibrate()], [integrate()], and [profile()].
-#'
-#' You may construct a model all at once:
-#'
-#'   model_spec(likelihood, estimand, nuisance, optimizer, execution)
-#'
-#' or incrementally using pipes:
-#'
-#'   model_spec() |>
-#'     add(likelihood_spec(...)) |>
-#'     add(estimand_spec(...))   |>
-#'     add(nuisance_spec(...))   |>
-#'     add(optimizer_spec(...))  |>
-#'     add(execution_spec(...))
-#'
-#' Validation occurs only when all required slots are filled.
-#'
-#' @param likelihood  Optional likelihood_spec().
-#' @param estimand    Optional estimand_spec().
-#' @param nuisance    Optional nuisance_spec().
-#' @param optimizer   Optional optimizer_spec().
-#' @param execution   Optional execution_spec().
-#' @param name        Optional name for the model.
-#' @param ...         Additional fields stored in `$extra`.
-#'
-#' @return A `model_spec` object.
 #' @export
 model_spec <- function(likelihood = NULL,
                        estimand   = NULL,
@@ -60,37 +56,19 @@ model_spec <- function(likelihood = NULL,
     extra      = list(...)
   )
 
-  class(x) <- "model_spec"
+  x <- new_model_spec(x)  # constructor from class-system.R
+  x$.__calibrated__ <- FALSE
 
-  # Validate only if complete
-  if (.is_model_spec_complete(x)) {
-    .validate_model_spec(x)
-  }
+  # Only validate structural components here
+  .validate_structural_specs(x)
 
   x
 }
 
 # ======================================================================
-# Incremental DSL: add()
+# INCREMENTAL SPEC BUILDER (add)
 # ======================================================================
 
-#' Add a Specification Component to a Model
-#'
-#' @description
-#' Adds a single component (`*_spec`) to a `model_spec()` container.
-#'
-#' Supports:
-#'   model_spec() |> add(likelihood_spec(...)) |> add(estimand_spec(...))
-#'
-#' Execution specs may be overwritten for user convenience; all other
-#' components error if reassigned.
-#'
-#' @param model A `model_spec` object.
-#' @param spec  A specification object (likelihood, estimand, nuisance,
-#'              optimizer, or execution).
-#' @param ...   Unused.
-#'
-#' @return Updated `model_spec` object.
 #' @export
 add <- function(model, spec, ...) {
   UseMethod("add")
@@ -101,28 +79,16 @@ add.model_spec <- function(model, spec, ...) {
 
   slot <- .identify_model_slot(spec)
 
-  # Execution is allowed to be replaced; others are not
-  if (slot != "execution" && !is.null(model[[slot]])) {
-    stop(sprintf(
-      "Model component '%s' has already been assigned.",
-      slot
-    ), call. = FALSE)
+  # Structural slots cannot be modified after calibration
+  if (.model_is_locked(model) && .slot_is_structural(slot)) {
+    stop(sprintf("Cannot modify structural slot '%s' after calibration.", slot), call. = FALSE)
   }
 
-  # Notify user when execution is overwritten
-  if (slot == "execution" && !is.null(model$execution)) {
-    message(sprintf(
-      "Replacing existing execution spec '%s' with '%s'.",
-      model$execution$name, spec$name
-    ))
-  }
-
+  # Allow overwriting
   model[[slot]] <- spec
 
-  # Validate if all required components are now filled
-  if (.is_model_spec_complete(model)) {
-    .validate_model_spec(model)
-  }
+  # Validate only structural parts
+  .validate_structural_specs(model)
 
   model
 }
@@ -133,11 +99,9 @@ add.default <- function(model, spec, ...) {
 }
 
 # ======================================================================
-# INTERNAL: Identify Component Slot
+# INTERNAL: Identify Component Slot by Class
 # ======================================================================
 
-#' @keywords internal
-#' @noRd
 .identify_model_slot <- function(x) {
 
   if (inherits(x, "likelihood_spec")) return("likelihood")
@@ -150,52 +114,63 @@ add.default <- function(model, spec, ...) {
 }
 
 # ======================================================================
-# INTERNAL: Completeness Check
+# INTERNAL: Validation of STRUCTURAL SPECS ONLY
 # ======================================================================
 
-#' @keywords internal
-#' @noRd
-.is_model_spec_complete <- function(model) {
-  # nuisance is optional (for profile likelihoods)
-  required <- c("likelihood", "estimand", "optimizer", "execution")
-  all(vapply(required, function(s) !is.null(model[[s]]), logical(1)))
-}
+.validate_structural_specs <- function(x) {
 
-# ======================================================================
-# INTERNAL: Full Validation
-# ======================================================================
+  if (!is.null(x$likelihood) && !inherits(x$likelihood, "likelihood_spec"))
+    stop("likelihood must be a likelihood_spec().", call. = FALSE)
 
-#' @keywords internal
-#' @noRd
-.validate_model_spec <- function(x) {
+  if (!is.null(x$estimand) && !inherits(x$estimand, "estimand_spec"))
+    stop("estimand must be an estimand_spec().", call. = FALSE)
 
-  if (!inherits(x$likelihood, "likelihood_spec"))
-    stop("model_spec requires a likelihood_spec().", call. = FALSE)
-
-  if (!inherits(x$estimand, "estimand_spec"))
-    stop("model_spec requires an estimand_spec().", call. = FALSE)
-
-  if (!inherits(x$optimizer, "optimizer_spec"))
-    stop("model_spec requires an optimizer_spec().", call. = FALSE)
-
-  if (!inherits(x$execution, "execution_spec"))
-    stop("model_spec requires an execution_spec (serial_spec or parallel_spec).",
-         call. = FALSE)
-
-  if (!is.null(x$nuisance) &&
-      !inherits(x$nuisance, "nuisance_spec"))
-    stop("nuisance must be NULL or a nuisance_spec().", call. = FALSE)
+  if (!is.null(x$nuisance) && !inherits(x$nuisance, "nuisance_spec"))
+    stop("nuisance must be a nuisance_spec().", call. = FALSE)
 
   invisible(x)
 }
 
 # ======================================================================
-# Print Method
+# INTERNAL: Complete Check for integrate() / profile()
+# ======================================================================
+
+.is_model_spec_generation_complete <- function(model) {
+  required <- c("likelihood", "estimand", "nuisance", "optimizer", "execution")
+  all(vapply(required, function(s) !is.null(model[[s]]), logical(1)))
+}
+
+.validate_model_for_generation <- function(model) {
+
+  if (!.is_model_spec_generation_complete(model)) {
+
+    missing <- c()
+    if (is.null(model$likelihood)) missing <- c(missing, "likelihood_spec()")
+    if (is.null(model$estimand))  missing <- c(missing, "estimand_spec()")
+    if (is.null(model$nuisance))  missing <- c(missing, "nuisance_spec()")
+    if (is.null(model$optimizer)) missing <- c(missing, "optimizer_spec()")
+    if (is.null(model$execution)) missing <- c(missing, "execution_spec()")
+
+    stop(
+      "Model is not ready for likelihood generation.\n",
+      "Missing required specifications:\n  - ",
+      paste(missing, collapse = "\n  - "),
+      "\nAdd missing specs using add(model, spec) before calling integrate() or profile().",
+      call. = FALSE
+    )
+  }
+
+  invisible(model)
+}
+
+
+# ======================================================================
+# PRINT METHOD
 # ======================================================================
 
 #' @export
 print.model_spec <- function(x, ...) {
-  cat("# Model Specification\n")
+  cat("<likelyr model_spec>\n")
   if (!is.null(x$name)) cat("Model:      ", x$name, "\n", sep="")
   cat("Likelihood: ", if (!is.null(x$likelihood)) x$likelihood$name else "(missing)", "\n", sep="")
   cat("Estimand:   ", if (!is.null(x$estimand))  x$estimand$name  else "(missing)", "\n", sep="")
@@ -206,5 +181,5 @@ print.model_spec <- function(x, ...) {
 }
 
 # ======================================================================
-# END
+# END spec-model.R
 # ======================================================================

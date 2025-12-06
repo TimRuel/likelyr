@@ -6,13 +6,6 @@
 \usage{
 total_branches(x)
 }
-\arguments{
-\item{x}{An execution_spec.}
-}
-\value{
-Integer number of branches.
-}
 \description{
-Returns the total number of Monte Carlo branches implied by an
-execution_spec (serial or parallel).
+Total Number of Monte Carlo Branches
 }

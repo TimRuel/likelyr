@@ -6,31 +6,13 @@
 #'
 #' @description
 #' Defines:
-#'   • the log-likelihood p(y | theta)
-#'   • the dimension J of theta
-#'   • an analytic θ̂_MLE initializer (required)
-#'   • model-level constraints:
-#'        – box:       theta_lower <= theta <= theta_upper
-#'        – inequality: ineq(theta) <= 0
+#'   • log-likelihood p(y | theta)
+#'   • dimension J of theta
+#'   • analytic theta_MLE initializer
+#'   • model-family constraints: box + inequality
 #'
-#' These constraints belong to the *model family*, not the optimizer.
-#'
-#' @param loglik        Function(theta, data) → numeric log-likelihood.
-#' @param theta_dim     Integer J = dim(theta).
-#' @param theta_mle_fn  Function(data) → theta_MLE.
-#'
-#' @param theta_lower   Optional scalar or numeric vector (length J).
-#' @param theta_upper   Optional scalar or numeric vector (length J).
-#'
-#' @param ineq          Optional inequality constraint:
-#'                       function(theta) → numeric vector <= 0.
-#' @param ineq_jac      Optional Jacobian:
-#'                       function(theta) → matrix (K × J).
-#'
-#' @param name          Optional descriptive name.
-#' @param ...           Extra fields.
-#'
-#' @return A `likelihood_spec` object.
+#' @return A `likelihood_spec` object with classes
+#'         c("likelihood_spec", "likelyr_spec").
 #' @export
 likelihood_spec <- function(loglik,
                             theta_dim,
@@ -54,8 +36,13 @@ likelihood_spec <- function(loglik,
     extra        = list(...)
   )
 
-  class(x) <- "likelihood_spec"
-  .validate_likelihood_spec(x)
+  # 1. Attach unified classes
+  x <- new_likelihood_spec(x)
+
+  # 2. Validate and finalize
+  x <- .validate_likelihood_spec(x)
+
+  x
 }
 
 # ----------------------------------------------------------------------
@@ -82,7 +69,6 @@ likelihood_spec <- function(loglik,
     stop("theta_mle_fn must be a function(data).", call. = FALSE)
 
   # box constraints -------------------------------------------------------
-  # recycle scalar → length J
   lower <- x$theta_lower
   upper <- x$theta_upper
 
@@ -108,43 +94,53 @@ likelihood_spec <- function(loglik,
     stop("Each element must satisfy theta_lower[i] <= theta_upper[i].",
          call. = FALSE)
 
+  # finalize normalization
   x$theta_lower <- lower
   x$theta_upper <- upper
 
   # inequality constraints ------------------------------------------------
   if (!is.null(x$ineq) && !is.function(x$ineq))
-    stop("ineq must be NULL or function(theta) → numeric vector <= 0.",
+    stop("ineq must be NULL or a function(theta) → numeric vector <= 0.",
          call. = FALSE)
 
   if (!is.null(x$ineq_jac) && !is.function(x$ineq_jac))
     stop("ineq_jac must be NULL or a function(theta) → Jacobian matrix.",
          call. = FALSE)
 
-  # ---- Optional: Check inequality Jacobian shape -----------------------
+  # Jacobian dimensionality test -----------------------------------------
   if (!is.null(x$ineq) && !is.null(x$ineq_jac)) {
 
-    # test at theta = midpoint of box if box exists, else zeros
     test_theta <- if (!is.null(lower) && !is.null(upper)) {
       (lower + upper) / 2
     } else {
       rep(0, J)
     }
 
-    # check dimensions only if the functions run successfully
-    g_val <- x$ineq(test_theta)
-    jac_val <- x$ineq_jac(test_theta)
+    g_val  <- x$ineq(test_theta)
+    jacval <- x$ineq_jac(test_theta)
 
     if (!is.numeric(g_val))
       stop("ineq(theta) must return a numeric vector.", call. = FALSE)
 
-    if (!is.matrix(jac_val))
+    if (!is.matrix(jacval))
       stop("ineq_jac(theta) must return a matrix.", call. = FALSE)
 
-    if (nrow(jac_val) != length(g_val) || ncol(jac_val) != J)
-      stop("ineq_jac(theta) must be a matrix with dimensions: ",
-           "n_constraints × theta_dim.",
+    if (nrow(jacval) != length(g_val) || ncol(jacval) != J)
+      stop("ineq_jac(theta) must be a matrix with dims: n_constraints × theta_dim.",
            call. = FALSE)
   }
 
+  x
+}
+
+# ------------------------------------------------------
+# PRINT METHOD
+# ------------------------------------------------------
+
+#' @export
+print.likelihood_spec <- function(x, ...) {
+  cat("# Likelihood Specification\n")
+  cat("- Name: ", x$name, "\n", sep = "")
   invisible(x)
 }
+

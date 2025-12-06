@@ -1,15 +1,14 @@
 # ======================================================================
-# eval-psi.R (v4.1)
+# eval-psi.R (v5.0)
 #
 # Fast evaluator for:
-#   θ*(ψ, ω̂) = argmax_θ E_{ω̂}[ log L(θ) ]
-#               subject to ψ(θ) = ψ_target
+#   θ*(ψ, ω̂) = argmax_θ E_{ω̂}[ log L(θ) ] subject to ψ(θ) = ψ_target
 #
-# Fully aligned with new API:
-#   • likelihood_spec() owns constraints:
-#         theta_lower, theta_upper, ineq, ineq_jac
-#   • optimizer_spec() owns solver settings
-#   • calibrate() binds data
+# Updated for the new calibrated-model API:
+#   • likelihood_spec owns constraints (theta bounds, inequalities)
+#   • estimand_spec owns psi_fn, psi_jac
+#   • nuisance_spec owns E_loglik(), E_loglik_grad()
+#   • optimizer_spec owns solver settings
 #
 # ======================================================================
 
@@ -17,24 +16,24 @@
 #' Build Fast ψ-Conditional Optimizer for Branch Evaluation (Internal)
 #'
 #' @description
-#' Returns a **two-stage factory** for extremely fast repeated solutions:
+#' Constructs a *two-stage closure system* for fast repeated solutions:
 #'
 #' \deqn{
 #'   \theta^{\*}(\psi, \omega)
 #'     = \arg\max_{\theta} E_{\omega}[ \log L(\theta) ]
 #'     \quad\text{s.t.}\quad
-#'       \psi(\theta)=\psi_{\mathrm{target}}.
+#'     ψ(\theta)=ψ_{\mathrm{target}}.
 #' }
 #'
-#' The returned object enables:
+#' Usage:
 #'
 #' \preformatted{
-#'   f1 <- build_eval_psi_fun(cal)
-#'   f2 <- f1(omega_hat)
-#'   out <- f2(psi_target, theta_init)
+#' f1 <- build_eval_psi_fun(cal)
+#' f2 <- f1(omega_hat)
+#' out <- f2(psi_target, theta_init)
 #' }
 #'
-#' @param cal A `calibrated_model` returned by `calibrate()`.
+#' @param cal A `calibrated_model` object.
 #'
 #' @return A nested function:
 #'
@@ -49,50 +48,55 @@
 build_eval_psi_fun <- function(cal) {
 
   # ---------------------------------------------------------------
-  # Unpack model components
+  # Unpack calibrated components
   # ---------------------------------------------------------------
   lik      <- cal$likelihood
+  est      <- cal$estimand
+  nuis     <- cal$nuisance
   opt      <- cal$optimizer
 
-  loglik        <- cal$loglik
-  E_loglik      <- cal$E_loglik
-  E_loglik_grad <- cal$E_loglik_grad
-  psi_fn        <- cal$psi_fn
-  psi_jac       <- cal$psi_jac
+  # Bound, data-bound closures (now inside specs)
+  loglik        <- lik$loglik
+  psi_fn        <- est$psi_fn
+  psi_jac       <- est$psi_jac
 
-  has_grad <- !is.null(E_loglik_grad)
+  E_loglik      <- nuis$E_loglik
+  E_loglik_grad <- nuis$E_loglik_grad
+  has_grad      <- !is.null(E_loglik_grad)
 
   # ---------------------------------------------------------------
-  # Likelihood-level constraints (correct names!)
+  # Likelihood-level constraints
   # ---------------------------------------------------------------
-  theta_lower <- lik$theta_lower   # may be NULL
-  theta_upper <- lik$theta_upper   # may be NULL
+  theta_lower <- lik$theta_lower
+  theta_upper <- lik$theta_upper
   ineq_fn     <- lik$ineq
   ineq_jac_fn <- lik$ineq_jac
 
   J <- lik$theta_dim
 
-  # Expand NULL bounds to ±Inf
+  # Expand missing bounds
   if (is.null(theta_lower)) theta_lower <- rep(-Inf, J)
   if (is.null(theta_upper)) theta_upper <- rep( Inf, J)
 
   # ---------------------------------------------------------------
-  # Create closed-over environment for auglag()
+  # Optimization environment for auglag()
   # ---------------------------------------------------------------
   eval_env <- list2env(
     list(
-      # Static model constraints
+      # static constraints
       lower       = theta_lower,
       upper       = theta_upper,
       hin         = ineq_fn,
       hinjac      = ineq_jac_fn,
       heqjac      = psi_jac,
+
+      # solver settings
       localsolver = opt$localsolver,
       localtol    = opt$localtol,
       control     = opt$control,
       deprecatedBehavior = FALSE,
 
-      # Dynamic fields
+      # dynamic variables updated for each call
       omega_hat   = NULL,
       psi_target  = NULL,
       x0          = NULL
@@ -101,7 +105,7 @@ build_eval_psi_fun <- function(cal) {
   )
 
   # ---------------------------------------------------------------
-  # Permanent, minimal-overhead closures
+  # Key closures for nloptr::auglag()
   # ---------------------------------------------------------------
   eval_env$fn <- function(theta) {
     -E_loglik(theta, eval_env$omega_hat)
@@ -116,14 +120,14 @@ build_eval_psi_fun <- function(cal) {
   }
 
   # ---------------------------------------------------------------
-  # First stage: fix nuisance ω̂
+  # Stage 1: fix nuisance ω̂
   # ---------------------------------------------------------------
   function(omega_hat) {
 
     eval_env$omega_hat <- omega_hat
 
     # -------------------------------------------------------------
-    # Second stage: solve θ*(ψ_target, ω̂)
+    # Stage 2: solve θ(ψ_target, ω̂)
     # -------------------------------------------------------------
     function(psi_target, theta_init) {
 

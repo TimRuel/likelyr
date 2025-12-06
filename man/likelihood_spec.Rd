@@ -16,38 +16,14 @@ likelihood_spec(
   ...
 )
 }
-\arguments{
-\item{loglik}{Function(theta, data) → numeric log-likelihood.}
-
-\item{theta_dim}{Integer J = dim(theta).}
-
-\item{theta_mle_fn}{Function(data) → theta_MLE.}
-
-\item{theta_lower}{Optional scalar or numeric vector (length J).}
-
-\item{theta_upper}{Optional scalar or numeric vector (length J).}
-
-\item{ineq}{Optional inequality constraint:
-function(theta) → numeric vector <= 0.}
-
-\item{ineq_jac}{Optional Jacobian:
-function(theta) → matrix (K × J).}
-
-\item{name}{Optional descriptive name.}
-
-\item{...}{Extra fields.}
-}
 \value{
-A \code{likelihood_spec} object.
+A \code{likelihood_spec} object with classes
+c("likelihood_spec", "likelyr_spec").
 }
 \description{
 Defines:
-• the log-likelihood p(y | theta)
-• the dimension J of theta
-• an analytic θ̂_MLE initializer (required)
-• model-level constraints:
-– box:       theta_lower <= theta <= theta_upper
-– inequality: ineq(theta) <= 0
-
-These constraints belong to the \emph{model family}, not the optimizer.
+• log-likelihood p(y | theta)
+• dimension J of theta
+• analytic theta_MLE initializer
+• model-family constraints: box + inequality
 }

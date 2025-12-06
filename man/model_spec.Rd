@@ -14,49 +14,14 @@ model_spec(
   ...
 )
 }
-\arguments{
-\item{likelihood}{Optional likelihood_spec().}
-
-\item{estimand}{Optional estimand_spec().}
-
-\item{nuisance}{Optional nuisance_spec().}
-
-\item{optimizer}{Optional optimizer_spec().}
-
-\item{execution}{Optional execution_spec().}
-
-\item{name}{Optional name for the model.}
-
-\item{...}{Additional fields stored in \verb{$extra}.}
-}
-\value{
-A \code{model_spec} object.
-}
 \description{
-A \code{model_spec} is a declarative container describing the 5 components
-required to compute profile or integrated likelihoods:
+Declares:
+• likelihood_spec()  (required before calibration)
+• estimand_spec()    (required before calibration)
+• nuisance_spec()    (required before calibration)
+• optimizer_spec()   (required before integrate/profile)
+• execution_spec()   (required before integrate/profile)
 
-• likelihood_spec()
-• estimand_spec()
-• nuisance_spec()   (optional for PL)
-• optimizer_spec()
-• execution_spec()
-
-No computation occurs here. Calibration and likelihood generation are
-handled by \code{\link[=calibrate]{calibrate()}}, \code{\link[=integrate]{integrate()}}, and \code{\link[=profile]{profile()}}.
-
-You may construct a model all at once:
-
-model_spec(likelihood, estimand, nuisance, optimizer, execution)
-
-or incrementally using pipes:
-
-model_spec() |>
-add(likelihood_spec(...)) |>
-add(estimand_spec(...))   |>
-add(nuisance_spec(...))   |>
-add(optimizer_spec(...))  |>
-add(execution_spec(...))
-
-Validation occurs only when all required slots are filled.
+Structural specs must be present before calibration. Execution specs
+may be added later.
 }

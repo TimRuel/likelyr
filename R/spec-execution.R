@@ -1,7 +1,26 @@
 # ======================================================================
 # Execution Mode Specifications (Serial / Parallel)
-# Polished for v3.0 model_spec pipeline
+# Updated for unified likelyr class system
 # ======================================================================
+
+# ----------------------------------------------------------------------
+# Constructors (internal)
+# ----------------------------------------------------------------------
+
+new_execution_spec <- function(x) {
+  class(x) <- c("execution_spec", "likelyr_spec")
+  x
+}
+
+new_serial_spec <- function(x) {
+  class(x) <- c("serial_spec", "execution_spec", "likelyr_spec")
+  x
+}
+
+new_parallel_spec <- function(x) {
+  class(x) <- c("parallel_spec", "execution_spec", "likelyr_spec")
+  x
+}
 
 # ----------------------------------------------------------------------
 # Serial Execution Specification
@@ -10,14 +29,9 @@
 #' Serial Execution Specification
 #'
 #' @description
-#' Runs Monte Carlo computation **in serial**. No parallel workers are used.
+#' Runs Monte Carlo computation **in serial**. No parallel workers.
 #'
-#' @param R Positive integer: number of Monte Carlo branches.
-#' @param seed Logical or integer seed.
-#' @param packages Character vector of required packages.
-#' @param name Optional name/label.
-#'
-#' @return A `serial_spec` (also inherits `execution_spec`).
+#' @return A `serial_spec` object.
 #' @export
 serial_spec <- function(R,
                         seed     = TRUE,
@@ -32,8 +46,10 @@ serial_spec <- function(R,
     packages = packages
   )
 
-  class(x) <- c("serial_spec", "execution_spec")
+  x <- new_serial_spec(x)
+
   .validate_execution_serial(x)
+
   x
 }
 
@@ -43,17 +59,7 @@ serial_spec <- function(R,
 
 #' Parallel Execution Specification (foreach + %dofuture%)
 #'
-#' @description
-#' Runs Monte Carlo computation **in parallel** using a configured
-#' future backend. Total branches = num_workers * chunk_size.
-#'
-#' @param num_workers Positive integer number of workers.
-#' @param chunk_size  Positive integer chunk size per worker.
-#' @param seed Logical or integer.
-#' @param packages Character vector.
-#' @param name Optional label.
-#'
-#' @return A `parallel_spec` (also inherits `execution_spec`).
+#' @return A `parallel_spec` object.
 #' @export
 parallel_spec <- function(num_workers,
                           chunk_size = 1L,
@@ -70,16 +76,17 @@ parallel_spec <- function(num_workers,
     packages    = packages
   )
 
-  class(x) <- c("parallel_spec", "execution_spec")
+  x <- new_parallel_spec(x)
+
   .validate_execution_parallel(x)
+
   x
 }
 
 # ======================================================================
-# INTERNAL VALIDATORS (tightened)
+# INTERNAL VALIDATORS
 # ======================================================================
 
-#' @keywords internal
 .validate_execution_serial <- function(x) {
 
   if (!is.numeric(x$R) || length(x$R) != 1 || is.na(x$R) || x$R < 1)
@@ -94,7 +101,6 @@ parallel_spec <- function(num_workers,
   invisible(x)
 }
 
-#' @keywords internal
 .validate_execution_parallel <- function(x) {
 
   if (!is.numeric(x$num_workers) ||
@@ -125,13 +131,6 @@ parallel_spec <- function(num_workers,
 # ======================================================================
 
 #' Total Number of Monte Carlo Branches
-#'
-#' @description
-#' Returns the total number of Monte Carlo branches implied by an
-#' execution_spec (serial or parallel).
-#'
-#' @param x An execution_spec.
-#' @return Integer number of branches.
 #' @export
 total_branches <- function(x) {
   UseMethod("total_branches")
@@ -149,15 +148,15 @@ total_branches.default <- function(x) {
 }
 
 # ======================================================================
-# PRINT METHODS (polished)
+# PRINT METHODS
 # ======================================================================
 
 #' @export
 print.serial_spec <- function(x, ...) {
   cat("# Execution Mode: SERIAL\n")
-  cat("- Name:         ", x$name,     "\n", sep = "")
-  cat("- # Branches:   ", total_branches(x), "\n", sep="")
-  cat("- Seed:         ", x$seed,     "\n", sep = "")
+  cat("- Name:         ", x$name, "\n", sep = "")
+  cat("- # Branches:   ", total_branches(x), "\n", sep = "")
+  cat("- Seed:         ", x$seed, "\n", sep = "")
   cat("- Packages:     ", paste(x$packages, collapse = ", "), "\n", sep = "")
   invisible(x)
 }
@@ -165,11 +164,12 @@ print.serial_spec <- function(x, ...) {
 #' @export
 print.parallel_spec <- function(x, ...) {
   cat("# Execution Mode: PARALLEL (foreach + %dofuture%)\n")
-  cat("- Name:         ", x$name,          "\n", sep = "")
-  cat("- # Workers:    ", x$num_workers,   "\n", sep = "")
-  cat("- Chunk size:   ", x$chunk_size,    "\n", sep = "")
-  cat("- # Branches:   ", total_branches(x), "\n", sep="")
-  cat("- Seed:         ", x$seed,          "\n", sep = "")
+  cat("- Name:         ", x$name, "\n", sep = "")
+  cat("- # Workers:    ", x$num_workers, "\n", sep = "")
+  cat("- Chunk size:   ", x$chunk_size, "\n", sep = "")
+  cat("- # Branches:   ", total_branches(x), "\n", sep = "")
+  cat("- Seed:         ", x$seed, "\n", sep = "")
   cat("- Packages:     ", paste(x$packages, collapse = ", "), "\n", sep = "")
   invisible(x)
 }
+

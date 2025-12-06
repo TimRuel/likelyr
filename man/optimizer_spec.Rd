@@ -7,7 +7,6 @@
 optimizer_spec(
   localsolver = "SLSQP",
   control = list(),
-  box = list(lower = NULL, upper = NULL),
   localtol = 1e-06,
   max_retries = 10,
   name = NULL,
@@ -15,26 +14,26 @@ optimizer_spec(
 )
 }
 \arguments{
-\item{localsolver}{Solver method used inside auglag (default: "SLSQP").}
+\item{localsolver}{Inner solver used inside auglag (default "SLSQP")}
 
-\item{control}{List of nloptr options (passed to auglag).}
+\item{control}{List of nloptr::auglag / local options}
 
-\item{box}{List(lower, upper) box constraints.}
+\item{localtol}{Local solver tolerance}
 
-\item{localtol}{Tolerance for local solver.}
+\item{max_retries}{Number of restart attempts}
 
-\item{max_retries}{Number of retries for the local solver.}
+\item{name}{Optional descriptive name}
 
-\item{name}{Optional descriptive name.}
-
-\item{...}{Extra fields.}
+\item{...}{Extra user-defined fields}
 }
 \value{
-An \code{optimizer_spec} object.
+An \code{optimizer_spec} object with classes:
+c("optimizer_spec", "likelyr_spec")
 }
 \description{
 Defines the optimization policy for theta, specifically targeting
-\code{nloptr::auglag()}. The arguments are ordered to match the typical
-workflow: solver choice → control options → constraints →
-initialization → retry behavior → naming.
+\code{nloptr::auglag()}. Arguments follow workflow order:
+
+solver choice → nloptr options → box constraints →
+tolerances → retry policy → name.
 }

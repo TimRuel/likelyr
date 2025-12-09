@@ -4,21 +4,22 @@
 \alias{infer_one_result}
 \title{Inference for a Single Likelihood Grid}
 \usage{
-infer_one_result(res, alpha)
+infer_one_result(res, alpha_levels, psi_0)
 }
 \arguments{
-\item{res}{A likelihood result object containing either:
+\item{res}{A likelihood result object containing one of:
 \itemize{
-\item \code{log_L_bar_df} (integrated likelihood)
-\item \code{profile_df}   (profile likelihood)
+\item \code{log_L_bar_df} — Integrated Likelihood grid
+\item \code{profile_df}   — Profile Likelihood grid
 }}
 
-\item{alpha}{Numeric vector of confidence levels.}
+\item{alpha}{Numeric vector of α levels.}
 }
 \value{
 A \code{"likelyr_inference"} object.
 }
 \description{
-Internal helper used by \code{\link[=infer]{infer()}} to process \strong{one} likelihood grid.
+Internal helper used by infer() to compute inference for one
+likelihood grid (Integrated or Profiled).
 }
 \keyword{internal}

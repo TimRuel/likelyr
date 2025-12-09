@@ -7,25 +7,33 @@
 nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 }
 \arguments{
-\item{E_loglik}{Function(theta, omega_hat, data) → numeric}
+\item{E_loglik}{Required. Function \verb{(theta, omega_hat, data) -> numeric}
+giving the expected log-likelihood.}
 
-\item{E_loglik_grad}{Optional gradient function(theta, omega_hat, data)}
+\item{E_loglik_grad}{Optional gradient function \verb{(theta, omega_hat, data) -> numeric vector}.
+If supplied, must return a vector of length \code{theta_dim}.}
 
-\item{name}{Optional descriptive name}
+\item{name}{Optional descriptive name for the nuisance component.}
 
-\item{...}{Extra stored fields}
+\item{...}{Additional fields stored but unused.}
 }
 \value{
 A \code{nuisance_spec} object with classes:
-c("nuisance_spec", "likelyr_spec")
+\code{c("nuisance_spec", "likelyr")}.
 }
 \description{
-Defines the nuisance-parameter contribution to the \emph{expected}
-log-likelihood under the distribution of Y indexed by ω̂:
+Defines the nuisance contribution to the \emph{expected} log-likelihood
+used in Monte Carlo Integrated Likelihood:
 
-E\link{ log p(Y | theta); ω̂ }
+\deqn{
+  E_{\omegâ}[ \log p(Y \mid \theta) ].
+}
 
-Required for integrated likelihood calculations. Includes:
-• expected log-likelihood E_loglik(theta, omega_hat, data)
-• optional gradient wrt theta
+The nuisance specification provides:
+
+• \code{E_loglik(theta, omega_hat, data)} — expected log-likelihood
+• \code{E_loglik_grad(theta, omega_hat, data)} — optional gradient wrt θ
+
+These functions are used \emph{only} for integrated likelihood calculations.
+They play no role in profile likelihood.
 }

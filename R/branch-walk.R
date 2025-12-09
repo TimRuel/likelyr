@@ -7,8 +7,6 @@
 #'
 #'   eval_psi_fun(psi_k, theta_init)
 #'
-#' This replaces the old interface eval_psi_fun(k, theta_init).
-#'
 #' @param grid A psi_grid object created by psi_grid_anchor().
 #' @param k_direction +1 (right sweep) or -1 (left sweep)
 #' @param k_start Integer index where sweeping begins

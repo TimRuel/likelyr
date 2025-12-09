@@ -5,6 +5,7 @@
 \title{Create a Model Specification}
 \usage{
 model_spec(
+  parameter = NULL,
   likelihood = NULL,
   estimand = NULL,
   nuisance = NULL,
@@ -15,13 +16,18 @@ model_spec(
 )
 }
 \description{
-Declares:
-• likelihood_spec()  (required before calibration)
-• estimand_spec()    (required before calibration)
-• nuisance_spec()    (required before calibration)
-• optimizer_spec()   (required before integrate/profile)
-• execution_spec()   (required before integrate/profile)
+A likelyr model specification declares the structural and computational
+components needed for likelihood-based inference:
 
-Structural specs must be present before calibration. Execution specs
-may be added later.
+\strong{Structural components (must be present before calibration):}
+• parameter_spec()
+• likelihood_spec()
+• estimand_spec()
+• nuisance_spec()
+
+\strong{Computational components (required for integrate()/profile()):}
+• optimizer_spec()
+• execution_spec()
+
+Structural components cannot be modified \emph{after} calibration.
 }

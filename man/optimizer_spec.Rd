@@ -14,26 +14,33 @@ optimizer_spec(
 )
 }
 \arguments{
-\item{localsolver}{Inner solver used inside auglag (default "SLSQP")}
+\item{localsolver}{Character scalar. Inner solver used inside \code{nloptr::auglag}.
+Default: \code{"SLSQP"}.}
 
-\item{control}{List of nloptr::auglag / local options}
+\item{control}{Named list of nloptr/auglag control options.}
 
-\item{localtol}{Local solver tolerance}
+\item{localtol}{Numeric scalar specifying local solver tolerance.}
 
-\item{max_retries}{Number of restart attempts}
+\item{max_retries}{Numeric scalar giving number of restart attempts allowed when
+optimization fails to converge.}
 
-\item{name}{Optional descriptive name}
+\item{name}{Optional descriptive name.}
 
-\item{...}{Extra user-defined fields}
+\item{...}{Additional stored but unused user metadata.}
 }
 \value{
 An \code{optimizer_spec} object with classes:
-c("optimizer_spec", "likelyr_spec")
+\code{c("optimizer_spec", "likelyr")}.
 }
 \description{
-Defines the optimization policy for theta, specifically targeting
-\code{nloptr::auglag()}. Arguments follow workflow order:
+Defines optimization behavior for estimating θ using
+\code{nloptr::auglag()}. This specification controls:
 
-solver choice → nloptr options → box constraints →
-tolerances → retry policy → name.
+• Local solver (e.g., "SLSQP")
+• nloptr control parameters
+• Local solver tolerance
+• Restart policy (max_retries)
+
+These settings are used by both profile and integrated likelihood
+routines when solving constrained optimization problems.
 }

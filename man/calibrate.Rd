@@ -11,16 +11,16 @@ calibrate(model, data, verbose = FALSE)
 
 \item{data}{User data.}
 
-\item{verbose}{Logical; print calibration diagnostics.
-Defaults to FALSE for pipe-friendly behavior.}
+\item{verbose}{Logical; print calibration diagnostics.}
 }
 \value{
 A \code{calibrated_model} object.
 }
 \description{
 Prepares a model for computing profile or integrated likelihoods.
-Calibration is modular: each structural component (likelihood,
-estimand, nuisance) is processed by its own calibration helper.
+Calibration is modular: each structural component (parameter,
+likelihood, estimand, nuisance) is processed by its own calibration
+helper.
 
 Optimizer and execution specs are \emph{not required at calibration time}.
 They may be supplied later and are validated by integrate()/profile().

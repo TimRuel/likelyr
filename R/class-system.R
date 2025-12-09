@@ -24,6 +24,11 @@
 # SPECIFICATION CLASS CONSTRUCTORS
 # ======================================================================
 
+new_parameter_spec <- function(x) {
+  class(x) <- c("parameter_spec", "likelyr")
+  x
+}
+
 new_likelihood_spec <- function(x) {
   class(x) <- c("likelihood_spec", "likelyr")
   x
@@ -44,11 +49,18 @@ new_optimizer_spec <- function(x) {
   x
 }
 
-new_execution_spec <- function(x, serial = FALSE) {
-  if (serial)
-    class(x) <- c("serial_spec", "execution_spec", "likelyr")
-  else
-    class(x) <- c("parallel_spec", "execution_spec", "likelyr")
+new_execution_spec <- function(x) {
+  class(x) <- c("execution_spec", "likelyr")
+  x
+}
+
+new_serial_spec <- function(x) {
+  class(x) <- c("serial_spec", "execution_spec", "likelyr")
+  x
+}
+
+new_parallel_spec <- function(x) {
+  class(x) <- c("parallel_spec", "execution_spec", "likelyr")
   x
 }
 

@@ -4,26 +4,27 @@
 \alias{likelihood_spec}
 \title{Specify a Parametric Likelihood Model}
 \usage{
-likelihood_spec(
-  loglik,
-  theta_dim,
-  theta_mle_fn,
-  theta_lower = NULL,
-  theta_upper = NULL,
-  ineq = NULL,
-  ineq_jac = NULL,
-  name = NULL,
-  ...
-)
+likelihood_spec(loglik, theta_mle_fn, name = NULL, ...)
+}
+\arguments{
+\item{loglik}{Function(theta, data) → log-likelihood.}
+
+\item{theta_mle_fn}{Function(data) → initial θ̂.}
+
+\item{name}{Optional descriptive name.}
+
+\item{...}{Additional stored metadata (unused internally).}
 }
 \value{
-A \code{likelihood_spec} object with classes
-c("likelihood_spec", "likelyr_spec").
+A \code{likelihood_spec} object.
 }
 \description{
-Defines:
-• log-likelihood p(y | theta)
-• dimension J of theta
-• analytic theta_MLE initializer
-• model-family constraints: box + inequality
+Defines the \emph{likelihood component} of the model:
+
+• loglik(theta, data)  — the log-likelihood function
+• theta_mle_fn(data)   — analytic initializer for θ̂
+
+All parameter–space structure (dimension, bounds, true value,
+inequality constraints) must now be supplied via \code{parameter_spec()}.
+\code{likelihood_spec()} is intentionally lightweight.
 }

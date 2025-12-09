@@ -13,9 +13,8 @@ calibrate_likelihood(likelihood, data)
 }
 \value{
 The SAME likelihood_spec object, enriched with:
-• $loglik     — data-bound closure
-• $theta_mle  — analytic MLE computed on \code{data}
+• $loglik — a closure(theta) that captures \code{data}
 }
 \description{
-Binds data to the likelihood functions and computes theta_MLE.
+Binds data to the likelihood's log-likelihood closure.
 }

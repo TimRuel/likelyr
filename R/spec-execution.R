@@ -1,35 +1,21 @@
 # ======================================================================
 # Execution Mode Specifications (Serial / Parallel)
-# Updated for unified likelyr class system
+# Unified class system (v3.1)
 # ======================================================================
 
-# ----------------------------------------------------------------------
-# Constructors (internal)
-# ----------------------------------------------------------------------
-
-new_execution_spec <- function(x) {
-  class(x) <- c("execution_spec", "likelyr_spec")
-  x
-}
-
-new_serial_spec <- function(x) {
-  class(x) <- c("serial_spec", "execution_spec", "likelyr_spec")
-  x
-}
-
-new_parallel_spec <- function(x) {
-  class(x) <- c("parallel_spec", "execution_spec", "likelyr_spec")
-  x
-}
-
-# ----------------------------------------------------------------------
-# Serial Execution Specification
-# ----------------------------------------------------------------------
+# ======================================================================
+# SERIAL EXECUTION
+# ======================================================================
 
 #' Serial Execution Specification
 #'
 #' @description
-#' Runs Monte Carlo computation **in serial**. No parallel workers.
+#' Runs Monte Carlo branch generation **in serial** (no parallelism).
+#'
+#' @param R Positive integer: number of Monte Carlo branches.
+#' @param seed Logical or numeric seed for reproducibility.
+#' @param packages Character vector of packages to load.
+#' @param name Optional identifier.
 #'
 #' @return A `serial_spec` object.
 #' @export
@@ -47,17 +33,21 @@ serial_spec <- function(R,
   )
 
   x <- new_serial_spec(x)
-
   .validate_execution_serial(x)
-
   x
 }
 
-# ----------------------------------------------------------------------
-# Parallel Execution Specification
-# ----------------------------------------------------------------------
+# ======================================================================
+# PARALLEL EXECUTION
+# ======================================================================
 
 #' Parallel Execution Specification (foreach + %dofuture%)
+#'
+#' @param num_workers Positive integer: number of parallel workers.
+#' @param chunk_size Positive integer: branches per worker.
+#' @param seed Logical or numeric seed for reproducibility.
+#' @param packages Character vector of packages to load on workers.
+#' @param name Optional identifier.
 #'
 #' @return A `parallel_spec` object.
 #' @export
@@ -77,51 +67,60 @@ parallel_spec <- function(num_workers,
   )
 
   x <- new_parallel_spec(x)
-
   .validate_execution_parallel(x)
-
   x
 }
 
 # ======================================================================
-# INTERNAL VALIDATORS
+# VALIDATORS
 # ======================================================================
 
 .validate_execution_serial <- function(x) {
 
-  if (!is.numeric(x$R) || length(x$R) != 1 || is.na(x$R) || x$R < 1)
-    stop("serial_spec(): `R` must be a positive integer >= 1.", call. = FALSE)
+  # R: number of serial MC branches
+  if (!is.numeric(x$R) ||
+      length(x$R) != 1 ||
+      !is.finite(x$R) ||
+      x$R < 1 ||
+      x$R != as.integer(x$R))
+    stop("serial_spec(): R must be a positive integer.", call. = FALSE)
 
+  # seed: logical or numeric
   if (!is.logical(x$seed) && !is.numeric(x$seed))
-    stop("serial_spec(): `seed` must be logical or numeric.", call. = FALSE)
+    stop("serial_spec(): seed must be logical or numeric.", call. = FALSE)
 
+  # packages: character vector
   if (!is.character(x$packages))
-    stop("serial_spec(): `packages` must be a character vector.", call. = FALSE)
+    stop("serial_spec(): packages must be a character vector.", call. = FALSE)
 
   invisible(x)
 }
 
 .validate_execution_parallel <- function(x) {
 
+  # workers
   if (!is.numeric(x$num_workers) ||
       length(x$num_workers) != 1 ||
-      is.na(x$num_workers) ||
-      x$num_workers < 1)
-    stop("parallel_spec(): `num_workers` must be a positive integer >= 1.",
-         call. = FALSE)
+      !is.finite(x$num_workers) ||
+      x$num_workers < 1 ||
+      x$num_workers != as.integer(x$num_workers))
+    stop("parallel_spec(): num_workers must be a positive integer.", call. = FALSE)
 
+  # chunk size
   if (!is.numeric(x$chunk_size) ||
       length(x$chunk_size) != 1 ||
-      is.na(x$chunk_size) ||
-      x$chunk_size < 1)
-    stop("parallel_spec(): `chunk_size` must be a positive integer >= 1.",
-         call. = FALSE)
+      !is.finite(x$chunk_size) ||
+      x$chunk_size < 1 ||
+      x$chunk_size != as.integer(x$chunk_size))
+    stop("parallel_spec(): chunk_size must be a positive integer.", call. = FALSE)
 
+  # seed
   if (!is.logical(x$seed) && !is.numeric(x$seed))
-    stop("parallel_spec(): `seed` must be logical or numeric.", call. = FALSE)
+    stop("parallel_spec(): seed must be logical or numeric.", call. = FALSE)
 
+  # packages
   if (!is.character(x$packages))
-    stop("parallel_spec(): `packages` must be a character vector.", call. = FALSE)
+    stop("parallel_spec(): packages must be a character vector.", call. = FALSE)
 
   invisible(x)
 }
@@ -140,7 +139,9 @@ total_branches <- function(x) {
 total_branches.serial_spec <- function(x) x$R
 
 #' @export
-total_branches.parallel_spec <- function(x) x$num_workers * x$chunk_size
+total_branches.parallel_spec <- function(x) {
+  x$num_workers * x$chunk_size
+}
 
 #' @export
 total_branches.default <- function(x) {
@@ -154,22 +155,25 @@ total_branches.default <- function(x) {
 #' @export
 print.serial_spec <- function(x, ...) {
   cat("# Execution Mode: SERIAL\n")
-  cat("- Name:         ", x$name, "\n", sep = "")
-  cat("- # Branches:   ", total_branches(x), "\n", sep = "")
-  cat("- Seed:         ", x$seed, "\n", sep = "")
-  cat("- Packages:     ", paste(x$packages, collapse = ", "), "\n", sep = "")
+  cat("- Name:        ", x$name, "\n", sep = "")
+  cat("- Branches:    ", total_branches(x), "\n", sep = "")
+  cat("- Seed:        ", x$seed, "\n", sep = "")
+  cat("- Packages:    ",
+      if (length(x$packages)) paste(x$packages, collapse = ", ") else "<none>",
+      "\n", sep = "")
   invisible(x)
 }
 
 #' @export
 print.parallel_spec <- function(x, ...) {
   cat("# Execution Mode: PARALLEL (foreach + %dofuture%)\n")
-  cat("- Name:         ", x$name, "\n", sep = "")
-  cat("- # Workers:    ", x$num_workers, "\n", sep = "")
-  cat("- Chunk size:   ", x$chunk_size, "\n", sep = "")
-  cat("- # Branches:   ", total_branches(x), "\n", sep = "")
-  cat("- Seed:         ", x$seed, "\n", sep = "")
-  cat("- Packages:     ", paste(x$packages, collapse = ", "), "\n", sep = "")
+  cat("- Name:        ", x$name, "\n", sep = "")
+  cat("- Workers:     ", x$num_workers, "\n", sep = "")
+  cat("- Chunk size:  ", x$chunk_size, "\n", sep = "")
+  cat("- Branches:    ", total_branches(x), "\n", sep = "")
+  cat("- Seed:        ", x$seed, "\n", sep = "")
+  cat("- Packages:    ",
+      if (length(x$packages)) paste(x$packages, collapse = ", ") else "<none>",
+      "\n", sep = "")
   invisible(x)
 }
-

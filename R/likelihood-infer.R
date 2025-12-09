@@ -6,46 +6,39 @@
 #'
 #' @description
 #' Computes likelihood-based inferential quantities — MLEs, smoothed
-#' likelihood curves, relative log-likelihood functions, and LR-based
-#' confidence intervals — for one or more likelihood results stored
-#' inside a `calibrated_model`.
+#' likelihood curves, relative log-likelihood functions, and
+#' likelihood-ratio (LR) confidence intervals.
 #'
-#' This function **modifies the calibrated model in place**, attaching
-#' an inference object to each likelihood component under:
+#' This function **modifies** the calibrated model by attaching, for
+#' each likelihood result in `cal$results`, a `"likelyr_inference"`
+#' object nested at:
 #'
 #' \preformatted{
 #'   cal$results[[name]]$inference
 #' }
 #'
-#' The updated calibrated model is returned, with class
-#' `"likelyr_inferred"` added via [mark_inferred()].
-#'
 #' @details
-#' A calibrated model may contain:
+#' If `alpha_levels` is **NULL**, it is automatically derived from the estimand:
 #'
-#' * Integrated likelihood results (`"IL"`)
-#' * Profile likelihood results (`"PL"`)
-#' * Other likelihood-based outputs
+#' \preformatted{
+#'   alpha_levels = 1 - estimand$confidence_levels
+#' }
 #'
-#' For each selected result, `infer()` generates:
+#' This ensures that inference defaults to the confidence levels the user
+#' supplied when defining the estimand specification.
 #'
-#' * Spline-smoothed likelihood curve
-#' * MLE and maximum log-likelihood
-#' * Relative log-likelihood function rLL(ψ)
-#' * Likelihood-ratio confidence intervals
+#' @param cal A `calibrated_model` produced by calibrate() and then
+#'   integrate() or profile().
+#' @param which Optional vector of names in `cal$results` to infer on.
+#'   Default = all.
+#' @param alpha_levels Optional numeric vector of α-levels (e.g. c(0.05, 0.1)).
+#'   If NULL, uses values derived from the estimand spec.
 #'
-#' @param cal A `calibrated_model` returned by [calibrate()] and
-#'   subsequently by [integrate()] or [profile()].
-#' @param which Optional character vector specifying which entries of
-#'   `cal$results` to infer on. Default: all likelihood results.
-#' @param alpha Numeric vector of confidence levels (e.g. `0.05`).
-#'
-#' @return The **same calibrated_model**, but with each selected result
-#' updated to contain an `"inference"` object. The returned model gains
-#' class `"likelyr_inferred"`.
+#' @return The same `calibrated_model`, now with class
+#'   `"likelyr_inferred"` and inference objects added.
 #'
 #' @export
-infer <- function(cal, which = NULL, alpha = 0.05) {
+infer <- function(cal, which = NULL, alpha_levels = NULL) {
 
   if (!inherits(cal, "calibrated_model"))
     stop("infer() requires a calibrated_model.", call. = FALSE)
@@ -57,6 +50,11 @@ infer <- function(cal, which = NULL, alpha = 0.05) {
     stop("infer(): No likelihood results present. Run integrate() or profile().",
          call. = FALSE)
 
+  # If alpha_levels not supplied, derive from estimand spec
+  if (is.null(alpha_levels)) {
+    alpha_levels <- 1 - cal$estimand$confidence_levels
+  }
+
   available <- names(cal$results)
 
   if (is.null(which)) {
@@ -64,36 +62,47 @@ infer <- function(cal, which = NULL, alpha = 0.05) {
   } else {
     missing <- setdiff(which, available)
     if (length(missing) > 0)
-      stop("infer(): Unknown result(s): ",
-           paste(missing, collapse = ", "), call. = FALSE)
+      stop(
+        "infer(): Unknown result(s): ",
+        paste(missing, collapse = ", "),
+        call. = FALSE
+      )
   }
 
+  psi_0 <- cal$estimand$psi_0
+
+  # Perform inference for each requested result
   for (name in which) {
     res <- cal$results[[name]]
-    cal$results[[name]]$inference <- infer_one_result(res, alpha)
+
+    # Make the estimand spec available for CI expansion
+    res$estimand <- cal$estimand
+
+    cal$results[[name]]$inference <- infer_one_result(res, alpha_levels, psi_0)
   }
 
-  cal <- mark_inferred(cal)
-  cal
+  mark_inferred(cal)
 }
 
 # =====================================================================
-# Internal: Inference for a Single IL or PL Result
+# Internal: Inference for a Single Likelihood Result
 # =====================================================================
 
 #' @title Inference for a Single Likelihood Grid
 #' @description
-#' Internal helper used by [infer()] to process **one** likelihood grid.
+#' Internal helper used by infer() to compute inference for one
+#' likelihood grid (Integrated or Profiled).
 #'
-#' @param res A likelihood result object containing either:
-#'   * `log_L_bar_df` (integrated likelihood)
-#'   * `profile_df`   (profile likelihood)
-#' @param alpha Numeric vector of confidence levels.
+#' @param res A likelihood result object containing one of:
+#'   * `log_L_bar_df` — Integrated Likelihood grid
+#'   * `profile_df`   — Profile Likelihood grid
+#' @param alpha Numeric vector of α levels.
 #'
 #' @return A `"likelyr_inference"` object.
 #' @keywords internal
-infer_one_result <- function(res, alpha) {
+infer_one_result <- function(res, alpha_levels, psi_0) {
 
+  # Determine grid type
   if (!is.null(res$log_L_bar_df)) {
     df   <- res$log_L_bar_df
     mode <- "Integrated"
@@ -101,58 +110,53 @@ infer_one_result <- function(res, alpha) {
     df   <- res$profile_df
     mode <- "Profile"
   } else {
-    stop("infer(): Result object does not contain a likelihood grid.", call. = FALSE)
+    stop("infer_one_result(): Result object does not contain a likelihood grid.",
+         call. = FALSE)
   }
 
   if (!all(c("psi", "value") %in% names(df)))
-    stop("Likelihood grid must contain columns 'psi' and 'value'.", call. = FALSE)
+    stop("Likelihood grid must contain 'psi' and 'value'.", call. = FALSE)
 
+  # Retrieve estimand (for uniroot expansion)
+  estimand <- res$estimand %||%
+    stop("infer_one_result(): result must contain $estimand.", call. = FALSE)
+
+  expand_factor <- estimand$uniroot_expand_factor %||% 0.05
+
+  # Validate the factor
+  if (!is.numeric(expand_factor) || length(expand_factor) != 1 || expand_factor < 0)
+    stop("estimand$uniroot_expand_factor must be a non-negative scalar.", call. = FALSE)
+
+  # Prepare loglik column
   df <- dplyr::rename(df, loglik = value)
 
+  # Fit spline, obtain MLE, construct rLL
   spline_model <- fit_ll_spline(df)
   MLE_data     <- compute_MLE(spline_model, df)
   rel_ll_fn    <- make_relative_loglik_fn(spline_model, MLE_data$Maximum)
-  conf_ints    <- compute_ci(rel_ll_fn, df, MLE_data, alpha)
+
+  # Compute LR-based CIs
+  conf_ints <- compute_ci(
+    relative_loglik_fn    = rel_ll_fn,
+    df                    = df,
+    MLE_data              = MLE_data,
+    alpha_levels          = alpha_levels,
+    uniroot_expand_factor = expand_factor
+  )
 
   new_inference_result(list(
     psi             = df$psi,
     loglik          = df$loglik,
     spline_model    = spline_model,
-    MLE             = MLE_data$MLE,
+    psi_0           = psi_0,
+    psi_mle         = MLE_data$MLE,
     max_loglik      = MLE_data$Maximum,
     relative_loglik = rel_ll_fn,
     conf_ints       = conf_ints,
-    mode            = mode
+    mode            = mode,
+    alpha_levels    = alpha_levels
   ))
 }
-
-# =====================================================================
-# Inference Object Class Documentation
-# =====================================================================
-
-#' Likelyr Inference Object
-#'
-#' @name likelyr_inference
-#' @rdname likelyr_inference
-#'
-#' @description
-#' Objects of class `"likelyr_inference"` store inference results for a
-#' single likelihood curve.
-#'
-#' @details
-#' Each object contains:
-#'
-#' * `psi` — grid of ψ values
-#' * `loglik` — log-likelihood values
-#' * `spline_model` — smoothing spline fit
-#' * `MLE` — maximum-likelihood estimate
-#' * `max_loglik` — maximum log-likelihood
-#' * `relative_loglik` — function returning rLL(ψ)
-#' * `conf_ints` — LR confidence intervals
-#' * `mode` — `"Integrated"` or `"Profile"`
-#'
-#' @return A `"likelyr_inference"` object.
-NULL
 
 # =====================================================================
 # S3 Print Method
@@ -165,6 +169,7 @@ print.likelyr_inference <- function(x, ...) {
   cat("  Type:     ", x$mode, "\n", sep = "")
   cat("  MLE:      ", format(x$MLE), "\n", sep = "")
   cat("  Max LL:   ", format(x$max_loglik), "\n", sep = "")
+  cat("  Alpha:    ", paste(format(x$alpha_levels), collapse = ", "), "\n")
 
   if (!is.null(x$conf_ints)) {
     cat("  CIs:\n")
@@ -184,10 +189,11 @@ print.likelyr_inference <- function(x, ...) {
 summary.likelyr_inference <- function(object, ...) {
 
   out <- list(
-    mode       = object$mode,
-    MLE        = object$MLE,
-    max_loglik = object$max_loglik,
-    conf_ints  = object$conf_ints
+    mode         = object$mode,
+    MLE          = object$MLE,
+    max_loglik   = object$max_loglik,
+    alpha_levels = object$alpha_levels,
+    conf_ints    = object$conf_ints
   )
 
   class(out) <- "summary_likelyr_inference"
@@ -198,9 +204,10 @@ summary.likelyr_inference <- function(object, ...) {
 print.summary_likelyr_inference <- function(x, ...) {
 
   cat("<Summary: likelyr_inference>\n")
-  cat("  Type:     ", x$mode, "\n", sep = "")
-  cat("  MLE:      ", format(x$MLE), "\n", sep = "")
-  cat("  Max LL:   ", format(x$max_loglik), "\n", sep = "")
+  cat("  Type:     ", x$mode, "\n")
+  cat("  MLE:      ", format(x$MLE), "\n")
+  cat("  Max LL:   ", format(x$max_loglik), "\n")
+  cat("  Alpha:    ", paste(format(x$alpha_levels), collapse = ", "), "\n")
 
   cat("\n  Confidence Intervals:\n")
   if (!is.null(x$conf_ints)) print(x$conf_ints) else cat("    <none>\n")
@@ -212,18 +219,6 @@ print.summary_likelyr_inference <- function(x, ...) {
 # S3 Plot Method
 # =====================================================================
 
-#' Plot a Likelyr Inference Object
-#'
-#' @description
-#' Plots the relative log-likelihood curve rLL(ψ), marks the MLE, and
-#' optionally displays confidence interval boundaries.
-#'
-#' @param x A `"likelyr_inference"` object.
-#' @param show_ci Logical; display CI bounds if TRUE.
-#' @param ... Ignored.
-#'
-#' @return A ggplot object (invisibly).
-#'
 #' @export
 plot.likelyr_inference <- function(x, show_ci = TRUE, ...) {
 
@@ -257,14 +252,14 @@ plot.likelyr_inference <- function(x, show_ci = TRUE, ...) {
         p <- p + ggplot2::geom_vline(
           xintercept = ci$lower,
           linetype   = "dashed",
-          color      = "gray80"
+          color      = "gray70"
         )
 
       if (!is.na(ci$upper))
         p <- p + ggplot2::geom_vline(
           xintercept = ci$upper,
           linetype   = "dashed",
-          color      = "gray80"
+          color      = "gray70"
         )
     }
   }

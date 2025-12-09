@@ -7,21 +7,42 @@
 profile(cal, ...)
 }
 \arguments{
-\item{cal}{A calibrated_model object}
+\item{cal}{A \code{calibrated_model} produced by \code{\link[=calibrate]{calibrate()}}.}
 
-\item{...}{Additional arguments passed to build_one_branch()}
+\item{...}{Additional arguments forwarded to \code{\link[=generate_profile]{generate_profile()}}.}
 
-\item{verbose}{Logical; print diagnostics}
+\item{verbose}{Logical; print diagnostic messages (default FALSE).}
 }
 \value{
-The SAME calibrated_model, augmented with:
+The SAME calibrated_model object, augmented with:
 \itemize{
-\item class "likelyr_profile"
-\item results$PL — a likelyr_profile_result object
+\item \code{results$PL} — a \code{likelyr_profile_result} object
+\item class \code{"likelyr_profiled"}
 }
 }
 \description{
-Computes the profile likelihood (PL) and attaches it to \verb{$results$PL}
-inside the calibrated_model. The PL is a \emph{single branch} of the IL with
-nuisance parameters fixed at their MLE (i.e., omega_hat = theta_MLE).
+Computes the \emph{profile likelihood} curve for the calibrated model.
+
+Unlike the integrated likelihood (IL), the profile likelihood (PL)
+does \strong{not} involve ω̂–sampling or Monte Carlo methods. Instead,
+nuisance parameters are fixed at their MLE:
+
+\preformatted{
+   ω̂ = θ̂_MLE
+}
+
+The likelihood is then evaluated along a ψ–grid, forming a \emph{single
+deterministic branch}. The result is attached to:
+
+\preformatted{
+  cal$results$PL
+}
+}
+\examples{
+\dontrun{
+cal <- calibrate(model, data)
+cal <- profile(cal)
+plot(cal$results$PL)
+}
+
 }

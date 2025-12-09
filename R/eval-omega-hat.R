@@ -5,10 +5,10 @@
 #   • Multi-scale perturbations (local + global)
 #   • Tangent-space dispersion using an orthonormal basis
 #   • Optional recentering around previous ω̂ samples
-#   • Full likelihood_spec() constraint support (bounds + ineq)
+#   • Full parameter_spec() constraint support (bounds + ineq)
 #
 # This is now fully aligned with the calibrated model layout:
-#   - theta_mle       in cal$likelihood$theta_mle
+#   - theta_mle       in cal$parameter$theta_mle
 #   - psi_fn, psi_jac in cal$estimand$psi_fn / $psi_jac
 #   - psi_mle         in cal$estimand$psi_mle
 # ======================================================================
@@ -81,15 +81,15 @@
 #' @export
 make_omega_hat_initgen <- function(cal) {
 
-  lik       <- cal$likelihood
-  estimand  <- cal$estimand
+  param    <- cal$parameter
+  estimand <- cal$estimand
 
-  theta_mle <- lik$theta_mle
+  theta_mle <- param$theta_mle
   psi_jac   <- estimand$psi_jac
 
-  J      <- lik$theta_dim
-  lower  <- lik$theta_lower %||% rep(-Inf, J)
-  upper  <- lik$theta_upper %||% rep( Inf,  J)
+  J      <- param$theta_dim
+  lower  <- param$theta_lower %||% rep(-Inf, J)
+  upper  <- param$theta_upper %||% rep( Inf,  J)
 
   # Build tangent-space basis at θ_MLE (may be NULL)
   B <- .tangent_basis(theta_mle, psi_jac)
@@ -164,7 +164,7 @@ make_omega_hat_sampler <- function(cal) {
 
   local({
 
-    lik      <- cal$likelihood
+    param    <- cal$parameter
     estimand <- cal$estimand
     opt      <- cal$optimizer
 
@@ -172,14 +172,14 @@ make_omega_hat_sampler <- function(cal) {
     psi_mle  <- estimand$psi_mle
     psi_jac  <- estimand$psi_jac
 
-    J <- lik$theta_dim
+    J <- param$theta_dim
 
-    lower <- lik$theta_lower %||% rep(-Inf, J)
-    upper <- lik$theta_upper %||% rep( Inf,  J)
+    lower <- param$theta_lower %||% rep(-Inf, J)
+    upper <- param$theta_upper %||% rep( Inf,  J)
 
     # Inequality constraints (may be NULL)
-    hin_fn    <- lik$ineq
-    hinjac_fn <- lik$ineq_jac
+    hin_fn    <- param$ineq
+    hinjac_fn <- param$ineq_jac
 
     # Objective is zero — pure feasibility problem on the manifold
     fn0    <- function(theta) 0

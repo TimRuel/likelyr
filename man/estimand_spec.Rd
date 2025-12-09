@@ -10,37 +10,52 @@ estimand_spec(
   search_interval_fn,
   increment,
   confidence_levels,
+  cutoff_buffer = 0.1,
+  uniroot_expand_factor = 0.02,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{psi_fn}{function(theta, data) → scalar ψ}
+\item{psi_fn}{Function(theta) → scalar ψ(θ). Required.}
 
-\item{psi_jac}{optional gradient function(theta, data)}
+\item{psi_jac}{Optional function(theta) → gradient ∇ψ(θ).}
 
-\item{search_interval_fn}{function(data) → numeric vector length 2}
+\item{search_interval_fn}{Function(data) → c(lower, upper). Required.}
 
-\item{increment}{positive numeric scalar}
+\item{increment}{Positive scalar giving ψ-grid spacing.}
 
-\item{confidence_levels}{numeric vector in (0, 1)}
+\item{confidence_levels}{Numeric vector strictly inside (0, 1).
+These are \strong{coverage levels} (not α). Example: \code{c(0.90, 0.95)}.}
 
-\item{name}{optional descriptive name}
+\item{cutoff_buffer}{Nonnegative scalar. Branches are extended to at
+least \code{(1 + cutoff_buffer)} times the deepest LR cutoff.}
 
-\item{...}{extra stored fields}
+\item{uniroot_expand_factor}{Nonnegative scalar. Used by CI routines
+to expand root-finding intervals.}
+
+\item{name}{Optional descriptive name.}
+
+\item{...}{Additional user metadata (stored but unused).}
 }
 \value{
-An \code{estimand_spec} object with classes
-c("estimand_spec", "likelyr_spec")
+An \code{estimand_spec} object.
 }
 \description{
-Defines:
-• ψ(θ)       — the estimand of interest
-• ∂ψ/∂θ      — optional analytic jacobian
-• search_interval_fn(data) → c(a, b)
-• increment  — step size for ψ grid during branch exploration
-• confidence_levels — confidence levels (0 < c < 1)
+Defines the estimand function ψ(θ) and all metadata needed for
+generating profile or integrated likelihood curves:
 
-The interval is a \emph{function of the data only}.
-If users want θ_MLE included, they must recompute θ_MLE inside it.
+• \code{psi_fn(theta)} — mapping from θ → ψ
+• optional analytic Jacobian ∂ψ/∂θ
+• \code{search_interval_fn(data)} — allowable ψ-range
+• grid \code{increment} for ψ exploration
+• \code{confidence_levels} for LR confidence intervals
+• \code{cutoff_buffer} to ensure branch depth beyond the strictest CI
+• \code{uniroot_expand_factor} to widen search intervals for CI endpoints
+
+\code{cutoff_buffer} ensures that branch construction explores \emph{past} the
+deepest LR cutoff induced by the smallest CI level.
+
+\code{uniroot_expand_factor} helps \code{compute_ci()} succeed even when roots
+lie just outside the discrete ψ-grid envelope.
 }

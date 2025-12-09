@@ -4,51 +4,42 @@
 \alias{infer}
 \title{Likelihood-Based Inference for a Calibrated Model}
 \usage{
-infer(cal, which = NULL, alpha = 0.05)
+infer(cal, which = NULL, alpha_levels = NULL)
 }
 \arguments{
-\item{cal}{A \code{calibrated_model} returned by \code{\link[=calibrate]{calibrate()}} and
-subsequently by \code{\link[=integrate]{integrate()}} or \code{\link[=profile]{profile()}}.}
+\item{cal}{A \code{calibrated_model} produced by calibrate() and then
+integrate() or profile().}
 
-\item{which}{Optional character vector specifying which entries of
-\code{cal$results} to infer on. Default: all likelihood results.}
+\item{which}{Optional vector of names in \code{cal$results} to infer on.
+Default = all.}
 
-\item{alpha}{Numeric vector of confidence levels (e.g. \code{0.05}).}
+\item{alpha_levels}{Optional numeric vector of α-levels (e.g. c(0.05, 0.1)).
+If NULL, uses values derived from the estimand spec.}
 }
 \value{
-The \strong{same calibrated_model}, but with each selected result
-updated to contain an \code{"inference"} object. The returned model gains
-class \code{"likelyr_inferred"}.
+The same \code{calibrated_model}, now with class
+\code{"likelyr_inferred"} and inference objects added.
 }
 \description{
 Computes likelihood-based inferential quantities — MLEs, smoothed
-likelihood curves, relative log-likelihood functions, and LR-based
-confidence intervals — for one or more likelihood results stored
-inside a \code{calibrated_model}.
+likelihood curves, relative log-likelihood functions, and
+likelihood-ratio (LR) confidence intervals.
 
-This function \strong{modifies the calibrated model in place}, attaching
-an inference object to each likelihood component under:
+This function \strong{modifies} the calibrated model by attaching, for
+each likelihood result in \code{cal$results}, a \code{"likelyr_inference"}
+object nested at:
 
 \preformatted{
   cal$results[[name]]$inference
 }
-
-The updated calibrated model is returned, with class
-\code{"likelyr_inferred"} added via \code{\link[=mark_inferred]{mark_inferred()}}.
 }
 \details{
-A calibrated model may contain:
-\itemize{
-\item Integrated likelihood results (\code{"IL"})
-\item Profile likelihood results (\code{"PL"})
-\item Other likelihood-based outputs
+If \code{alpha_levels} is \strong{NULL}, it is automatically derived from the estimand:
+
+\preformatted{
+  alpha_levels = 1 - estimand$confidence_levels
 }
 
-For each selected result, \code{infer()} generates:
-\itemize{
-\item Spline-smoothed likelihood curve
-\item MLE and maximum log-likelihood
-\item Relative log-likelihood function rLL(ψ)
-\item Likelihood-ratio confidence intervals
-}
+This ensures that inference defaults to the confidence levels the user
+supplied when defining the estimand specification.
 }

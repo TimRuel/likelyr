@@ -12,6 +12,17 @@ parallel_spec(
   name = "parallel"
 )
 }
+\arguments{
+\item{num_workers}{Positive integer: number of parallel workers.}
+
+\item{chunk_size}{Positive integer: branches per worker.}
+
+\item{seed}{Logical or numeric seed for reproducibility.}
+
+\item{packages}{Character vector of packages to load on workers.}
+
+\item{name}{Optional identifier.}
+}
 \value{
 A \code{parallel_spec} object.
 }

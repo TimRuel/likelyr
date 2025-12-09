@@ -8,18 +8,29 @@ library(foreach)
 library(likelyr)
 
 # ============================================================
+# Specify model parameter
+# ============================================================
+seed <- 7835
+set.seed(seed)
+J <- 6
+theta_0 <- rgamma(J, shape = 3, rate = 1)
+theta_lower <- 1e-12
+
+parameter <- parameter_spec(
+  name = "Model parameter spec",
+  theta_0 = theta_0,
+  theta_lower = theta_lower
+)
+
+# ============================================================
 # Specify likelihood
 # ============================================================
-J <- 6
 loglik <- function(theta, data) sum(dpois(data$Y, data$t * theta, log = TRUE))
 theta_mle_fn <- function(data) data$Y / data$t
-theta_lower <- 1e-12
 
 likelihood <- likelihood_spec(
   loglik = loglik,
-  theta_dim = J,
   theta_mle_fn = theta_mle_fn,
-  theta_lower = theta_lower,
   name = "Likelihood Spec"
 )
 
@@ -35,7 +46,9 @@ search_interval_fn <- function(data) {
   psi_mle + c(-1, 1) * 6 * psi_mle_se
 }
 increment <- 0.1
-confidence_levels <- 0.8
+confidence_levels <- c(0.90, 0.95, 0.99)
+cutoff_buffer <- 0.1
+uniroot_expand_factor <- 0.02
 
 estimand <- estimand_spec(
   psi_fn = psi_fn,
@@ -43,6 +56,8 @@ estimand <- estimand_spec(
   search_interval_fn = search_interval_fn,
   increment = increment,
   confidence_levels = confidence_levels,
+  cutoff_buffer = cutoff_buffer,
+  uniroot_expand_factor = uniroot_expand_factor,
   name = "Weighted Sum (psi)"
 )
 
@@ -78,8 +93,6 @@ optimizer <- optimizer_spec(
 # Specify execution plan (serial or parallel)
 # ============================================================
 R <- 10
-seed <- 7835
-
 execution <- serial_spec(
   R = R,
   seed = seed,
@@ -90,6 +103,7 @@ execution <- serial_spec(
 # Specify model
 # ============================================================
 model <- model_spec(name = "Poisson - Naive Rates") |>
+  add(parameter) |>
   add(likelihood) |>
   add(estimand) |>
   add(nuisance) |>
@@ -99,9 +113,7 @@ model <- model_spec(name = "Poisson - Naive Rates") |>
 # ============================================================
 # Calibrate model to data and integrate
 # ============================================================
-set.seed(seed)
 process_labels <- LETTERS[1:J]
-theta_0 <- rgamma(J, shape = 3, rate = 1)
 weights <- runif(J, 1, 3)
 t <- do.call(runif, list(n = J, min = J * 1, max = J * 5))
 mu_0 <- theta_0 * t
@@ -114,12 +126,16 @@ data <- tibble(process = factor(process_labels),
 
 fit <- model |>
   calibrate(data) |>
+  profile() |>
   integrate() |>
   diagnose() |>
-  infer(alpha = c(0.21, 0.22))
+  infer()
+
+fit <- fit |> infer()
 
 plot(fit$results$IL$diagnostics)
 plot(fit$results$IL$inference)
+plot(fit$results$PL$inference)
 
 # -------------------------------------------------------------
 # 5. Attach diagnostics (separate file)

@@ -44,14 +44,14 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 0B. Ensure model_spec is complete for IL generation
+  # 0B. Ensure model_spec is complete for likelihood integration
   # ------------------------------------------------------------------
-  .validate_model_for_generation(cal)
+  .validate_model_for_integration(cal)
 
   # Pull calibrated quantities
   psi_fn    <- cal$estimand$psi_fn
   psi_mle   <- cal$estimand$psi_mle
-  theta_mle <- cal$likelihood$theta_mle
+  theta_mle <- cal$parameter$theta_mle
 
   # Ensure results list is present
   if (is.null(cal$results)) cal$results <- list()
@@ -137,16 +137,17 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
 }
 
 # ======================================================================
-# INTERNAL VALIDATION FOR IL GENERATION
+# INTERNAL VALIDATION FOR LIKELIHOOD INTEGRATION WRT NUISANCE PARAMETER
 # ======================================================================
 
-.validate_model_for_generation <- function(cal) {
+.validate_model_for_integration <- function(cal) {
 
   model <- cal  # a calibrated_model inherits model_spec fields
 
-  if (!.is_model_spec_generation_complete(model)) {
+  if (!.is_model_spec_complete(model)) {
 
     missing <- c()
+    if (is.null(model$parameter)) missing <- c(missing, "parameter_spec()")
     if (is.null(model$likelihood)) missing <- c(missing, "likelihood_spec()")
     if (is.null(model$estimand))  missing <- c(missing, "estimand_spec()")
     if (is.null(model$nuisance))  missing <- c(missing, "nuisance_spec()")

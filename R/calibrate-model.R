@@ -6,8 +6,9 @@
 #'
 #' @description
 #' Prepares a model for computing profile or integrated likelihoods.
-#' Calibration is modular: each structural component (likelihood,
-#' estimand, nuisance) is processed by its own calibration helper.
+#' Calibration is modular: each structural component (parameter,
+#' likelihood, estimand, nuisance) is processed by its own calibration
+#' helper.
 #'
 #' Optimizer and execution specs are *not required at calibration time*.
 #' They may be supplied later and are validated by integrate()/profile().
@@ -15,7 +16,6 @@
 #' @param model   A `model_spec` object.
 #' @param data    User data.
 #' @param verbose Logical; print calibration diagnostics.
-#'                Defaults to FALSE for pipe-friendly behavior.
 #'
 #' @return A `calibrated_model` object.
 #' @export
@@ -45,20 +45,34 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # 2. Modular calibration of each spec component
   # -------------------------------------------------------------------
 
-  # 2a. Likelihood — binds loglik(), computes θ̂_MLE
-  model$likelihood <- calibrate_likelihood(model$likelihood, data)
-
-  # 2b. Estimand — binds ψ(), computes ψ̂_MLE and search interval
-  model$estimand <- calibrate_estimand(
-    model$estimand,
-    data      = data,
-    theta_mle = model$likelihood$theta_mle
+  # 2a. Parameter — dimension, bounds, θ₀, θ̂_MLE, constraints
+  model$parameter <- calibrate_parameter(
+    parameter  = model$parameter,
+    likelihood = model$likelihood,
+    data       = data
   )
 
-  # 2c. Nuisance — binds E_loglik(), gradient structure, etc.
-  model$nuisance <- calibrate_nuisance(model$nuisance, data)
+  # 2b. Likelihood — bind loglik(theta, data)
+  model$likelihood <- calibrate_likelihood(
+    likelihood = model$likelihood,
+    data       = data
+  )
 
-  # 2d. Execution — allowed to be NULL at calibration time
+  # 2c. Estimand — bind ψ(), compute ψ̂_MLE, ψ₀, and search interval
+  model$estimand <- calibrate_estimand(
+    estimand   = model$estimand,
+    data       = data,
+    theta_mle  = model$parameter$theta_mle,
+    theta_0    = model$parameter$theta_0
+  )
+
+  # 2d. Nuisance — bind E_loglik(), gradient structure, etc.
+  model$nuisance <- calibrate_nuisance(
+    nuisance = model$nuisance,
+    data     = data
+  )
+
+  # 2e. Execution — allowed to be NULL at calibration time
   if (!is.null(model$execution)) {
     model$execution <- calibrate_execution(model$execution)
   }
@@ -85,14 +99,19 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 # INTERNAL VALIDATION
 # ======================================================================
 
-# Only structural components must be present for calibration:
-#   • likelihood
-#   • estimand
-#   • nuisance
+# Structural components that must be present before calibration:
+#   • parameter_spec()
+#   • likelihood_spec()
+#   • estimand_spec()
+#   • nuisance_spec()
 #
 # optimizer_spec() and execution_spec() are NOT required here,
 # and will be validated later by integrate() or profile().
 .validate_model_for_calibration <- function(model) {
+
+  if (!inherits(model$parameter, "parameter_spec"))
+    stop("model$parameter must be a parameter_spec() before calibration.",
+         call. = FALSE)
 
   if (!inherits(model$likelihood, "likelihood_spec"))
     stop("model$likelihood must be a likelihood_spec() before calibration.",
@@ -110,20 +129,25 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 }
 
 # ======================================================================
-# PRINT METHOD (unchanged)
+# PRINT METHOD
 # ======================================================================
 
 #' @export
 print.calibrated_model <- function(x, ...) {
 
-  theta_mle <- x$likelihood$theta_mle
+  theta_mle <- x$parameter$theta_mle
   psi_mle   <- x$estimand$psi_mle
   interval  <- x$estimand$search_interval
 
   cat("# Calibrated Model (likelyr)\n")
 
   # core calibrated quantities
-  cat("- θ̂:           (", paste(format(theta_mle), collapse = ", "), ")\n", sep = "")
+  if (!is.null(theta_mle)) {
+    cat("- θ̂:           (", paste(format(theta_mle), collapse = ", "), ")\n", sep = "")
+  } else {
+    cat("- θ̂:           <not available>\n")
+  }
+
   cat("- ψ̂:            ", format(psi_mle), "\n", sep = "")
   cat("- interval:    [", interval[1], ", ", interval[2], "]\n", sep = "")
 

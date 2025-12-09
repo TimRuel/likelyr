@@ -50,15 +50,16 @@ build_eval_psi_fun <- function(cal) {
   # ---------------------------------------------------------------
   # Unpack calibrated components
   # ---------------------------------------------------------------
-  lik      <- cal$likelihood
-  est      <- cal$estimand
-  nuis     <- cal$nuisance
-  opt      <- cal$optimizer
+  param <- cal$parameter
+  lik   <- cal$likelihood
+  est   <- cal$estimand
+  nuis  <- cal$nuisance
+  opt   <- cal$optimizer
 
   # Bound, data-bound closures (now inside specs)
-  loglik        <- lik$loglik
-  psi_fn        <- est$psi_fn
-  psi_jac       <- est$psi_jac
+  loglik  <- lik$loglik
+  psi_fn  <- est$psi_fn
+  psi_jac <- est$psi_jac
 
   E_loglik      <- nuis$E_loglik
   E_loglik_grad <- nuis$E_loglik_grad
@@ -67,12 +68,12 @@ build_eval_psi_fun <- function(cal) {
   # ---------------------------------------------------------------
   # Likelihood-level constraints
   # ---------------------------------------------------------------
-  theta_lower <- lik$theta_lower
-  theta_upper <- lik$theta_upper
-  ineq_fn     <- lik$ineq
-  ineq_jac_fn <- lik$ineq_jac
+  theta_lower <- param$theta_lower
+  theta_upper <- param$theta_upper
+  ineq_fn     <- param$ineq
+  ineq_jac_fn <- param$ineq_jac
 
-  J <- lik$theta_dim
+  J <- param$theta_dim
 
   # Expand missing bounds
   if (is.null(theta_lower)) theta_lower <- rep(-Inf, J)

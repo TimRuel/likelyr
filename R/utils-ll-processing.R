@@ -62,38 +62,50 @@ compute_MLE <- function(spline_model, df) {
 #'
 #' @description
 #' Given a relative log-likelihood function:
-#'     rLL(psi) = loglik(psi) - max_loglik
-#'
+#'     rLL(psi) = loglik(psi) - max_loglik,
 #' compute LR-based confidence intervals satisfying:
-#'     rLL(psi) >= -crit
+#'     rLL(psi) >= -crit,
 #' where crit = 0.5 * χ²₁(1 - α).
 #'
 #' @param relative_loglik_fn A function rLL(psi).
 #' @param df A data frame with columns psi and loglik (grid).
 #' @param MLE_data Output from compute_MLE().
 #' @param alpha_levels Numeric vector of α levels.
+#' @param uniroot_expand_factor Multiplicative factor used to expand
+#'        the uniroot search interval outward (default 0.05 = 5%).
 #'
 #' @return A tibble with (confidence, alpha, lower, upper).
 #' @export
 compute_ci <- function(relative_loglik_fn,
                        df,
                        MLE_data,
-                       alpha_levels) {
-  psi_grid <- df$psi
-  MLE <- as.numeric(MLE_data$MLE)
+                       alpha_levels,
+                       uniroot_expand_factor) {
 
-  psi_min <- min(psi_grid)
-  psi_max <- max(psi_grid)
+  psi_grid <- df$psi
+  MLE      <- as.numeric(MLE_data$MLE)
+
+  psi_min0 <- min(psi_grid)
+  psi_max0 <- max(psi_grid)
 
   purrr::map_dfr(alpha_levels, function(alpha) {
 
-    crit <- stats::qchisq(1 - alpha, df = 1) / 2
+    crit  <- 0.5 * stats::qchisq(1 - alpha, df = 1)
     label <- paste0(100 * (1 - alpha), "%")
+
+    # ----------------------------------------------------------
+    # Expand intervals multiplicatively to improve robustness
+    # ----------------------------------------------------------
+    left_width   <- MLE - psi_min0
+    right_width  <- psi_max0 - MLE
+
+    psi_min <- psi_min0 - left_width  * uniroot_expand_factor
+    psi_max <- psi_max0 + right_width * uniroot_expand_factor
 
     # --- Lower bound ---
     lower <- tryCatch(
       stats::uniroot(
-        f = function(psi) relative_loglik_fn(psi) + crit,
+        f        = function(psi) relative_loglik_fn(psi) + crit,
         interval = c(psi_min, MLE)
       )$root,
       error = function(e) NA_real_
@@ -102,7 +114,7 @@ compute_ci <- function(relative_loglik_fn,
     # --- Upper bound ---
     upper <- tryCatch(
       stats::uniroot(
-        f = function(psi) relative_loglik_fn(psi) + crit,
+        f        = function(psi) relative_loglik_fn(psi) + crit,
         interval = c(MLE, psi_max)
       )$root,
       error = function(e) NA_real_

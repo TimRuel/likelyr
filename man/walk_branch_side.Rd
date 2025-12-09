@@ -38,7 +38,5 @@ through integer grid indices k, computing ψ_k from the supplied ψ-grid,
 and calling:
 
 eval_psi_fun(psi_k, theta_init)
-
-This replaces the old interface eval_psi_fun(k, theta_init).
 }
 \keyword{internal}

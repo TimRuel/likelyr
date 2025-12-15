@@ -7,10 +7,9 @@
 infer_one_result(res, alpha_levels, psi_0)
 }
 \arguments{
-\item{res}{A likelihood result object containing one of:
+\item{res}{A likelihood result object containing:
 \itemize{
-\item \code{log_L_bar_df} — Integrated Likelihood grid
-\item \code{profile_df}   — Profile Likelihood grid
+\item \code{df} — Dataframe of pseudolikelihood (psi, log L(psi)) values
 }}
 
 \item{alpha}{Numeric vector of α levels.}

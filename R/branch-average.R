@@ -25,10 +25,10 @@
 average_branches <- function(branches) {
 
   # -------------------------------------------------------------
-  # 1. Rename "value" columns: value1, value2, ...
+  # 1. Rename "loglik" columns: loglik1, loglik2, ...
   # -------------------------------------------------------------
   renamed <- Map(
-    f = function(br, i) dplyr::rename(br, !!paste0("value", i) := value),
+    f = function(br, i) dplyr::rename(br, !!paste0("loglik", i) := loglik),
     br = branches,
     i  = seq_along(branches)
   )
@@ -47,7 +47,7 @@ average_branches <- function(branches) {
   # 3. Extract matrix (K × R)
   # -------------------------------------------------------------
   branch_mat <- merged |>
-    dplyr::select(matches("^value\\d+$")) |>
+    dplyr::select(matches("^loglik\\d+$")) |>
     as.matrix()
 
   R <- ncol(branch_mat)
@@ -57,11 +57,11 @@ average_branches <- function(branches) {
   # -------------------------------------------------------------
   log_mean <- matrixStats::rowLogSumExps(branch_mat) - log(R)
 
-  df <- tibble::tibble(
+  psi_ll_df <- tibble::tibble(
     psi   = psi,
-    value = as.numeric(log_mean)
+    loglik = as.numeric(log_mean)
   )
 
-  list(df = df,
+  list(psi_ll_df = psi_ll_df,
        branch_mat = branch_mat)
 }

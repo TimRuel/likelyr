@@ -15,7 +15,7 @@
 #' @param eval_psi_fun Function(psi_value, theta_init) → list(theta_hat, branch_val)
 #' @param max_retries Integer number of jitter retries for monotonicity
 #'
-#' @return A tibble with columns k and value, sorted by k.
+#' @return A tibble with columns k and loglik, sorted by k.
 #'
 #' @keywords internal
 walk_branch_side <- function(
@@ -32,7 +32,7 @@ walk_branch_side <- function(
   current_par <- init_guess
   current_val <- Inf
 
-  df <- tibble::tibble(k = integer(), value = numeric())
+  df <- tibble::tibble(k = integer(), loglik = numeric())
 
   repeat {
 
@@ -85,7 +85,7 @@ walk_branch_side <- function(
     current_par <- eval$theta_hat
 
     # Record this step
-    df <- dplyr::add_row(df, k = k_curr, value = current_val)
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
 
     # Next grid index
     k_curr <- k_curr + k_direction

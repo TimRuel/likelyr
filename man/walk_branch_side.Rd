@@ -30,7 +30,7 @@ walk_branch_side(
 \item{max_retries}{Integer number of jitter retries for monotonicity}
 }
 \value{
-A tibble with columns k and value, sorted by k.
+A tibble with columns k and loglik, sorted by k.
 }
 \description{
 Performs a one-sided sweep of the branch log-likelihood by stepping

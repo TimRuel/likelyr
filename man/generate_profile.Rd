@@ -36,8 +36,8 @@ A tibble with:
 \itemize{
 \item k               – integer grid index
 \item psi             – ψ-values
-\item value           – log-likelihood at ψ
-\item value_centered  – loglik − max(loglik)
+\item loglik           – log-likelihood at ψ
+\item loglik_centered  – loglik − max(loglik)
 }
 
 The tibble is sorted in increasing order of ψ.

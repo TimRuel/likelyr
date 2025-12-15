@@ -130,10 +130,11 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # 5. Wrap into likelyr_profile_result
   # ------------------------------------------------------------------
   pl_result <- new_pl_result(list(
-    profile_df = profile_df,
-    psi_mle    = psi_mle,
-    theta_mle  = theta_mle,
-    status     = if (!is.null(profile_df)) "success" else "failed"
+    psi_ll_df = profile_df,
+    psi_mle   = psi_mle,
+    theta_mle = theta_mle,
+    mode      = "Profile",
+    status    = if (!is.null(profile_df)) "success" else "failed"
   ))
 
   # ------------------------------------------------------------------
@@ -187,8 +188,8 @@ print.likelyr_pl_result <- function(x, ...) {
   if (!is.null(x$theta_mle)) cat("theta_MLE: (",
                                  paste(format(x$theta_mle), collapse = ", "),
                                  ")\n", sep = "")
-  if (!is.null(x$profile_df))
-    cat("Grid points:", nrow(x$profile_df), "\n")
+  if (!is.null(x$df))
+    cat("Grid points:", nrow(x$df), "\n")
   invisible(x)
 }
 
@@ -200,8 +201,8 @@ summary.likelyr_pl_result <- function(object, ...) {
     status     = object$status,
     psi_mle    = object$psi_mle,
     theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$profile_df))
-      nrow(object$profile_df) else NA_integer_
+    n_grid     = if (!is.null(object$df))
+      nrow(object$df) else NA_integer_
   )
   class(out) <- "summary_likelyr_profile_result"
   out
@@ -216,4 +217,17 @@ print.summary_likelyr_pl_result <- function(x, ...) {
       paste(format(x$theta_mle), collapse = ", "), "\n", sep = "")
   cat("# Grid points: ", x$n_grid, "\n", sep = "")
   invisible(x)
+}
+
+# =====================================================================
+# S3 Plot Method
+# =====================================================================
+
+#' @export
+plot.likelyr_pl_result <- function(x) {
+
+  p <- plot_pseudolikelihood_points(x)
+
+  print(p)
+  invisible(p)
 }

@@ -21,7 +21,7 @@
 #' @param eval_psi_fun Function(psi, theta_init) → list(theta_hat, branch_val).
 #' @param max_retries Integer jitter retry budget for monotonicity enforcement.
 #'
-#' @return Tibble of (k, value), sorted by k.
+#' @return Tibble of (k, loglik), sorted by k.
 #' @keywords internal
 walk_profile_side <- function(
     psi_mle,
@@ -37,7 +37,7 @@ walk_profile_side <- function(
   current_par <- init_guess
   current_val <- Inf
 
-  df <- tibble::tibble(k = integer(), value = numeric())
+  df <- tibble::tibble(k = integer(), loglik = numeric())
 
   repeat {
 
@@ -73,8 +73,8 @@ walk_profile_side <- function(
     if (!is.finite(current_val) || current_val < cutoff)
       break
 
-    # Record k and value
-    df <- dplyr::add_row(df, k = k_curr, value = current_val)
+    # Record k and loglik
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
 
     # Update warm-start for continuation
     current_par <- eval$theta_hat

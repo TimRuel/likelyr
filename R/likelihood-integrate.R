@@ -101,16 +101,17 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
     branches    <- branch_result$branches
     omega_draws <- branch_result$omega_draws
 
-    log_L_bar <- average_branches(branches)
+    branch_avg <- average_branches(branches)
 
     new_il_result(list(
-      log_L_bar_df = log_L_bar$df,
-      branch_mat   = log_L_bar$branch_mat,
-      branches     = branches,
-      omega_draws  = omega_draws,
-      theta_mle    = theta_mle,
-      psi_mle      = psi_mle,
-      status       = "success"
+      psi_ll_df   = branch_avg$psi_ll_df,
+      branch_mat  = branch_avg$branch_mat,
+      branches    = branches,
+      omega_draws = omega_draws,
+      theta_mle   = theta_mle,
+      psi_mle     = psi_mle,
+      mode        = "Integrated",
+      status      = "success"
     ))
 
   }, error = function(e) {
@@ -183,8 +184,8 @@ print.likelyr_il_result <- function(x, ...) {
         paste(format(x$theta_mle), collapse = ", "),
         ")\n", sep = "")
 
-  if (!is.null(x$log_L_bar_df))
-    cat("Grid points: ", nrow(x$log_L_bar_df), "\n", sep = "")
+  if (!is.null(x$df))
+    cat("Grid points: ", nrow(x$df), "\n", sep = "")
 
   invisible(x)
 }
@@ -195,8 +196,8 @@ summary.likelyr_il_result <- function(object, ...) {
     status     = object$status,
     psi_mle    = object$psi_mle,
     theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$log_L_bar_df))
-      nrow(object$log_L_bar_df) else NA_integer_,
+    n_grid     = if (!is.null(object$df))
+      nrow(object$df) else NA_integer_,
     n_branches = if (!is.null(object$branches))
       length(object$branches) else NA_integer_
   )
@@ -214,4 +215,17 @@ print.summary_likelyr_il_result <- function(x, ...) {
   cat("# Grid points: ", x$n_grid, "\n", sep = "")
   cat("# Branches:    ", x$n_branches, "\n", sep = "")
   invisible(x)
+}
+
+# =====================================================================
+# S3 Plot Method
+# =====================================================================
+
+#' @export
+plot.likelyr_il_result <- function(x) {
+
+  p <- plot_pseudolikelihood_points(x)
+
+  print(p)
+  invisible(p)
 }

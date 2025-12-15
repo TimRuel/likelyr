@@ -9,16 +9,31 @@
 #' @return Named vector of colors for labelling CI endpoints on likelihood plot.
 #' @keywords internal
 get_ci_palette <- function(conf_ints) {
-
   confidence <- conf_ints$confidence
   n <- length(confidence)
 
-  ci_palette <- viridisLite::viridis(n, option = "D")
-  names(ci_palette) <- confidence
+  # Twilight Princess: cool teal-green, but lighter at the dark end
+  ci_colors <- colorspace::sequential_hcl(
+    n,
+    h = 150,           # bluish-green (teal forest vibe)
+    c = c(35, 65),     # moderate chroma → avoids neon & mud
+    l = c(92, 40),     # lighter dark end so plots stay readable
+    power = 1.1        # subtle easing for smooth transitions
+  )
 
-  ci_palette
+  names(ci_colors) <- confidence
+  ci_colors
 }
 
-# Default colors for MLE and truth markers
-MLE_COLOR   <- "#D55E00"  # orange
-TRUTH_COLOR <- "#009E73"  # teal
+# Default colors for pseudolikelihood curve, MLE marker, and truth marker
+CURVE_COLOR <- "#052880"
+MLE_COLOR   <- "#941703"
+TRUTH_COLOR <- "#C4A806"
+
+
+
+
+
+
+
+

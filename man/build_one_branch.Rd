@@ -37,12 +37,12 @@ enforcing monotonic branch behavior.}
 \value{
 A tibble with columns:
 \item{k}{Integer ψ-grid index relative to ψ̂_MLE}
-\item{value}{Log-likelihood at each ψ_k}
+\item{loglik}{Log-likelihood at each ψ_k}
 \item{psi}{ψ-grid value}
-\item{value_centered}{Centered loglik: value - max(value)}
+\item{loglik_centered}{Centered loglik: loglik - max(loglik)}
 
 with attributes:
-\item{mode_index}{Index of the maximum branch value}
+\item{mode_index}{Index of the maximum branch loglik value}
 \item{n_points}{Number of grid points in the branch}
 \item{psi_MLE}{Global ψ̂_MLE}
 }

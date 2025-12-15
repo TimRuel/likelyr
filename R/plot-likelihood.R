@@ -1,12 +1,31 @@
 # =====================================================================
 # plot-likelihood.R
-# Pseudolikelihood Visualization for Inference Objects
+# Pseudolikelihood Visualization for Result and Inference Objects
 # =====================================================================
 
-plot_pseudolikelihood <- function(x) {
+plot_pseudolikelihood_points <- function(psi_ll_df) {
 
-  psi_endpoints <- range(x$psi)
-  stat_fn <- make_stat_fn(psi_endpoints, x$relative_loglik)
+  p <- plot_base() +
+    ggplot2::geom_point(
+      data = psi_ll_df,
+      ggplot2::aes(x = psi, y = value),
+      color = "cyan",
+      size = 3,
+      alpha = 0.7
+      ) +
+    ggplot2::labs(
+      title = paste(x$mode, "Log-Likelihood"),
+      x     = expression(psi),
+      y     = expression("log L("*psi*")")
+    )
+
+  invisible(p)
+}
+
+plot_pseudolikelihood_curve <- function(x) {
+
+  psi_endpoints <- range(x$psi_ll_df$psi)
+  stat_fn <- make_stat_fn(psi_endpoints, x$zero_max_psi_ll_fn)
 
   MLE_label <- if (x$mode == "Profile") "hat(psi)" else "bar(psi)"
 
@@ -23,9 +42,9 @@ plot_pseudolikelihood <- function(x) {
     values_to = "value"
   )
 
-  ci_palette <- get_ci_colors(x$conf_ints)
+  ci_palette <- get_ci_palette(x$conf_ints)
 
-  crit_max <- 0.5 * qchisq(1 - min(x$alpha_levels), 1)
+  crit_max <- 0.5 * qchisq(1 - min(x$conf_ints$alpha), 1)
   y_min    <- -crit_max - 0.5
 
   p <- plot_base() +
@@ -62,6 +81,9 @@ plot_pseudolikelihood <- function(x) {
     ggrepel::geom_label_repel(
       data = label_data,
       ggplot2::aes(x = value, y = 0.5 * y_min, label = label, color = source),
+      direction = "y",
+      force = TRUE,
+      hjust = 0.5,
       parse = TRUE,
       seed = 7835,
       show.legend = FALSE
@@ -72,9 +94,9 @@ plot_pseudolikelihood <- function(x) {
     ) +
 
     ggplot2::labs(
-      title = paste0(x$mode, " Log-Likelihood"),
+      title = paste(x$mode, "Log-Likelihood"),
       x     = expression(psi),
-      y     = "Relative log-likelihood"
+      y     = expression("log L("*psi*")")
     ) +
     ggplot2::scale_x_continuous(expand = c(0, 0), limits = psi_endpoints) +
     ggplot2::scale_y_continuous(expand = c(0, 0), limits = c(y_min, 0.1)) +
@@ -84,6 +106,6 @@ plot_pseudolikelihood <- function(x) {
       legend.justification = c(1, 1)
     )
 
-  print(p)
   invisible(p)
 }
+

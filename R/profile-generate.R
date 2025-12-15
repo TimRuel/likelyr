@@ -27,8 +27,8 @@
 #' @return A tibble with:
 #'   * k               – integer grid index
 #'   * psi             – ψ-values
-#'   * value           – log-likelihood at ψ
-#'   * value_centered  – loglik − max(loglik)
+#'   * loglik           – log-likelihood at ψ
+#'   * loglik_centered  – loglik − max(loglik)
 #'
 #' The tibble is sorted in increasing order of ψ.
 #'
@@ -74,12 +74,12 @@ generate_profile <- function(
   # ------------------------------------------------------------
   profile <- dplyr::bind_rows(
     left,
-    tibble::tibble(k = 0L, value = loglik_at_mle),
+    tibble::tibble(k = 0L, loglik = loglik_at_mle),
     right
   ) |>
     dplyr::mutate(
       psi            = psi_mle + k * increment,
-      value_centered = value - max(value, na.rm = TRUE)
+      loglik_centered = loglik - max(loglik, na.rm = TRUE)
     ) |>
     dplyr::arrange(psi)
 

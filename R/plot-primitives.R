@@ -15,7 +15,7 @@ make_stat_fn <- function(psi_endpoints, relative_loglik_fn) {
   ggplot2::stat_function(
     fun = relative_loglik_fn,
     geom = "line",
-    color = "#00A2FF",
+    color = CURVE_COLOR,
     linewidth = 1.5,
     xlim = psi_endpoints
   )

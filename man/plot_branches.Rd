@@ -4,10 +4,12 @@
 \alias{plot_branches}
 \title{Plot Integrated Log-Likelihood Branches}
 \usage{
-plot_branches(mat)
+plot_branches(x)
 }
 \arguments{
-\item{mat}{Matrix of log-likelihood branches.}
+\item{mat}{Branch matrix.}
+
+\item{crit}{Critical value for horizontal cutoff line.}
 }
 \value{
 A ggplot object.

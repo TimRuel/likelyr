@@ -30,7 +30,7 @@ walk_profile_side(
 \item{max_retries}{Integer jitter retry budget for monotonicity enforcement.}
 }
 \value{
-Tibble of (k, value), sorted by k.
+Tibble of (k, loglik), sorted by k.
 }
 \description{
 Performs a one-sided sweep of the profile log-likelihood by moving

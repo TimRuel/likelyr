@@ -44,12 +44,12 @@
 #'
 #' @return A tibble with columns:
 #'   \item{k}{Integer ψ-grid index relative to ψ̂_MLE}
-#'   \item{value}{Log-likelihood at each ψ_k}
+#'   \item{loglik}{Log-likelihood at each ψ_k}
 #'   \item{psi}{ψ-grid value}
-#'   \item{value_centered}{Centered loglik: value - max(value)}
+#'   \item{loglik_centered}{Centered loglik: loglik - max(loglik)}
 #'
 #' with attributes:
-#'   \item{mode_index}{Index of the maximum branch value}
+#'   \item{mode_index}{Index of the maximum branch loglik value}
 #'   \item{n_points}{Number of grid points in the branch}
 #'   \item{psi_MLE}{Global ψ̂_MLE}
 #'
@@ -102,14 +102,14 @@ build_one_branch <- function(
     ) |>
     dplyr::arrange(.data$psi)
 
-  # Center values AFTER arranging
+  # Center loglik values AFTER arranging
   branch <- branch |>
     dplyr::mutate(
-      value_centered = .data$value - max(.data$value, na.rm = TRUE)
+      loglik_centered = .data$loglik - max(.data$loglik, na.rm = TRUE)
     )
 
   # Metadata
-  attr(branch, "mode_index") <- which.max(branch$value)
+  attr(branch, "mode_index") <- which.max(branch$loglik)
   attr(branch, "n_points")   <- nrow(branch)
   attr(branch, "psi_MLE")    <- psi_mle
 

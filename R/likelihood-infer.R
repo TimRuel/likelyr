@@ -93,68 +93,61 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
 #' Internal helper used by infer() to compute inference for one
 #' likelihood grid (Integrated or Profiled).
 #'
-#' @param res A likelihood result object containing one of:
-#'   * `log_L_bar_df` — Integrated Likelihood grid
-#'   * `profile_df`   — Profile Likelihood grid
+#' @param res A likelihood result object containing:
+#'   * `df` — Dataframe of pseudolikelihood (psi, log L(psi)) values
 #' @param alpha Numeric vector of α levels.
 #'
 #' @return A `"likelyr_inference"` object.
 #' @keywords internal
 infer_one_result <- function(res, alpha_levels, psi_0) {
 
-  # Determine grid type
-  if (!is.null(res$log_L_bar_df)) {
-    df   <- res$log_L_bar_df
-    mode <- "Integrated"
-  } else if (!is.null(res$profile_df)) {
-    df   <- res$profile_df
-    mode <- "Profile"
-  } else {
-    stop("infer_one_result(): Result object does not contain a likelihood grid.",
-         call. = FALSE)
-  }
+  psi_ll_df <- res$psi_ll_df
+  mode <- res$mode
 
-  if (!all(c("psi", "value") %in% names(df)))
-    stop("Likelihood grid must contain 'psi' and 'value'.", call. = FALSE)
+  psi_ll_fn <- fit_psi_ll_fn(psi_ll_df)
+  psi_ll_max_point <- get_psi_ll_max_point(psi_ll_fn, psi_ll_df)
+  psi_ll_argmax <- psi_ll_max_point$argmax
 
-  # Retrieve estimand (for uniroot expansion)
-  estimand <- res$estimand %||%
-    stop("infer_one_result(): result must contain $estimand.", call. = FALSE)
+  # MLE
+  se_psi_hat <- get_se_psi_hat(psi_ll_argmax, psi_ll_df)
+  psi_mle_df <- data.frame(psi_0 = psi_0, psi_hat = psi_ll_argmax, se_psi_hat = se_psi_hat)
+  psi_mle_kable <- render_psi_mle_kable(psi_mle_df, mode, show_caption = TRUE)
 
-  expand_factor <- estimand$uniroot_expand_factor %||% 0.05
+  # CI
+  psi_ll_max <- psi_ll_max_point$max
+  zero_max_psi_ll_fn <- shift_psi_ll_fn(psi_ll_fn, psi_ll_max)
 
-  # Validate the factor
-  if (!is.numeric(expand_factor) || length(expand_factor) != 1 || expand_factor < 0)
-    stop("estimand$uniroot_expand_factor must be a non-negative scalar.", call. = FALSE)
+  expand_factor <- res$estimand$uniroot_expand_factor
 
-  # Prepare loglik column
-  df <- dplyr::rename(df, loglik = value)
-
-  # Fit spline, obtain MLE, construct rLL
-  spline_model <- fit_ll_spline(df)
-  MLE_data     <- compute_MLE(spline_model, df)
-  rel_ll_fn    <- make_relative_loglik_fn(spline_model, MLE_data$Maximum)
-
-  # Compute LR-based CIs
-  conf_ints <- compute_ci(
-    relative_loglik_fn    = rel_ll_fn,
-    df                    = df,
-    MLE_data              = MLE_data,
+  psi_conf_ints_df <- get_psi_conf_ints_df(
+    zero_max_psi_ll_fn    = zero_max_psi_ll_fn,
+    psi_ll_argmax         = psi_ll_argmax,
+    psi_ll_df             = psi_ll_df,
     alpha_levels          = alpha_levels,
-    uniroot_expand_factor = expand_factor
+    uniroot_expand_factor = expand_factor,
+    psi_0                 = psi_0
+  )
+
+  psi_conf_ints_table <- get_psi_conf_ints_table(psi_conf_ints_df, psi_ll_argmax, psi_0)
+  ci_kable <- render_ci_kable(ci_table, mode, show_caption = TRUE)
+
+  inference_table <- render_inference_table(
+    mle_kable = mle_kable,
+    ci_kable  = ci_kable,
+    mode      = mode
   )
 
   new_inference_result(list(
-    psi             = df$psi,
-    loglik          = df$loglik,
     spline_model    = spline_model,
-    psi_0           = psi_0,
-    psi_mle         = MLE_data$MLE,
-    max_loglik      = MLE_data$Maximum,
     relative_loglik = rel_ll_fn,
+    loglik_df       = df,
+    psi_0           = psi_0,
+    psi_mle_df        = psi_mle_df,
+    mle_kable       = mle_kable,
     conf_ints       = conf_ints,
-    mode            = mode,
-    alpha_levels    = alpha_levels
+    ci_kable        = ci_kable,
+    table           = inference_table,
+    mode            = mode
   ))
 }
 
@@ -167,8 +160,8 @@ print.likelyr_inference <- function(x, ...) {
 
   cat("<likelyr_inference>\n")
   cat("  Type:     ", x$mode, "\n", sep = "")
-  cat("  MLE:      ", format(x$MLE), "\n", sep = "")
-  cat("  Max LL:   ", format(x$max_loglik), "\n", sep = "")
+  cat("  MLE:      ", format(x$mle_data$MLE), "\n", sep = "")
+  cat("  Max LL:   ", format(x$mle_data$Maximum), "\n", sep = "")
   cat("  Alpha:    ", paste(format(x$alpha_levels), collapse = ", "), "\n")
 
   if (!is.null(x$conf_ints)) {
@@ -190,9 +183,8 @@ summary.likelyr_inference <- function(object, ...) {
 
   out <- list(
     mode         = object$mode,
-    MLE          = object$MLE,
-    max_loglik   = object$max_loglik,
-    alpha_levels = object$alpha_levels,
+    MLE          = object$mle_data$MLE,
+    max_loglik   = object$mle_data$maximum,
     conf_ints    = object$conf_ints
   )
 
@@ -205,9 +197,8 @@ print.summary_likelyr_inference <- function(x, ...) {
 
   cat("<Summary: likelyr_inference>\n")
   cat("  Type:     ", x$mode, "\n")
-  cat("  MLE:      ", format(x$MLE), "\n")
-  cat("  Max LL:   ", format(x$max_loglik), "\n")
-  cat("  Alpha:    ", paste(format(x$alpha_levels), collapse = ", "), "\n")
+  cat("  MLE:      ", format(x$mle_data$MLE), "\n")
+  cat("  Max LL:   ", format(x$mle_data$max_loglik), "\n")
 
   cat("\n  Confidence Intervals:\n")
   if (!is.null(x$conf_ints)) print(x$conf_ints) else cat("    <none>\n")
@@ -220,49 +211,9 @@ print.summary_likelyr_inference <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_inference <- function(x, show_ci = TRUE, ...) {
+plot.likelyr_inference <- function(x) {
 
-  psi <- x$psi
-  rLL <- x$relative_loglik(psi)
-
-  df <- tibble::tibble(psi = psi, rLL = rLL)
-
-  p <- plot_base() +
-    ggplot2::geom_line(
-      data = df,
-      ggplot2::aes(x = psi, y = rLL),
-      color = "#00A2FF", linewidth = 1.2
-    ) +
-    ggplot2::geom_point(
-      data = tibble::tibble(psi = x$MLE, rLL = 0),
-      ggplot2::aes(x = psi, y = rLL),
-      color = "#FF5D00", size = 3
-    ) +
-    ggplot2::labs(
-      title = paste0("Relative Log-Likelihood (", x$mode, ")"),
-      x = expression(psi),
-      y = "Relative log-likelihood"
-    )
-
-  if (show_ci && !is.null(x$conf_ints)) {
-    for (i in seq_len(nrow(x$conf_ints))) {
-      ci <- x$conf_ints[i, ]
-
-      if (!is.na(ci$lower))
-        p <- p + ggplot2::geom_vline(
-          xintercept = ci$lower,
-          linetype   = "dashed",
-          color      = "gray70"
-        )
-
-      if (!is.na(ci$upper))
-        p <- p + ggplot2::geom_vline(
-          xintercept = ci$upper,
-          linetype   = "dashed",
-          color      = "gray70"
-        )
-    }
-  }
+  p <- plot_pseudolikelihood_curve(x$psi_ll_df)
 
   print(p)
   invisible(p)

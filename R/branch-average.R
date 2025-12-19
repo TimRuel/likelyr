@@ -1,11 +1,11 @@
 # ======================================================================
-# Average Branches (Monte Carlo Integrated Likelihood)
+# Average Branches (Monte Carlo Integrated Log-Likelihood)
 # ======================================================================
 
-#' Average Branches (Monte Carlo Integrated Likelihood)
+#' Average Branches (Monte Carlo Integrated Log-Likelihood)
 #'
 #' @description
-#' Computes the Monte Carlo integrated likelihood curve by averaging
+#' Computes the Monte Carlo integrated log-likelihood curve by averaging
 #' branch-specific log-likelihood values using the numerically-stable
 #' log-mean-exp identity:
 #'
@@ -61,6 +61,8 @@ average_branches <- function(branches) {
     psi   = psi,
     loglik = as.numeric(log_mean)
   )
+
+  attr(psi_ll_df, "type") <- "Integrated"
 
   list(psi_ll_df = psi_ll_df,
        branch_mat = branch_mat)

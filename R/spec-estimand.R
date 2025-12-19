@@ -2,11 +2,11 @@
 # Estimand Specification (v3.2)
 # ======================================================================
 
-#' Specify an Estimand ψ(θ) for Profile / Integrated Likelihood
+#' Specify an Estimand ψ(θ) for Profile / Integrated Log-Likelihood
 #'
 #' @description
 #' Defines the estimand function ψ(θ) and all metadata needed for
-#' generating profile or integrated likelihood curves:
+#' generating profile or integrated log-likelihood curves:
 #'
 #'   • `psi_fn(theta)` — mapping from θ → ψ
 #'   • optional analytic Jacobian ∂ψ/∂θ

@@ -2,11 +2,11 @@
 # Nuisance Specification (v3.1)
 # ======================================================================
 
-#' Specify Nuisance Components for Integrated Likelihood
+#' Specify Nuisance Components for Integrated Log-Likelihood
 #'
 #' @description
 #' Defines the nuisance contribution to the *expected* log-likelihood
-#' used in Monte Carlo Integrated Likelihood:
+#' used in Monte Carlo Integrated Log-Likelihood:
 #'
 #' \deqn{
 #'   E_{\omegâ}[ \log p(Y \mid \theta) ].
@@ -17,8 +17,8 @@
 #' • `E_loglik(theta, omega_hat, data)` — expected log-likelihood
 #' • `E_loglik_grad(theta, omega_hat, data)` — optional gradient wrt θ
 #'
-#' These functions are used *only* for integrated likelihood calculations.
-#' They play no role in profile likelihood.
+#' These functions are used *only* for integrated log-likelihood calculations.
+#' They play no role in profile log-likelihood.
 #'
 #' @param E_loglik
 #'   Required. Function `(theta, omega_hat, data) -> numeric`

@@ -1,8 +1,8 @@
 # ======================================================================
-# One-Sided Profile Likelihood Sweep (Internal)
+# One-Sided Profile Log-Likelihood Sweep (Internal)
 # ======================================================================
 
-#' One-Sided Profile Likelihood Sweep
+#' One-Sided Profile Log-Likelihood Sweep
 #'
 #' @description
 #' Performs a one-sided sweep of the profile log-likelihood by moving
@@ -11,7 +11,7 @@
 #' method along the constrained manifold ψ(θ) = ψ_k.
 #'
 #' Monotonicity of the profile curve is enforced via limited jittering,
-#' identical in spirit to integrated-likelihood branch sweeps.
+#' identical in spirit to integrated log-likelihood branch sweeps.
 #'
 #' @param psi_mle Numeric ψ̂.
 #' @param increment Numeric grid spacing (Δψ).

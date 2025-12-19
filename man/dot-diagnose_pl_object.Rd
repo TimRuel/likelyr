@@ -2,11 +2,11 @@
 % Please edit documentation in R/likelihood-diagnose.R
 \name{.diagnose_pl_object}
 \alias{.diagnose_pl_object}
-\title{Placeholder diagnostics for Profile Likelihood}
+\title{Placeholder diagnostics for Profile Log-Likelihood}
 \usage{
 .diagnose_pl_object(pl)
 }
 \description{
-Placeholder diagnostics for Profile Likelihood
+Placeholder diagnostics for Profile Log-Likelihood
 }
 \keyword{internal}

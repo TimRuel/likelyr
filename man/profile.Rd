@@ -2,7 +2,7 @@
 % Please edit documentation in R/likelihood-profile.R
 \name{profile}
 \alias{profile}
-\title{Profile Likelihood}
+\title{Profile Log-Likelihood}
 \usage{
 profile(cal, ...)
 }
@@ -21,9 +21,9 @@ The SAME calibrated_model object, augmented with:
 }
 }
 \description{
-Computes the \emph{profile likelihood} curve for the calibrated model.
+Computes the \emph{profile log-likelihood} curve for the calibrated model.
 
-Unlike the integrated likelihood (IL), the profile likelihood (PL)
+Unlike the integrated log-likelihood (IL), the profile log-likelihood (PL)
 does \strong{not} involve ω̂–sampling or Monte Carlo methods. Instead,
 nuisance parameters are fixed at their MLE:
 
@@ -31,7 +31,7 @@ nuisance parameters are fixed at their MLE:
    ω̂ = θ̂_MLE
 }
 
-The likelihood is then evaluated along a ψ–grid, forming a \emph{single
+The log-likelihood is then evaluated along a ψ–grid, forming a \emph{single
 deterministic branch}. The result is attached to:
 
 \preformatted{

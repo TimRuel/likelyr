@@ -16,14 +16,14 @@
 # INTERNAL: Build a full branch (left + right sweep) on the ψ-grid
 # ======================================================================
 
-#' Build a Full Branch on the ψ-Grid (Integrated Likelihood)
+#' Build a Full Branch on the ψ-Grid (Integrated Log-Likelihood)
 #'
 #' @description
 #' Given the branch mode (ψ̂_branch, θ̂_branch), this function sweeps
 #' outward along the ψ-grid in both directions (left and right) until
 #' the log-likelihood falls below a supplied cutoff.
 #'
-#' This is used for **integrated likelihood branches only**; the cutoff
+#' This is used for **integrated log-likelihood branches only**; the cutoff
 #' threshold (including any user-specified buffer) is computed upstream
 #' in [generate_branches()].
 #'
@@ -121,10 +121,10 @@ build_one_branch <- function(
 # INTERNAL: Generate Monte Carlo Branches (IL only)
 # ======================================================================
 
-#' Generate Monte Carlo Branches (Integrated Likelihood Only)
+#' Generate Monte Carlo Branches (Integrated Log-Likelihood Only)
 #'
 #' @description
-#' Generates `R` Monte Carlo branches for the integrated likelihood,
+#' Generates `R` Monte Carlo branches for the integrated log-likelihood,
 #' each branch corresponding to a draw of ω̂ satisfying ψ(ω̂) = ψ_MLE.
 #'
 #' For each branch:

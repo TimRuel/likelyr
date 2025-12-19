@@ -18,8 +18,8 @@ and diagnostics added to each result.
 }
 \description{
 Scans all entries of \code{cal$results}, attaching a diagnostics object to
-each likelihood result (Integrated or Profile). Integrated Likelihood
-(IL) receives full Monte Carlo diagnostics; Profile Likelihood (PL)
+each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
+(IL) receives full Monte Carlo diagnostics; Profile Log-Likelihood (PL)
 receives a placeholder for now.
 
 Diagnostics are stored under:

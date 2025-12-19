@@ -1,6 +1,6 @@
 # =====================================================================
 # plot-palette.R
-# Color Palettes for Likelihood Visualization
+# Color Palettes for Log-Likelihood Visualization
 # =====================================================================
 
 #' Colors for Likelihood-Ratio Confidence Levels
@@ -8,9 +8,9 @@
 #' @param conf_ints Data frame of CI values.
 #' @return Named vector of colors for labelling CI endpoints on likelihood plot.
 #' @keywords internal
-get_ci_palette <- function(conf_ints) {
-  confidence <- conf_ints$confidence
-  n <- length(confidence)
+get_ci_palette <- function(interval_estimates_df) {
+  levels <- interval_estimates_df$Level
+  n <- length(levels)
 
   # Twilight Princess: cool teal-green, but lighter at the dark end
   ci_colors <- colorspace::sequential_hcl(
@@ -21,7 +21,7 @@ get_ci_palette <- function(conf_ints) {
     power = 1.1        # subtle easing for smooth transitions
   )
 
-  names(ci_colors) <- confidence
+  names(ci_colors) <- levels
   ci_colors
 }
 

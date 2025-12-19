@@ -4,7 +4,7 @@
 \alias{get_ci_palette}
 \title{Colors for Likelihood-Ratio Confidence Levels}
 \usage{
-get_ci_palette(conf_ints)
+get_ci_palette(interval_estimates_df)
 }
 \arguments{
 \item{conf_ints}{Data frame of CI values.}

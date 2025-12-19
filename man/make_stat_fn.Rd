@@ -2,19 +2,19 @@
 % Please edit documentation in R/plot-primitives.R
 \name{make_stat_fn}
 \alias{make_stat_fn}
-\title{Build ggplot stat_function layer for pseudolikelihood curves}
+\title{Build ggplot stat_function layer for pseudo-log-likelihood curves}
 \usage{
-make_stat_fn(psi_endpoints, relative_loglik_fn)
+make_stat_fn(psi_endpoints, zero_max_psi_ll_fn)
 }
 \arguments{
 \item{psi_endpoints}{Numeric range.}
 
-\item{relative_loglik_fn}{Function of psi.}
+\item{zero_max_psi_ll_fn}{Function of psi.}
 }
 \value{
 A ggplot stat_function layer.
 }
 \description{
-Build ggplot stat_function layer for pseudolikelihood curves
+Build ggplot stat_function layer for pseudo-log-likelihood curves
 }
 \keyword{internal}

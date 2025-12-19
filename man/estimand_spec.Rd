@@ -2,7 +2,7 @@
 % Please edit documentation in R/spec-estimand.R
 \name{estimand_spec}
 \alias{estimand_spec}
-\title{Specify an Estimand ψ(θ) for Profile / Integrated Likelihood}
+\title{Specify an Estimand ψ(θ) for Profile / Integrated Log-Likelihood}
 \usage{
 estimand_spec(
   psi_fn,
@@ -43,7 +43,7 @@ An \code{estimand_spec} object.
 }
 \description{
 Defines the estimand function ψ(θ) and all metadata needed for
-generating profile or integrated likelihood curves:
+generating profile or integrated log-likelihood curves:
 
 • \code{psi_fn(theta)} — mapping from θ → ψ
 • optional analytic Jacobian ∂ψ/∂θ

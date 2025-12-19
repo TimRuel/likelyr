@@ -1,41 +1,45 @@
 # =====================================================================
-# likelihood-inference.R — Likelihood-based inference for likelyr
+# likelihood-infer.R — Likelihood-based inference for likelyr
 # =====================================================================
 
 #' Likelihood-Based Inference for a Calibrated Model
 #'
 #' @description
-#' Computes likelihood-based inferential quantities — MLEs, smoothed
-#' likelihood curves, relative log-likelihood functions, and
-#' likelihood-ratio (LR) confidence intervals.
+#' Attaches likelihood-based inferential summaries—point estimates and
+#' likelihood-ratio confidence intervals—to previously computed likelihood
+#' results.
 #'
-#' This function **modifies** the calibrated model by attaching, for
-#' each likelihood result in `cal$results`, a `"likelyr_inference"`
-#' object nested at:
+#' This function does **not** recompute likelihoods. It operates on likelihood
+#' objects (e.g. from `integrate()` or `profile()`) already stored in a
+#' calibrated model.
+#'
+#' For each selected likelihood result in `cal$results`, a
+#' `"likelyr_inference"` object is attached at:
 #'
 #' \preformatted{
 #'   cal$results[[name]]$inference
 #' }
 #'
 #' @details
-#' If `alpha_levels` is **NULL**, it is automatically derived from the estimand:
+#' If `alpha_levels` is **NULL**, values are derived from the estimand
+#' specification:
 #'
 #' \preformatted{
 #'   alpha_levels = 1 - estimand$confidence_levels
 #' }
 #'
-#' This ensures that inference defaults to the confidence levels the user
-#' supplied when defining the estimand specification.
+#' ensuring consistency between estimation and inference defaults.
 #'
-#' @param cal A `calibrated_model` produced by calibrate() and then
-#'   integrate() or profile().
-#' @param which Optional vector of names in `cal$results` to infer on.
-#'   Default = all.
-#' @param alpha_levels Optional numeric vector of α-levels (e.g. c(0.05, 0.1)).
-#'   If NULL, uses values derived from the estimand spec.
+#' @param cal A `calibrated_model` produced by `calibrate()` and then
+#'   `integrate()` or `profile()`.
+#' @param which Optional character vector naming entries in `cal$results`
+#'   to perform inference on. Defaults to all available likelihood results.
+#' @param alpha_levels Optional numeric vector of α-levels
+#'   (e.g. `c(0.05, 0.1)`). If `NULL`, derived from the estimand specification.
 #'
-#' @return The same `calibrated_model`, now with class
-#'   `"likelyr_inferred"` and inference objects added.
+#' @return
+#' The same `calibrated_model`, augmented with inference results and
+#' assigned the additional class `"likelyr_inferred"`.
 #'
 #' @export
 infer <- function(cal, which = NULL, alpha_levels = NULL) {
@@ -47,13 +51,23 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
     stop("infer() requires a model that has been calibrated.", call. = FALSE)
 
   if (is.null(cal$results))
-    stop("infer(): No likelihood results present. Run integrate() or profile().",
-         call. = FALSE)
+    stop(
+      "infer(): No likelihood results present. ",
+      "Run integrate() or profile() first.",
+      call. = FALSE
+    )
 
-  # If alpha_levels not supplied, derive from estimand spec
+  # --------------------------------------------------
+  # Alpha levels
+  # --------------------------------------------------
   if (is.null(alpha_levels)) {
     alpha_levels <- 1 - cal$estimand$confidence_levels
   }
+
+  # --------------------------------------------------
+  # Interval-expansion control (from estimand spec)
+  # --------------------------------------------------
+  expand_factor <- cal$estimand$uniroot_expand_factor
 
   available <- names(cal$results)
 
@@ -71,84 +85,32 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
 
   psi_0 <- cal$estimand$psi_0
 
+  # --------------------------------------------------
   # Perform inference for each requested result
+  # --------------------------------------------------
   for (name in which) {
+
     res <- cal$results[[name]]
 
-    # Make the estimand spec available for CI expansion
-    res$estimand <- cal$estimand
+    if (is.null(res$psi_ll_df)) {
+      stop(
+        "infer(): Missing psi_ll_df in result '", name, "'.",
+        call. = FALSE
+      )
+    }
 
-    cal$results[[name]]$inference <- infer_one_result(res, alpha_levels, psi_0)
+    synthesis <- synthesize(
+      psi_ll_df     = res$psi_ll_df,
+      alpha_levels  = alpha_levels,
+      psi_0         = psi_0,
+      expand_factor = expand_factor,
+      render        = TRUE
+    )
+
+    cal$results[[name]]$inference <- new_inference_result(synthesis)
   }
 
   mark_inferred(cal)
-}
-
-# =====================================================================
-# Internal: Inference for a Single Likelihood Result
-# =====================================================================
-
-#' @title Inference for a Single Likelihood Grid
-#' @description
-#' Internal helper used by infer() to compute inference for one
-#' likelihood grid (Integrated or Profiled).
-#'
-#' @param res A likelihood result object containing:
-#'   * `df` — Dataframe of pseudolikelihood (psi, log L(psi)) values
-#' @param alpha Numeric vector of α levels.
-#'
-#' @return A `"likelyr_inference"` object.
-#' @keywords internal
-infer_one_result <- function(res, alpha_levels, psi_0) {
-
-  psi_ll_df <- res$psi_ll_df
-  mode <- res$mode
-
-  psi_ll_fn <- fit_psi_ll_fn(psi_ll_df)
-  psi_ll_max_point <- get_psi_ll_max_point(psi_ll_fn, psi_ll_df)
-  psi_ll_argmax <- psi_ll_max_point$argmax
-
-  # MLE
-  se_psi_hat <- get_se_psi_hat(psi_ll_argmax, psi_ll_df)
-  psi_mle_df <- data.frame(psi_0 = psi_0, psi_hat = psi_ll_argmax, se_psi_hat = se_psi_hat)
-  psi_mle_kable <- render_psi_mle_kable(psi_mle_df, mode, show_caption = TRUE)
-
-  # CI
-  psi_ll_max <- psi_ll_max_point$max
-  zero_max_psi_ll_fn <- shift_psi_ll_fn(psi_ll_fn, psi_ll_max)
-
-  expand_factor <- res$estimand$uniroot_expand_factor
-
-  psi_conf_ints_df <- get_psi_conf_ints_df(
-    zero_max_psi_ll_fn    = zero_max_psi_ll_fn,
-    psi_ll_argmax         = psi_ll_argmax,
-    psi_ll_df             = psi_ll_df,
-    alpha_levels          = alpha_levels,
-    uniroot_expand_factor = expand_factor,
-    psi_0                 = psi_0
-  )
-
-  psi_conf_ints_table <- get_psi_conf_ints_table(psi_conf_ints_df, psi_ll_argmax, psi_0)
-  ci_kable <- render_ci_kable(ci_table, mode, show_caption = TRUE)
-
-  inference_table <- render_inference_table(
-    mle_kable = mle_kable,
-    ci_kable  = ci_kable,
-    mode      = mode
-  )
-
-  new_inference_result(list(
-    spline_model    = spline_model,
-    relative_loglik = rel_ll_fn,
-    loglik_df       = df,
-    psi_0           = psi_0,
-    psi_mle_df        = psi_mle_df,
-    mle_kable       = mle_kable,
-    conf_ints       = conf_ints,
-    ci_kable        = ci_kable,
-    table           = inference_table,
-    mode            = mode
-  ))
 }
 
 # =====================================================================
@@ -159,14 +121,48 @@ infer_one_result <- function(res, alpha_levels, psi_0) {
 print.likelyr_inference <- function(x, ...) {
 
   cat("<likelyr_inference>\n")
-  cat("  Type:     ", x$mode, "\n", sep = "")
-  cat("  MLE:      ", format(x$mle_data$MLE), "\n", sep = "")
-  cat("  Max LL:   ", format(x$mle_data$Maximum), "\n", sep = "")
-  cat("  Alpha:    ", paste(format(x$alpha_levels), collapse = ", "), "\n")
 
-  if (!is.null(x$conf_ints)) {
+  if (!is.null(x$psi_ll_df)) {
+    cat("  Type:     ", attr(x$psi_ll_df, "type"), "\n")
+  }
+
+  if (!is.null(x$point_estimate_df)) {
+
+    pe <- x$point_estimate_df
+
+    cat(
+      "  MLE:      ",
+      format(pe$psi_hat),
+      "\n",
+      sep = ""
+    )
+
+    if ("se_psi_hat" %in% names(pe)) {
+      cat(
+        "  SE(MLE):  ",
+        format(pe$se_psi_hat),
+        "\n",
+        sep = ""
+      )
+    }
+  }
+
+  if (!is.null(x$interval_estimates_df) &&
+      "Level" %in% names(x$interval_estimates_df)) {
+
+    alpha_levels <- 1 - scales::parse_percent(x$interval_estimates_df$Level)
+
+    cat(
+      "  Alpha:    ",
+      paste(format(alpha_levels), collapse = ", "),
+      "\n",
+      sep = ""
+    )
+  }
+
+  if (!is.null(x$interval_estimates_df)) {
     cat("  CIs:\n")
-    print(x$conf_ints)
+    print(x$interval_estimates_df)
   } else {
     cat("  CIs:      <none>\n")
   }
@@ -181,11 +177,14 @@ print.likelyr_inference <- function(x, ...) {
 #' @export
 summary.likelyr_inference <- function(object, ...) {
 
+  pe <- object$point_estimate_df
+  ci <- object$interval_estimates_df
+
   out <- list(
-    mode         = object$mode,
-    MLE          = object$mle_data$MLE,
-    max_loglik   = object$mle_data$maximum,
-    conf_ints    = object$conf_ints
+    type       = attr(object$psi_ll_df, "type"),
+    psi_hat    = if (!is.null(pe)) pe$psi_hat else NA_real_,
+    se_psi_hat = if (!is.null(pe) && "se_psi_hat" %in% names(pe)) pe$se_psi_hat else NA_real_,
+    conf_ints  = ci
   )
 
   class(out) <- "summary_likelyr_inference"
@@ -196,12 +195,23 @@ summary.likelyr_inference <- function(object, ...) {
 print.summary_likelyr_inference <- function(x, ...) {
 
   cat("<Summary: likelyr_inference>\n")
-  cat("  Type:     ", x$mode, "\n")
-  cat("  MLE:      ", format(x$mle_data$MLE), "\n")
-  cat("  Max LL:   ", format(x$mle_data$max_loglik), "\n")
+
+  if (!is.null(x$psi_ll_df)) {
+    cat("  Type:     ", attr(x$psi_ll_df, "type"), "\n")
+  }
+
+  cat("  MLE:      ", format(x$psi_hat), "\n")
+
+  if (!is.na(x$se_psi_hat)) {
+    cat("  SE(MLE):  ", format(x$se_psi_hat), "\n")
+  }
 
   cat("\n  Confidence Intervals:\n")
-  if (!is.null(x$conf_ints)) print(x$conf_ints) else cat("    <none>\n")
+  if (!is.null(x$conf_ints)) {
+    print(x$conf_ints)
+  } else {
+    cat("    <none>\n")
+  }
 
   invisible(x)
 }
@@ -211,9 +221,14 @@ print.summary_likelyr_inference <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_inference <- function(x) {
+plot.likelyr_inference <- function(x, ...) {
 
-  p <- plot_pseudolikelihood_curve(x$psi_ll_df)
+  p <- plot_pseudolikelihood_curve(
+    psi_ll_df             = x$psi_ll_df,
+    zero_max_psi_ll_fn    = x$zero_max_psi_ll_fn,
+    point_estimate_df     = x$point_estimate_df,
+    interval_estimates_df = x$interval_estimates_df
+  )
 
   print(p)
   invisible(p)

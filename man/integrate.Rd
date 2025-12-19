@@ -2,7 +2,7 @@
 % Please edit documentation in R/likelihood-integrate.R
 \name{integrate}
 \alias{integrate}
-\title{Integrated Likelihood}
+\title{Integrated Log-Likelihood}
 \usage{
 integrate(cal, ...)
 }

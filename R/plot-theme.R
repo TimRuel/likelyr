@@ -1,6 +1,6 @@
 # =====================================================================
 # plot-theme.R
-# Base Theme for Likelihood Plots
+# Base Theme for Log-Likelihood Plots
 # =====================================================================
 
 #' Base Dark Theme for Log-Likelihood Plots

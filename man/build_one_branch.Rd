@@ -2,7 +2,7 @@
 % Please edit documentation in R/branch-generate.R
 \name{build_one_branch}
 \alias{build_one_branch}
-\title{Build a Full Branch on the ψ-Grid (Integrated Likelihood)}
+\title{Build a Full Branch on the ψ-Grid (Integrated Log-Likelihood)}
 \usage{
 build_one_branch(
   psi_hat_branch,
@@ -51,7 +51,7 @@ Given the branch mode (ψ̂_branch, θ̂_branch), this function sweeps
 outward along the ψ-grid in both directions (left and right) until
 the log-likelihood falls below a supplied cutoff.
 
-This is used for \strong{integrated likelihood branches only}; the cutoff
+This is used for \strong{integrated log-likelihood branches only}; the cutoff
 threshold (including any user-specified buffer) is computed upstream
 in \code{\link[=generate_branches]{generate_branches()}}.
 }

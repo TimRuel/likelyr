@@ -2,7 +2,7 @@
 % Please edit documentation in R/profile-generate.R
 \name{generate_profile}
 \alias{generate_profile}
-\title{Generate a Profile Likelihood Curve}
+\title{Generate a Profile Log-Likelihood Curve}
 \usage{
 generate_profile(
   psi_mle,
@@ -44,7 +44,7 @@ The tibble is sorted in increasing order of ψ.
 }
 \description{
 Internal helper used by \code{\link[=profile]{profile()}} to construct the \emph{profile
-likelihood branch} by sweeping left and right from ψ̂ using a fixed
+log-likelihood branch} by sweeping left and right from ψ̂ using a fixed
 increment. Nuisance parameters remain fixed at θ̂ throughout.
 
 The function performs:

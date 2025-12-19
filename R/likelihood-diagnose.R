@@ -6,8 +6,8 @@
 #'
 #' @description
 #' Scans all entries of `cal$results`, attaching a diagnostics object to
-#' each likelihood result (Integrated or Profile). Integrated Likelihood
-#' (IL) receives full Monte Carlo diagnostics; Profile Likelihood (PL)
+#' each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
+#' (IL) receives full Monte Carlo diagnostics; Profile Log-Likelihood (PL)
 #' receives a placeholder for now.
 #'
 #' Diagnostics are stored under:
@@ -43,7 +43,7 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
     stop("diagnose() requires a calibrated_model.", call. = FALSE)
 
   if (is.null(cal$results) || length(cal$results) == 0)
-    stop("diagnose(): No likelihood results found. Run integrate() or profile().",
+    stop("diagnose(): No pseudolikelihood results found. Run integrate() or profile().",
          call. = FALSE)
 
   # Loop over ALL results
@@ -53,7 +53,7 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
     diag_obj <- NULL
 
     # ------------------------------------------------------------
-    # Integrated Likelihood
+    # Integrated Log-Likelihood
     # ------------------------------------------------------------
     if (inherits(res, "likelyr_il_result")) {
 
@@ -67,7 +67,7 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
         attr(diag_obj, "omega_matrix") <- omega_mat
 
       # ------------------------------------------------------------
-      # Profile Likelihood
+      # Profile Log-Likelihood
       # ------------------------------------------------------------
     } else if (inherits(res, "likelyr_pl_result")) {
 
@@ -233,13 +233,13 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
 # PL Diagnostics (placeholder)
 # ======================================================================
 
-#' Placeholder diagnostics for Profile Likelihood
+#' Placeholder diagnostics for Profile Log-Likelihood
 #'
 #' @keywords internal
 .diagnose_pl_object <- function(pl) {
 
   diag <- list(
-    type       = "Profile Likelihood",
+    type       = "Profile",
     supported  = FALSE,
     message    = "Diagnostics for profile likelihood are not yet implemented.",
     warnings   = "No diagnostic computations were performed."
@@ -257,8 +257,8 @@ print.likelyr_diagnostics <- function(x, ...) {
 
   cat("<likelyr_diagnostics>\n")
 
-  if (!is.null(x$type) && x$type == "Profile Likelihood") {
-    cat("  Type: Profile Likelihood (placeholder)\n")
+  if (!is.null(x$type) && x$type == "Profile") {
+    cat("  Type: Profile Log-Likelihood (placeholder)\n")
     cat("  Message: ", x$message, "\n", sep = "")
     return(invisible(x))
   }
@@ -296,8 +296,8 @@ plot.likelyr_diagnostics <- function(x, ...) {
   plots <- list()
 
   # PL results are empty
-  if (!is.null(x$type) && x$type == "Profile Likelihood") {
-    message("No diagnostic plots available for profile likelihood (placeholder).")
+  if (!is.null(x$type) && x$type == "Profile") {
+    message("No diagnostic plots available for profile log-likelihood (placeholder).")
     return(invisible(plots))
   }
 

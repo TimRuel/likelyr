@@ -2,7 +2,7 @@
 # likelihood-integrate.R  — Unified likelyr API version
 # ======================================================================
 
-#' Integrated Likelihood
+#' Integrated Log-Likelihood
 #'
 #' @description
 #' Computes the integrated likelihood (IL) and attaches it to the input
@@ -78,8 +78,8 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   exec <- cal$execution
 
   if (verbose) {
-    cat("[integrate] Monte Carlo Integrated Likelihood\n")
-    cat("[integrate] Mode:",
+    cat("[integrate] Monte Carlo Integrated Log-Likelihood\n")
+    cat("[integrate] Execution:",
         if (inherits(exec, "parallel_spec")) "PARALLEL" else "SERIAL",
         "| Branches:", exec$total_branches, "\n")
   }
@@ -110,7 +110,6 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
       omega_draws = omega_draws,
       theta_mle   = theta_mle,
       psi_mle     = psi_mle,
-      mode        = "Integrated",
       status      = "success"
     ))
 
@@ -173,7 +172,7 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
 
 #' @export
 print.likelyr_il_result <- function(x, ...) {
-  cat("<Integrated Likelihood Result>\n")
+  cat("<Integrated Log-Likelihood Result>\n")
   cat("Status: ", x$status, "\n", sep = "")
 
   if (!is.null(x$psi_mle))
@@ -208,7 +207,7 @@ summary.likelyr_il_result <- function(object, ...) {
 
 #' @export
 print.summary_likelyr_il_result <- function(x, ...) {
-  cat("<Summary: Integrated Likelihood>\n")
+  cat("<Summary: Integrated Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
   cat("theta_MLE:     ", paste(format(x$theta_mle), collapse = ", "), "\n", sep = "")
@@ -224,7 +223,7 @@ print.summary_likelyr_il_result <- function(x, ...) {
 #' @export
 plot.likelyr_il_result <- function(x) {
 
-  p <- plot_pseudolikelihood_points(x)
+  p <- plot_pseudolikelihood_points(x$psi_ll_df)
 
   print(p)
   invisible(p)

@@ -2,7 +2,7 @@
 % Please edit documentation in R/branch-generate.R
 \name{generate_branches}
 \alias{generate_branches}
-\title{Generate Monte Carlo Branches (Integrated Likelihood Only)}
+\title{Generate Monte Carlo Branches (Integrated Log-Likelihood Only)}
 \usage{
 generate_branches(cal, verbose = TRUE)
 }
@@ -17,7 +17,7 @@ A list with components:
 \item{omega_draws}{List of ω̂ vectors used per branch}
 }
 \description{
-Generates \code{R} Monte Carlo branches for the integrated likelihood,
+Generates \code{R} Monte Carlo branches for the integrated log-likelihood,
 each branch corresponding to a draw of ω̂ satisfying ψ(ω̂) = ψ_MLE.
 
 For each branch:

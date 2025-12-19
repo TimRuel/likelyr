@@ -1,13 +1,13 @@
 # ======================================================================
-# likelihood-profile.R — Profile Likelihood API
+# likelihood-profile.R — Profile Log-Likelihood API
 # ======================================================================
 
-#' Profile Likelihood
+#' Profile Log-Likelihood
 #'
 #' @description
-#' Computes the *profile likelihood* curve for the calibrated model.
+#' Computes the *profile log-likelihood* curve for the calibrated model.
 #'
-#' Unlike the integrated likelihood (IL), the profile likelihood (PL)
+#' Unlike the integrated log-likelihood (IL), the profile log-likelihood (PL)
 #' does **not** involve ω̂–sampling or Monte Carlo methods. Instead,
 #' nuisance parameters are fixed at their MLE:
 #'
@@ -15,7 +15,7 @@
 #'    ω̂ = θ̂_MLE
 #' }
 #'
-#' The likelihood is then evaluated along a ψ–grid, forming a *single
+#' The log-likelihood is then evaluated along a ψ–grid, forming a *single
 #' deterministic branch*. The result is attached to:
 #'
 #' \preformatted{
@@ -62,7 +62,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
     stop("profile() requires calibrate() first.", call. = FALSE)
 
   # ------------------------------------------------------------------
-  # 0B. Profile likelihood does NOT require optimizer/execution specs
+  # 0B. Profile log-likelihood does NOT require optimizer/execution specs
   # ------------------------------------------------------------------
   .validate_model_for_profile(cal)
 
@@ -78,7 +78,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 2. Execution summary
   # ------------------------------------------------------------------
-  if (verbose) cat("[profile] Profile Likelihood\n")
+  if (verbose) cat("[profile] Profile Log-Likelihood\n")
 
   # ------------------------------------------------------------------
   # 3. Compute branch cutoff from confidence levels
@@ -104,7 +104,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   increment   <- cal$execution$increment   %||% 0.05
   max_retries <- cal$execution$max_retries %||% 4
 
-  profile_df <- tryCatch(
+  psi_ll_df <- tryCatch(
 
     generate_profile(
       psi_mle       = psi_mle,
@@ -130,11 +130,10 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # 5. Wrap into likelyr_profile_result
   # ------------------------------------------------------------------
   pl_result <- new_pl_result(list(
-    psi_ll_df = profile_df,
+    psi_ll_df = psi_ll_df,
     psi_mle   = psi_mle,
     theta_mle = theta_mle,
-    mode      = "Profile",
-    status    = if (!is.null(profile_df)) "success" else "failed"
+    status    = if (!is.null(psi_ll_df)) "success" else "failed"
   ))
 
   # ------------------------------------------------------------------
@@ -154,7 +153,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # VALIDATION
 # ======================================================================
 
-# Profile likelihood requires:
+# Profile log-likelihood requires:
 #   • likelihood spec
 #   • estimand spec
 #   • nuisance spec
@@ -182,7 +181,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
 
 #' @export
 print.likelyr_pl_result <- function(x, ...) {
-  cat("<Profile Likelihood Result>\n")
+  cat("<Profile Log-Likelihood Result>\n")
   if (!is.null(x$status))    cat("Status:     ", x$status, "\n", sep = "")
   if (!is.null(x$psi_mle))   cat("psi_MLE:    ", format(x$psi_mle), "\n", sep = "")
   if (!is.null(x$theta_mle)) cat("theta_MLE: (",
@@ -210,7 +209,7 @@ summary.likelyr_pl_result <- function(object, ...) {
 
 #' @export
 print.summary_likelyr_pl_result <- function(x, ...) {
-  cat("<Summary: Profile Likelihood>\n")
+  cat("<Summary: Profile Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
   cat("theta_MLE:     ",
@@ -226,7 +225,7 @@ print.summary_likelyr_pl_result <- function(x, ...) {
 #' @export
 plot.likelyr_pl_result <- function(x) {
 
-  p <- plot_pseudolikelihood_points(x)
+  p <- plot_pseudolikelihood_points(x$psi_ll_df)
 
   print(p)
   invisible(p)

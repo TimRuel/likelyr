@@ -2,7 +2,7 @@
 % Please edit documentation in R/profile-walk.R
 \name{walk_profile_side}
 \alias{walk_profile_side}
-\title{One-Sided Profile Likelihood Sweep}
+\title{One-Sided Profile Log-Likelihood Sweep}
 \usage{
 walk_profile_side(
   psi_mle,
@@ -39,6 +39,6 @@ solver is warm-started from the previous θ̂, enforcing a continuation
 method along the constrained manifold ψ(θ) = ψ_k.
 
 Monotonicity of the profile curve is enforced via limited jittering,
-identical in spirit to integrated-likelihood branch sweeps.
+identical in spirit to integrated log-likelihood branch sweeps.
 }
 \keyword{internal}

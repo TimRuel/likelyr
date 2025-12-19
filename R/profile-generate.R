@@ -1,12 +1,12 @@
 # ======================================================================
-# Profile-Likelihood Builder (Improved)
+# Profile Log-Likelihood Builder (Improved)
 # ======================================================================
 
-#' Generate a Profile Likelihood Curve
+#' Generate a Profile Log-Likelihood Curve
 #'
 #' @description
 #' Internal helper used by [profile()] to construct the *profile
-#' likelihood branch* by sweeping left and right from ψ̂ using a fixed
+#' log-likelihood branch* by sweeping left and right from ψ̂ using a fixed
 #' increment. Nuisance parameters remain fixed at θ̂ throughout.
 #'
 #' The function performs:
@@ -72,7 +72,7 @@ generate_profile <- function(
   # ------------------------------------------------------------
   # 3. Combine all points including center
   # ------------------------------------------------------------
-  profile <- dplyr::bind_rows(
+  psi_ll_df <- dplyr::bind_rows(
     left,
     tibble::tibble(k = 0L, loglik = loglik_at_mle),
     right
@@ -84,7 +84,8 @@ generate_profile <- function(
     dplyr::arrange(psi)
 
   # Metadata
-  attr(profile, "n_points") <- nrow(profile)
+  attr(psi_ll_df, "n_points") <- nrow(psi_ll_df)
+  attr(psi_ll_df, "type") <- "Profile"
 
-  profile
+  return(psi_ll_df)
 }

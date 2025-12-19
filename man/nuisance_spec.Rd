@@ -2,7 +2,7 @@
 % Please edit documentation in R/spec-nuisance.R
 \name{nuisance_spec}
 \alias{nuisance_spec}
-\title{Specify Nuisance Components for Integrated Likelihood}
+\title{Specify Nuisance Components for Integrated Log-Likelihood}
 \usage{
 nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 }
@@ -23,7 +23,7 @@ A \code{nuisance_spec} object with classes:
 }
 \description{
 Defines the nuisance contribution to the \emph{expected} log-likelihood
-used in Monte Carlo Integrated Likelihood:
+used in Monte Carlo Integrated Log-Likelihood:
 
 \deqn{
   E_{\omegâ}[ \log p(Y \mid \theta) ].
@@ -34,6 +34,6 @@ The nuisance specification provides:
 • \code{E_loglik(theta, omega_hat, data)} — expected log-likelihood
 • \code{E_loglik_grad(theta, omega_hat, data)} — optional gradient wrt θ
 
-These functions are used \emph{only} for integrated likelihood calculations.
-They play no role in profile likelihood.
+These functions are used \emph{only} for integrated log-likelihood calculations.
+They play no role in profile log-likelihood.
 }

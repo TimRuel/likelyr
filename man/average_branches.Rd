@@ -2,7 +2,7 @@
 % Please edit documentation in R/branch-average.R
 \name{average_branches}
 \alias{average_branches}
-\title{Average Branches (Monte Carlo Integrated Likelihood)}
+\title{Average Branches (Monte Carlo Integrated Log-Likelihood)}
 \usage{
 average_branches(branches)
 }
@@ -18,7 +18,7 @@ average_branches(branches)
 tibble(psi, value) with attribute \code{"diagnostics"}
 }
 \description{
-Computes the Monte Carlo integrated likelihood curve by averaging
+Computes the Monte Carlo integrated log-likelihood curve by averaging
 branch-specific log-likelihood values using the numerically-stable
 log-mean-exp identity:
 

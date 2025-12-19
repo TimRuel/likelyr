@@ -5,16 +5,18 @@
 
 plot_pseudolikelihood_points <- function(psi_ll_df) {
 
+  type <- attr(psi_ll_df, "type")
+
   p <- plot_base() +
     ggplot2::geom_point(
       data = psi_ll_df,
-      ggplot2::aes(x = psi, y = value),
+      ggplot2::aes(x = psi, y = loglik),
       color = "cyan",
       size = 3,
       alpha = 0.7
       ) +
     ggplot2::labs(
-      title = paste(x$mode, "Log-Likelihood"),
+      title = paste(type, "Log-Likelihood"),
       x     = expression(psi),
       y     = expression("log L("*psi*")")
     )
@@ -22,29 +24,40 @@ plot_pseudolikelihood_points <- function(psi_ll_df) {
   invisible(p)
 }
 
-plot_pseudolikelihood_curve <- function(x) {
+plot_pseudolikelihood_curve <- function(
+    psi_ll_df,
+    zero_max_psi_ll_fn,
+    point_estimate_df,
+    interval_estimates_df
+) {
 
-  psi_endpoints <- range(x$psi_ll_df$psi)
-  stat_fn <- make_stat_fn(psi_endpoints, x$zero_max_psi_ll_fn)
+  type <- attr(psi_ll_df, "type")
 
-  MLE_label <- if (x$mode == "Profile") "hat(psi)" else "bar(psi)"
+  psi_endpoints <- range(psi_ll_df$psi)
+  stat_fn <- make_stat_fn(psi_endpoints, zero_max_psi_ll_fn)
+
+  psi_hat <- point_estimate_df$psi_hat
+  psi_0 <- point_estimate_df$psi_0
 
   label_data <- data.frame(
     source = c("MLE", "Truth"),
-    value  = c(x$psi_mle, x$psi_0),
-    label  = c(MLE_label, "psi[0]")
+    value  = c(psi_hat, psi_0),
+    label  = c("hat(psi)", "psi[0]")
   )
+
+  conf_ints <- attr(interval_estimates_df, "interval_estimates_raw")
+  conf_ints$level <- interval_estimates_df$Level
 
   conf_ints_long <- tidyr::pivot_longer(
-    x$conf_ints,
+    conf_ints,
     cols = c("lower", "upper"),
-    names_to = "endpoint_position",
-    values_to = "value"
+    names_to = "position",
+    values_to = "endpoint"
   )
 
-  ci_palette <- get_ci_palette(x$conf_ints)
+  ci_palette <- get_ci_palette(interval_estimates_df)
 
-  crit_max <- 0.5 * qchisq(1 - min(x$conf_ints$alpha), 1)
+  crit_max <- 0.5 * qchisq(1 - min(conf_ints$alpha), 1)
   y_min    <- -crit_max - 0.5
 
   p <- plot_base() +
@@ -54,14 +67,14 @@ plot_pseudolikelihood_curve <- function(x) {
     # CI lines
     ggplot2::geom_vline(
       data = conf_ints_long,
-      ggplot2::aes(xintercept = value, color = confidence),
+      ggplot2::aes(xintercept = endpoint, color = level),
       linetype = "dashed",
       linewidth = 1
     ) +
     ggplot2::scale_color_manual(
       name   = "Confidence",
       values = ci_palette,
-      breaks = x$conf_ints$confidence,
+      breaks = interval_estimates_df$Level,
       guide  = ggplot2::guide_legend(
         override.aes = list(
           linetype = "solid",
@@ -94,7 +107,7 @@ plot_pseudolikelihood_curve <- function(x) {
     ) +
 
     ggplot2::labs(
-      title = paste(x$mode, "Log-Likelihood"),
+      title = paste(type, "Log-Likelihood"),
       x     = expression(psi),
       y     = expression("log L("*psi*")")
     ) +

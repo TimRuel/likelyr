@@ -74,8 +74,10 @@ synthesize <- function(
   point_estimate_df <- tibble::tibble(
     psi_0      = psi_0,
     psi_hat    = point_estimate,
+    error      = point_estimate - psi_0,
     se_psi_hat = se_point_estimate
-  )
+  ) |>
+    round(2)
 
   attr(point_estimate_df, "type") <- type
 

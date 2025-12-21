@@ -130,33 +130,23 @@ fit <- model |>
   integrate() |>
   diagnose() |>
   infer()
+  # compare()
+
+
+
+
 
 # plot(fit$results$IL$diagnostics)
-plot(fit$results$IL)
-plot(fit$results$PL)
-plot(fit$results$IL$inference)
-plot(fit$results$PL$inference)
+# plot(fit$results$IL)
+# plot(fit$results$PL)
+# plot(fit$results$IL$inference)
+# plot(fit$results$PL$inference)
 
 # plan(callr, workers = wf$execution$num_workers)
 # fit  <- fit_integrated(cal)
 # plan(sequential)
 
 
-# ci_table <- tabulate_ci(conf_ints, psi_hat, psi_0)
-#
-#
-#
-#
-#
-#
-#
-# x <- fit$results$IL
-#
-# conf_ints |>
-#   mutate(SE = (upper - lower) / (2 * qnorm(1-alpha/2)))
-# #
-# # df <- fit$results$IL$df
-# # psi_mle <- fit$results$IL$psi_mle
-# #
+
 
 

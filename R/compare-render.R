@@ -1,6 +1,6 @@
-# =====================================================================
-# infer-render.R — Rendering helpers for likelihood inference
-# =====================================================================
+# =========================================================================
+# compare-render.R — Rendering helpers for pseudo-log-likelihood comparison
+# =========================================================================
 
 # ---------------------------------------------------------------------
 # Palette
@@ -9,102 +9,81 @@
 #' Palette for inference kables
 #'
 #' @description
-#' Returns a single, consistent color palette for inference tables.
+#' Returns a single, consistent color palette for comparison tables.
 #' Designed to be visually restrained, blue-centric, and publication-safe.
 #'
 #' @return A named list of color values.
 #' @keywords internal
-inference_kable_palette <- function() {
+comparison_kable_palette <- function() {
 
   list(
-    # --------------------------------------------------
     # Body text colors
-    # --------------------------------------------------
-    psi_0     = "#6CBF6C",
-    psi_hat   = "#6FA3D9",
-    error     = "#F0B51A",
-    se        = "#E06C75",
-    level     = "#6CBF6C",
-    interval  = "#6FA3D9",
-    length    = "#F0B51A",
-    lower_dev = "#E06C75",
-    upper_dev = "#C678DD",
+    psi_0     = "#7FBF7F",
+    psi_hat   = "#81A1C1",
+    se        = "#D08770",
+    level     = "#8FBCBB",
+    interval  = "#5E81AC",
+    length    = "#EBCB8B",
+    lower_dev = "#D08770",
+    upper_dev = "#B48EAD",
     covers_ok = "#A3BE8C",
     covers_no = "#BF616A",
 
-    # --------------------------------------------------
     # Header text
-    # --------------------------------------------------
-    header_text      = "#D8DEE9",
-    header_row_text  = "#EAEAEA",
+    header_text = "#B9D9EB",
 
-    # --------------------------------------------------
-    # Group headers (stronger separation)
-    # --------------------------------------------------
-    bg_group_pe = "#343A46",  # darker PE
-    bg_group_ie = "#262B36",  # clearly heavier IE
+    # Group headers
+    bg_group_pe = "#434C5E",
+    bg_group_ie = "#3E5C7A",
 
-    # --------------------------------------------------
     # Column headers
-    # --------------------------------------------------
-    bg_head_pe  = "#3C4454",
-    bg_head_ie  = "#2E3442",
+    bg_head_pe  = "#4A5568",
+    bg_head_ie  = "#4E6A88",
 
-    # --------------------------------------------------
     # Body backgrounds
-    # --------------------------------------------------
-    bg_body_pe  = "#252A3420",
-    bg_body_ie  = "#1B202920",
+    bg_body_pe  = "#2E344020",
+    bg_body_ie  = "#34495E20",
 
-    # --------------------------------------------------
     # Column-level PE backgrounds
-    # --------------------------------------------------
-    bg_body_pe_psi0   = "#252A3425",
-    bg_body_pe_psihat = "#2A304025",
-    bg_body_pe_se     = "#22273325",
+    bg_body_pe_psi0   = "#2E344025",
+    bg_body_pe_psihat = "#323A4A25",
+    bg_body_pe_se     = "#2C314025",
 
-    # --------------------------------------------------
     # Accents
-    # --------------------------------------------------
-    separator  = "#4C566A",
-    header_row = "#303644"
+    separator   = "#4C566A",
+    header_row  = "#3B4252",
+    header_row_text = "#EAEAEA"
   )
 }
 
 # ---------------------------------------------------------------------
-# Point estimate table
+# Point estimate comparison table
 # ---------------------------------------------------------------------
 
-#' Render point estimate table
+#' Render point estimate comparison table
 #'
-#' @param point_estimate_df Data frame with columns `psi_0`, `psi_hat`,
-#'   and `se_psi_hat`.
-#' @param show_caption Logical; whether to display a caption.
+#' @param res
 #'
 #' @return A kableExtra object.
-render_point_estimate_kable <- function(point_estimate_df, show_caption = TRUE) {
+render_point_estimate_comparison <- function(res) {
 
-  pal <- inference_kable_palette()
+  point_estimates_df <- get_point_estimates_df(res)
 
-  type <- attr(point_estimate_df, "type")
+  pal <- comparison_kable_palette()
 
-  caption_html <- if (isTRUE(show_caption)) {
-    paste0(
-      "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-      "Point Estimate and Uncertainty Measures<br>",
-      "<em>(", type, " Log-Likelihood)</em>",
-      "</span>"
-    )
-  } else {
-    NULL
-  }
+  caption_html <- paste0(
+    "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
+    "Point Estimates and Standard Errors<br>",
+    "<em>(Integrated Log-Likelihood vs Profile Log-Likelihood)</em>",
+    "</span>"
+  )
 
   kableExtra::kbl(
-    point_estimate_df,
+    point_estimates_df,
     col.names = c(
       "$\\psi_0$",
+      "Method",
       "$\\hat{\\psi}$",
-      "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
       "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$"
     ),
     caption = caption_html,
@@ -119,8 +98,7 @@ render_point_estimate_kable <- function(point_estimate_df, show_caption = TRUE) 
     ) |>
     kableExtra::column_spec(1, color = pal$psi_0)   |>
     kableExtra::column_spec(2, color = pal$psi_hat) |>
-    kableExtra::column_spec(3, color = pal$error) |>
-    kableExtra::column_spec(4, color = pal$se)
+    kableExtra::column_spec(3, color = pal$se)
 }
 
 # ---------------------------------------------------------------------
@@ -150,7 +128,7 @@ render_interval_estimates_kable <- function(interval_estimates_df, show_caption 
   caption_html <- if (isTRUE(show_caption)) {
     paste0(
       "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-      "Interval Estimates and Uncertainty Measures<br>",
+      "Interval Estimates<br>",
       "<em>(", type, " Log-Likelihood)</em>",
       "</span>"
     )
@@ -209,7 +187,6 @@ render_inference_kable <- function(inference_df) {
       col.names = c(
         "$\\psi_0$",
         "$\\hat{\\psi}$",
-        "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
         "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$",
         "Confidence<br/>Level",
         "Interval",
@@ -220,14 +197,14 @@ render_inference_kable <- function(inference_df) {
       ),
       caption = paste0(
         "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-        "Estimates and Uncertainty Measures<br>",
+        "Point Estimate and Confidence Intervals<br>",
         "<em>(", type, " Log-Likelihood)</em>",
         "</span>"
       )
     ) |>
 
     kableExtra::add_header_above(
-      c("Point Estimate" = 4, "Interval Estimates" = 6),
+      c("Point Estimate" = 3, "Interval Estimates" = 6),
       bold       = TRUE,
       background = c(pal$bg_group_pe, pal$bg_group_ie),
       color      = pal$header_text
@@ -236,33 +213,32 @@ render_inference_kable <- function(inference_df) {
     kableExtra::kable_material_dark(font_size = 17) |>
 
     kableExtra::column_spec(
-      1:4, background = pal$bg_head_pe,
+      1:3, background = pal$bg_head_pe,
       bold = TRUE, color = pal$header_text, include_thead = TRUE
     ) |>
     kableExtra::column_spec(
-      5:10, background = pal$bg_head_ie,
+      4:9, background = pal$bg_head_ie,
       bold = TRUE, color = pal$header_text, include_thead = TRUE
     ) |>
 
-    kableExtra::column_spec(1:4, background = pal$bg_body_pe) |>
-    kableExtra::column_spec(5:10, background = pal$bg_body_ie) |>
+    kableExtra::column_spec(1:3, background = pal$bg_body_pe) |>
+    kableExtra::column_spec(4:9, background = pal$bg_body_ie) |>
 
     kableExtra::column_spec(
-      4, border_right = paste0("1px solid ", pal$separator)
+      3, border_right = paste0("1px solid ", pal$separator)
     ) |>
 
     kableExtra::column_spec(1, color = pal$psi_0)     |>
     kableExtra::column_spec(2, color = pal$psi_hat)   |>
-    kableExtra::column_spec(3, color = pal$error)     |>
-    kableExtra::column_spec(4, color = pal$se)        |>
-    kableExtra::column_spec(5, color = pal$level)     |>
-    kableExtra::column_spec(6, color = pal$interval)  |>
-    kableExtra::column_spec(7, color = pal$length)    |>
-    kableExtra::column_spec(8, color = pal$lower_dev) |>
-    kableExtra::column_spec(9, color = pal$upper_dev) |>
+    kableExtra::column_spec(3, color = pal$se)        |>
+    kableExtra::column_spec(4, color = pal$level)     |>
+    kableExtra::column_spec(5, color = pal$interval)  |>
+    kableExtra::column_spec(6, color = pal$length)    |>
+    kableExtra::column_spec(7, color = pal$lower_dev) |>
+    kableExtra::column_spec(8, color = pal$upper_dev) |>
 
     kableExtra::column_spec(
-      10,
+      9,
       color = ifelse(
         inference_df[[9]] %in% c("✅", "✔", "TRUE"),
         pal$covers_ok,
@@ -271,20 +247,19 @@ render_inference_kable <- function(inference_df) {
       width = "3em"
     ) |>
 
+    kableExtra::column_spec(
+      1, background = pal$bg_body_pe_psi0,   include_thead = FALSE
+    ) |>
+    kableExtra::column_spec(
+      2, background = pal$bg_body_pe_psihat, include_thead = FALSE
+    ) |>
+    kableExtra::column_spec(
+      3, background = pal$bg_body_pe_se,     include_thead = FALSE
+    ) |>
+
     kableExtra::kable_styling(
       full_width = FALSE,
       position   = "center"
     ) |>
-
-    kableExtra::column_spec(
-      1:10,
-      extra_css = "vertical-align: middle;"
-    ) |>
-
-    kableExtra::row_spec(
-      0:1,
-      extra_css = "vertical-align: middle;"
-    ) |>
-
-    kableExtra::collapse_rows(columns = 1:4)
+    kableExtra::collapse_rows(columns = 1:3)
 }

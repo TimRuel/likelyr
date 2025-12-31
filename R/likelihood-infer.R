@@ -99,7 +99,7 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
       )
     }
 
-    synthesis <- synthesize(
+    inference_synthesis <- synthesize_inference(
       psi_ll_df     = res$psi_ll_df,
       alpha_levels  = alpha_levels,
       psi_0         = psi_0,
@@ -107,7 +107,7 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
       render        = TRUE
     )
 
-    cal$results[[name]]$inference <- new_inference_result(synthesis)
+    cal$results[[name]]$inference <- new_inference_result(inference_synthesis)
   }
 
   mark_inferred(cal)
@@ -147,10 +147,10 @@ print.likelyr_inference <- function(x, ...) {
     }
   }
 
-  if (!is.null(x$interval_estimates_df) &&
-      "Level" %in% names(x$interval_estimates_df)) {
+  if (!is.null(x$interval_estimate_df) &&
+      "Level" %in% names(x$interval_estimate_df)) {
 
-    alpha_levels <- 1 - scales::parse_percent(x$interval_estimates_df$Level)
+    alpha_levels <- 1 - scales::parse_percent(x$interval_estimate_df$Level)
 
     cat(
       "  Alpha:    ",
@@ -160,9 +160,9 @@ print.likelyr_inference <- function(x, ...) {
     )
   }
 
-  if (!is.null(x$interval_estimates_df)) {
+  if (!is.null(x$interval_estimate_df)) {
     cat("  CIs:\n")
-    print(x$interval_estimates_df)
+    print(x$interval_estimate_df)
   } else {
     cat("  CIs:      <none>\n")
   }
@@ -178,7 +178,7 @@ print.likelyr_inference <- function(x, ...) {
 summary.likelyr_inference <- function(object, ...) {
 
   pe <- object$point_estimate_df
-  ci <- object$interval_estimates_df
+  ci <- object$interval_estimate_df
 
   out <- list(
     type       = attr(object$psi_ll_df, "type"),
@@ -227,7 +227,7 @@ plot.likelyr_inference <- function(x, ...) {
     psi_ll_df             = x$psi_ll_df,
     zero_max_psi_ll_fn    = x$zero_max_psi_ll_fn,
     point_estimate_df     = x$point_estimate_df,
-    interval_estimates_df = x$interval_estimates_df
+    interval_estimate_df = x$interval_estimate_df
   )
 
   print(p)

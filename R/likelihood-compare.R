@@ -32,23 +32,13 @@ compare <- function(x) {
 
   validate_compare_input(x)
 
-  point_estimate_comparison <- render_point_estimate_comparison(x)
+  pseudolikelihood_plot <- plot_pseudolikelihoods(x)
 
-  interval_estimate_comparison <- render_interval_estimate_comparison(x)
-
-  estimate_comparison <- render_estimate_comparison(x)
-
-  log_likelihood_comparison_plot <- plot_log_likelihood_comparison(x)
-
-  tables <- list(
-    point_estimate_comparison    = point_estimate_comparison,
-    interval_estimate_comparison = interval_estimate_comparison,
-    estimate_comparison          = estimate_comparison
-  )
+  pseudolikelihood_tables <- synthesize_comparison(x)
 
   comparison <- list(
-    tables = tables,
-    plot   = log_likelihood_comparison_plot,
+    tables = pseudolikelihood_tables,
+    plot   = pseudolikelihood_plot,
   )
 
   x$comparison <- new_comparison_result(comparison)

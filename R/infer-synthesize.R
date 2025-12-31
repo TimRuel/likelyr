@@ -26,15 +26,15 @@
 #' \describe{
 #'   \item{psi_ll_fn}{Smoothed log-likelihood function.}
 #'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, and SE(ψ̂).}
-#'   \item{interval_estimates_df}{Formatted confidence interval table.}
-#'   \item{inference_df}{Combined point and interval summary table.}
+#'   \item{interval_estimate_df}{Formatted confidence interval table.}
+#'   \item{inference_df}{Combined point and interval estimate summary table.}
 #'   \item{point_estimate_kable}{Rendered point estimate table (if `render`).}
-#'   \item{interval_estimates_kable}{Rendered interval table (if `render`).}
+#'   \item{interval_estimate_kable}{Rendered interval estimate table (if `render`).}
 #'   \item{inference_kable}{Rendered combined inference table (if `render`).}
 #' }
 #'
 #' @keywords internal
-synthesize <- function(
+synthesize_inference <- function(
     psi_ll_df,
     alpha_levels,
     psi_0,
@@ -82,11 +82,11 @@ synthesize <- function(
   attr(point_estimate_df, "type") <- type
 
   # --------------------------------------------------
-  # Interval estimates
+  # Interval estimate
   # --------------------------------------------------
   zero_max_psi_ll_fn <- shift_psi_ll_fn(psi_ll_fn, max_loglik)
 
-  interval_estimates_df <- get_interval_estimates_df(
+  interval_estimate_df <- get_interval_estimate_df(
     point_estimate     = point_estimate,
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     psi_ll_df          = psi_ll_df,
@@ -95,41 +95,42 @@ synthesize <- function(
     psi_0              = psi_0
   )
 
-  attr(interval_estimates_df, "type") <- type
+  attr(interval_estimate_df, "type") <- type
 
   # --------------------------------------------------
   # Synthesis table (numeric only)
   # --------------------------------------------------
   inference_df <- dplyr::bind_cols(
     point_estimate_df,
-    interval_estimates_df
+    interval_estimate_df
   )
 
   attr(inference_df, "type") <- type
+  attr(inference_df, "interval_estimate_raw") <- attr(interval_estimate_df, "interval_estimate_raw")
 
   # --------------------------------------------------
   # Optional rendering
   # --------------------------------------------------
   point_estimate_kable     <- NULL
-  interval_estimates_kable <- NULL
+  interval_estimate_kable <- NULL
   inference_kable          <- NULL
 
   if (isTRUE(render)) {
     point_estimate_kable <- render_point_estimate_kable(point_estimate_df, show_caption = TRUE)
 
-    interval_estimates_kable <- render_interval_estimates_kable(interval_estimates_df, show_caption = TRUE)
+    interval_estimate_kable <- render_interval_estimate_kable(interval_estimate_df, show_caption = TRUE)
 
     inference_kable <- render_inference_kable(inference_df)
   }
 
   list(
-    zero_max_psi_ll_fn       = zero_max_psi_ll_fn,
-    psi_ll_df                = psi_ll_df,
-    point_estimate_df        = point_estimate_df,
-    interval_estimates_df    = interval_estimates_df,
-    inference_df             = inference_df,
-    point_estimate_kable     = point_estimate_kable,
-    interval_estimates_kable = interval_estimates_kable,
-    inference_kable          = inference_kable
+    zero_max_psi_ll_fn      = zero_max_psi_ll_fn,
+    psi_ll_df               = psi_ll_df,
+    point_estimate_df       = point_estimate_df,
+    interval_estimate_df    = interval_estimate_df,
+    inference_df            = inference_df,
+    point_estimate_kable    = point_estimate_kable,
+    interval_estimate_kable = interval_estimate_kable,
+    inference_kable         = inference_kable
   )
 }

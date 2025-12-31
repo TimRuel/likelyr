@@ -3,9 +3,9 @@ devtools::document()
 # devtools::install(force = TRUE, upgrade = "never")
 devtools::load_all()
 
-library(dplyr)
+# library(dplyr)
 library(foreach)
-library(likelyr)
+# library(likelyr)
 
 # ============================================================
 # Specify model parameter
@@ -118,11 +118,11 @@ weights <- runif(J, 1, 3)
 t <- do.call(runif, list(n = J, min = J * 1, max = J * 5))
 mu_0 <- theta_0 * t
 Y <- rpois(J, mu_0)
-data <- tibble(process = factor(process_labels),
+data <- dplyr::tibble(process = factor(process_labels),
                t = t,
                Y = Y,
                weights = weights) |>
-  group_by(process)
+  dplyr::group_by(process)
 
 fit <- model |>
   calibrate(data) |>

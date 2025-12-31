@@ -1,5 +1,5 @@
 # ======================================================================
-# infer-interval_estimates.R — Likelihood-based confidence intervals for ψ
+# infer-interval_estimate.R — Likelihood-based confidence intervals for ψ
 # ======================================================================
 
 # ----------------------------------------------------------------------
@@ -159,7 +159,7 @@ estimate_interval <- function(
 #' Augments raw confidence interval bounds with interval length,
 #' deviations from the MLE, and optional truth coverage indicators.
 #'
-#' @param interval_estimates_df Data frame with columns `alpha`, `lower`,
+#' @param interval_estimate_df Data frame with columns `alpha`, `lower`,
 #'   and `upper`.
 #' @param point_estimate Numeric scalar giving the MLE of \eqn{\psi}.
 #' @param psi_0 Optional numeric scalar giving the true value of
@@ -170,12 +170,12 @@ estimate_interval <- function(
 #'
 #' @keywords internal
 add_interval_diagnostics <- function(
-    interval_estimates_df,
+    interval_estimate_df,
     point_estimate,
     psi_0 = NA_real_
 ) {
 
-  interval_estimates_df |>
+  interval_estimate_df <- interval_estimate_df |>
     dplyr::mutate(
       Length = dplyr::if_else(
         is.na(lower) | is.na(upper),
@@ -207,6 +207,11 @@ add_interval_diagnostics <- function(
         TRUE                  ~ "❌"
       )
     )
+
+  attr(interval_estimate_df, "point_estimate") <- point_estimate
+  attr(interval_estimate_df, "psi_0") <- psi_0
+
+  return(interval_estimate_df)
 }
 
 # ----------------------------------------------------------------------
@@ -222,7 +227,7 @@ add_interval_diagnostics <- function(
 #'
 #' This function is strictly a *presentation helper*.
 #'
-#' @param interval_estimates_df Data frame containing confidence interval
+#' @param interval_estimate_df Data frame containing confidence interval
 #'   bounds and diagnostics.
 #' @param digits Integer giving the number of decimal places to round
 #'   numeric columns.
@@ -231,9 +236,9 @@ add_interval_diagnostics <- function(
 #' A formatted data frame suitable for display.
 #'
 #' @keywords internal
-format_interval_estimates_df <- function(interval_estimates_df, digits = 2) {
+format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
 
-  formatted_df <- interval_estimates_df |>
+  formatted_df <- interval_estimate_df |>
     dplyr::mutate(
       Level = scales::percent(1 - alpha),
 
@@ -258,7 +263,7 @@ format_interval_estimates_df <- function(interval_estimates_df, digits = 2) {
       )
     )
 
-  attr(formatted_df, "interval_estimates_raw") <- interval_estimates_df |>
+  attr(formatted_df, "interval_estimate_raw") <- interval_estimate_df |>
     dplyr::select(alpha, lower, upper)
 
   return(formatted_df)
@@ -294,7 +299,7 @@ format_interval_estimates_df <- function(interval_estimates_df, digits = 2) {
 #' each confidence level.
 #'
 #' @export
-get_interval_estimates_df <- function(
+get_interval_estimate_df <- function(
     point_estimate,
     zero_max_psi_ll_fn,
     psi_ll_df,
@@ -316,5 +321,5 @@ get_interval_estimates_df <- function(
       )
     ) |>
     add_interval_diagnostics(point_estimate, psi_0) |>
-    format_interval_estimates_df()
+    format_interval_estimate_df()
 }

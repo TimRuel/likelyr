@@ -1,0 +1,90 @@
+# ==================================================
+# TABLE COLOR CONFIGURATION (DARK THEME)
+# ==================================================
+
+# --------------------------------------------------
+# Text colors
+# --------------------------------------------------
+text:
+
+  # Body text (semantic)
+  body:
+    pseudolikelihood: "#D65DB1"
+    psi_0:            "#6CBF6C"
+    psi_hat:          "#6FA3D9"
+    error:            "#F0B51A"
+    se:               "#E06C75"
+    level:            "#5FA8A8"
+    interval:         "#6FA3D9"
+    diagram:          "#88C0D0"
+    length:           "#F0B51A"
+    lower_dev:        "#E06C75"
+    upper_dev:        "#C678DD"
+
+  # Header text
+  header:
+    column: "#D8DEE9"
+    group:  "#EAEAEA"
+
+
+# --------------------------------------------------
+# Background colors (table surfaces)
+# --------------------------------------------------
+background:
+
+  # ----------------------------------------------
+  # Group headers (top-level column groupings)
+  # ----------------------------------------------
+  group_header:
+    point_estimate:    "#1B202920"
+    interval_estimate: "#2E3442"
+    truth:             "#28303A"   # darker anchor
+
+  # ----------------------------------------------
+  # Column headers
+  # ----------------------------------------------
+  column_header:
+    point_estimate:    "#252A3420"
+    interval_estimate: "#343A46"
+    truth:             "#28303A"
+
+  # ----------------------------------------------
+  # Default body backgrounds
+  # ----------------------------------------------
+  body:
+    point_estimate:    "#242934"   # darker than before
+    interval_estimate: "#3C4454"
+    truth:             "#1E242D"   # anchor plane
+
+  # ----------------------------------------------
+  # Column-level semantic backgrounds
+  # ----------------------------------------------
+  column:
+    point:    "#2A303B"   # lighter than PE rows → clear column identity
+    truth:    "#1E242D"   # darkest non-interval surface
+    interval: "#2A304028"
+    diagram:  "#1E303828"
+
+  # ----------------------------------------------
+  # Row block backgrounds (alternating stripes)
+  # ----------------------------------------------
+  row:
+
+    # Point-estimate rows (Profile / Integrated)
+    pseudolikelihood:
+      a: "#242934"   # darker stripe
+      b: "#303744"   # lighter stripe (increased contrast)
+
+    # Interval rows (by confidence level)
+    level:
+      a: "#1E222B"
+      b: "#2A303B"
+
+
+# --------------------------------------------------
+# Accents / structural signals
+# --------------------------------------------------
+accent:
+  separator:  "#4C566A"
+  header_row: "#303644"
+  group_row:  "#272C36"

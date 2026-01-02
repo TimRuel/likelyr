@@ -3,76 +3,6 @@
 # =====================================================================
 
 # ---------------------------------------------------------------------
-# Palette
-# ---------------------------------------------------------------------
-
-#' Palette for inference kables
-#'
-#' @description
-#' Returns a single, consistent color palette for inference tables.
-#' Designed to be visually restrained, blue-centric, and publication-safe.
-#'
-#' @return A named list of color values.
-#' @keywords internal
-inference_kable_palette <- function() {
-
-  list(
-    # --------------------------------------------------
-    # Body text colors
-    # --------------------------------------------------
-    psi_0     = "#6CBF6C",
-    psi_hat   = "#6FA3D9",
-    error     = "#F0B51A",
-    se        = "#E06C75",
-    level     = "#6CBF6C",
-    interval  = "#6FA3D9",
-    diagram   = "#88C0D0",
-    length    = "#F0B51A",
-    lower_dev = "#E06C75",
-    upper_dev = "#C678DD",
-    covers_ok = "#A3BE8C",
-    covers_no = "#BF616A",
-
-    # --------------------------------------------------
-    # Header text
-    # --------------------------------------------------
-    header_text      = "#D8DEE9",
-    header_row_text  = "#EAEAEA",
-
-    # --------------------------------------------------
-    # Group headers
-    # --------------------------------------------------
-    bg_group_pe = "#1B202920",
-    bg_group_ie = "#2E3442",
-
-    # --------------------------------------------------
-    # Column headers
-    # --------------------------------------------------
-    bg_head_pe  = "#252A3420",
-    bg_head_ie  = "#343A46",
-
-    # --------------------------------------------------
-    # Body backgrounds
-    # --------------------------------------------------
-    bg_body_pe  = "#262B36",
-    bg_body_ie  = "#3C4454",
-
-    # --------------------------------------------------
-    # Column-level PE backgrounds
-    # --------------------------------------------------
-    bg_body_pe_psi0    = "#252A3425",
-    bg_body_pe_psihat = "#2A304025",
-    bg_body_pe_se     = "#22273325",
-
-    # --------------------------------------------------
-    # Accents
-    # --------------------------------------------------
-    separator  = "#4C566A",
-    header_row = "#303644"
-  )
-}
-
-# ---------------------------------------------------------------------
 # Point estimate table
 # ---------------------------------------------------------------------
 
@@ -80,48 +10,49 @@ inference_kable_palette <- function() {
 #'
 #' @param point_estimate_df Data frame with columns `psi_0`, `psi_hat`,
 #'   and `se_psi_hat`.
-#' @param show_caption Logical; whether to display a caption.
 #'
 #' @return A kableExtra object.
-render_point_estimate_kable <- function(point_estimate_df, show_caption = TRUE) {
+#' Render point estimate table
+#'
+#' @description
+#' Renders a formatted table of point estimates and associated uncertainty
+#' measures using `kableExtra`.
+#'
+#' @details
+#' If the input data frame has a character attribute \code{"type"}, it is used
+#' to annotate the table caption (e.g., "Profile Log-Likelihood" or
+#' "Integrated Log-Likelihood"). If no such attribute is present, the caption
+#' is rendered without a subtitle.
+#'
+#' @param point_estimate_df Data frame with columns \code{psi_0},
+#'   \code{psi_hat}, \code{error}, and \code{se_psi_hat}.
+#'
+#' @return A `kableExtra` HTML table object.
+#'
+#' @family inference-renderers
+#' @export
+render_point_estimate_table <- function(point_estimate_df) {
 
-  pal <- inference_kable_palette()
+  required <- c("psi_0", "psi_hat", "error", "se_psi_hat")
+  stopifnot(all(required %in% names(point_estimate_df)))
 
-  type <- attr(point_estimate_df, "type")
+  type <- attr(point_estimate_df, "type", exact = TRUE)
+  if (length(type) == 0) type <- NULL
 
-  caption_html <- if (isTRUE(show_caption)) {
-    paste0(
-      "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-      "Point Estimate and Uncertainty Measures<br>",
-      "<em>(", type, " Log-Likelihood)</em>",
-      "</span>"
-    )
-  } else {
-    NULL
-  }
-
-  kableExtra::kbl(
-    point_estimate_df,
-    col.names = c(
+  .render_point_estimate_base(
+    df = point_estimate_df,
+    col_names = c(
       "$\\psi_0$",
       "$\\hat{\\psi}$",
       "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
       "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$"
-    ),
-    caption = caption_html,
-    escape  = FALSE,
-    align   = "c"
-  ) |>
-    kableExtra::kable_material_dark(font_size = 17) |>
-    kableExtra::row_spec(
-      0,
-      background = pal$header_row,
-      color      = pal$header_row_text
-    ) |>
-    kableExtra::column_spec(1, color = pal$psi_0)   |>
-    kableExtra::column_spec(2, color = pal$psi_hat) |>
-    kableExtra::column_spec(3, color = pal$error) |>
-    kableExtra::column_spec(4, color = pal$se)
+      ),
+    header_groups = c("Truth" = 1, "Estimate" = 3),
+    caption = .table_caption(
+      "Point Estimate and Uncertainty Measures",
+      type
+      )
+  )
 }
 
 # ---------------------------------------------------------------------
@@ -132,231 +63,173 @@ render_point_estimate_kable <- function(point_estimate_df, show_caption = TRUE) 
 #'
 #' @param interval_estimate_df Data frame produced by
 #'   `get_interval_estimate_df()`.
-#' @param show_caption Logical; whether to display a caption.
 #'
 #' @return A kableExtra object.
-render_interval_estimate_kable <- function(interval_estimate_df, show_caption = TRUE) {
-
-  type <- attr(interval_estimate_df, "type")
-  interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
-  point_estimate <- attr(interval_estimate_df, "point_estimate")
-  psi_0 <- attr(interval_estimate_df, "psi_0")
-
-  pal <- inference_kable_palette()
+render_interval_estimate_table <- function(interval_estimate_df) {
 
   required <- c(
-    "Level", "Interval", "Length",
-    "Lower Deviation", "Upper Deviation", "Status"
+    "Interval", "Length", "Lower Deviation",
+    "Upper Deviation", "Status", "Level"
   )
   stopifnot(all(required %in% names(interval_estimate_df)))
 
-  caption_html <- if (isTRUE(show_caption)) {
-    paste0(
-      "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-      "Interval Estimates and Uncertainty Measures<br>",
-      "<em>(", type, " Log-Likelihood)</em>",
-      "</span>"
+  type <- attr(interval_estimate_df, "type", exact = TRUE)
+  if (length(type) == 0) type <- NULL
+
+  interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
+  point_estimate        <- attr(interval_estimate_df, "point_estimate")
+  psi_0                 <- attr(interval_estimate_df, "psi_0")
+
+  stopifnot(
+    !is.null(interval_estimate_raw),
+    !is.null(point_estimate),
+    !is.null(psi_0)
+  )
+
+  stripe_bg <- .interval_level_bg(interval_estimate_df$Level)
+
+  df_render <- interval_estimate_df |>
+    dplyr::mutate(
+      psi_0 = round(psi_0, 2),
+      .before = "Interval"
+    ) |>
+    dplyr::mutate(
+      Diagram = "",
+      .after = "Interval"
     )
-  } else {
-    NULL
-  }
 
-  interval_estimate_df |>
-    dplyr::mutate(Diagram = "", .after = "Interval") |>
-    kableExtra::kbl(
-      col.names = c(
-        "Confidence<br/>Level",
-        "Interval",
-        "Diagram",
-        "Length",
-        "Lower<br/>Deviation",
-        "Upper<br/>Deviation",
-        "Covers $\\psi_0$"
-      ),
-      caption = caption_html,
-      escape  = FALSE,
-      align   = "c"
-    ) |>
-
-    kableExtra::kable_material_dark(font_size = 17) |>
-
-    kableExtra::row_spec(
-      0,
-      background = pal$header_row,
-      color      = pal$header_row_text
-    ) |>
-
-    kableExtra::column_spec(1, color = pal$level)    |>
-    kableExtra::column_spec(2, color = pal$interval) |>
-
-    # --------------------------------------------------
-    # Visualization column (fully palette-driven)
-    # --------------------------------------------------
-    kableExtra::column_spec(
-      3,
-      image = kableExtra::spec_pointrange(
-        x     = rep(point_estimate, nrow(interval_estimate_raw)),
-        xmin  = interval_estimate_raw$lower,
-        xmax  = interval_estimate_raw$upper,
-        vline = psi_0,
-        line_col  = pal$diagram,
-        width = 300,
-        height = 150,
-        cex = 0.6
-      )
-    ) |>
-
-    kableExtra::column_spec(4, color = pal$length)    |>
-    kableExtra::column_spec(5, color = pal$lower_dev) |>
-    kableExtra::column_spec(6, color = pal$upper_dev)
+  .render_interval_estimate_base(
+    df = df_render,
+    col_names = c(
+      "$\\psi_0$",
+      "Interval",
+      "Diagram",
+      "Length",
+      "Lower<br/>Deviation",
+      "Upper<br/>Deviation",
+      "Covers $\\psi_0$",
+      "Confidence<br/>Level"
+    ),
+    header_groups = c("Truth" = 1, "Estimate" = 7),
+    caption = .table_caption(
+      "Interval Estimates and Uncertainty Measures",
+      type
+    ),
+    stripe_bg      = stripe_bg,
+    diagram_x      = rep(point_estimate, nrow(interval_estimate_raw)),
+    diagram_lower  = interval_estimate_raw$lower,
+    diagram_upper  = interval_estimate_raw$upper,
+    vline          = psi_0,
+    include_pl     = FALSE,
+    collapse_cols  = 1
+  )
 }
 
 # ---------------------------------------------------------------------
-# Combined inference table
+# Combined estimate table
 # ---------------------------------------------------------------------
 
-#' Render combined inference table
+#' Render combined estimate table
 #'
-#' @param inference_df Data frame combining point and interval estimates.
+#' @param estimate_df Data frame combining point and interval estimates.
 #' @return A kableExtra object.
-render_inference_kable <- function(inference_df) {
+render_estimate_table <- function(estimate_df) {
 
-  type <- attr(inference_df, "type")
+  # --------------------------------------------------
+  # Validate required columns
+  # --------------------------------------------------
+  required <- c(
+    "se_psi_hat", "error", "psi_hat", "psi_0",
+    "Interval", "Length", "Lower Deviation",
+    "Upper Deviation", "Status", "Level"
+  )
+  stopifnot(all(required %in% names(estimate_df)))
 
-  interval_estimate_raw <- attr(inference_df, "interval_estimate_raw")
-  point_estimate <- inference_df$psi_hat
-  psi_0 <- inference_df$psi_0 |> unique()
+  # --------------------------------------------------
+  # Extract rendering metadata
+  # --------------------------------------------------
+  type <- attr(estimate_df, "type", exact = TRUE)
+  if (length(type) == 0) type <- NULL
 
-  pal <- inference_kable_palette()
+  interval_estimate_raw <- attr(estimate_df, "interval_estimate_raw")
+  stopifnot(!is.null(interval_estimate_raw))
 
-  inference_df |>
-    dplyr::mutate(across(where(is.numeric), \(x) round(x, 2))) |>
-    dplyr::mutate(Diagram = "", .after = "Interval") |>
-    kableExtra::kbl(
-      booktabs = TRUE,
-      escape   = FALSE,
-      align    = "c",
-      col.names = c(
-        "$\\psi_0$",
-        "$\\hat{\\psi}$",
-        "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
-        "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$",
-        "Confidence<br/>Level",
-        "Interval",
-        "Diagram",
-        "Length",
-        "Lower<br/>Deviation",
-        "Upper<br/>Deviation",
-        "Covers $\\psi_0$"
+  psi_0 <- unique(estimate_df$psi_0)
+  stopifnot(length(psi_0) == 1)
+
+  # --------------------------------------------------
+  # Prepare render data
+  # --------------------------------------------------
+  df_render <- estimate_df |>
+    dplyr::mutate(
+      dplyr::across(
+        c(se_psi_hat, error, psi_hat, psi_0,
+          Length, `Lower Deviation`, `Upper Deviation`),
+        ~ round(.x, 2)
+        )
+      ) |>
+    dplyr::mutate(
+      Diagram = "",
+      .after = "Interval"
+    )
+
+  bg_interval <- .interval_level_bg(df_render$Level)
+  bg_pe       <- table_pe_row_bg(type)
+
+  body_spec_fun <- function(tbl) {
+    tbl |>
+      kableExtra::column_spec(1, color = table_text_body("se")) |>
+      kableExtra::column_spec(2, color = table_text_body("error")) |>
+      kableExtra::column_spec(3, color = table_text_body("psi_hat")) |>
+      kableExtra::column_spec(4, color = table_text_body("psi_0")) |>
+      kableExtra::column_spec(5, color = table_text_body("interval")) |>
+      kableExtra::column_spec(
+        6,
+        image = kableExtra::spec_pointrange(
+          x     = estimate_df$psi_hat,
+          xmin  = interval_estimate_raw$lower,
+          xmax  = interval_estimate_raw$upper,
+          vline = psi_0,
+          line_col = table_text_body("diagram"),
+          width  = 300,
+          height = 150,
+          cex    = 0.6
+          )
+        ) |>
+      kableExtra::column_spec(7,  color = table_text_body("length")) |>
+      kableExtra::column_spec(8,  color = table_text_body("lower_dev")) |>
+      kableExtra::column_spec(9, color = table_text_body("upper_dev")) |>
+      kableExtra::column_spec(11, color = table_text_body("level"))
+  }
+
+  # --------------------------------------------------
+  # Render table via shared base
+  # --------------------------------------------------
+  .render_estimates_base(
+    df_render = df_render,
+    caption   = .table_caption(
+      "Estimates and Uncertainty Measures",
+      type
       ),
-      caption = paste0(
-        "<span style='color:#2D2D2D; font-size:1.05em; font-weight:500;'>",
-        "Estimates and Uncertainty Measures<br>",
-        "<em>(", type, " Log-Likelihood)</em>",
-        "</span>"
-      )
-    ) |>
-
-    # --------------------------------------------------
-    # Group headers (updated counts)
-    # --------------------------------------------------
-    kableExtra::add_header_above(
-      c("Point Estimate" = 4, "Interval Estimates" = 7),
-      bold       = TRUE,
-      background = c(pal$bg_group_pe, pal$bg_group_ie),
-      color      = pal$header_text
-    ) |>
-
-    kableExtra::kable_material_dark(font_size = 17) |>
-
-    # --------------------------------------------------
-    # Column headers
-    # --------------------------------------------------
-    kableExtra::column_spec(
-      1:4,
-      background = pal$bg_head_pe,
-      bold = TRUE, color = pal$header_text, include_thead = TRUE
-    ) |>
-    kableExtra::column_spec(
-      5:11,
-      background = pal$bg_head_ie,
-      bold = TRUE, color = pal$header_text, include_thead = TRUE
-    ) |>
-
-    # --------------------------------------------------
-    # Body backgrounds
-    # --------------------------------------------------
-    kableExtra::column_spec(1:4, background = pal$bg_body_pe)    |>
-    kableExtra::column_spec(5:11, background = pal$bg_body_ie) |>
-
-    # --------------------------------------------------
-    # Visual separator
-    # --------------------------------------------------
-    kableExtra::column_spec(
-      4, border_right = paste0("1px solid ", pal$separator)
-    ) |>
-
-    # --------------------------------------------------
-    # Text coloring
-    # --------------------------------------------------
-    kableExtra::column_spec(1, color = pal$psi_0)    |>
-    kableExtra::column_spec(2, color = pal$psi_hat)  |>
-    kableExtra::column_spec(3, color = pal$error)    |>
-    kableExtra::column_spec(4, color = pal$se)       |>
-    kableExtra::column_spec(5, color = pal$level)    |>
-    kableExtra::column_spec(6, color = pal$interval) |>
-
-    # --------------------------------------------------
-    # Diagram column (CI glyphs)
-    # --------------------------------------------------
-    kableExtra::column_spec(
-      7,
-      image = kableExtra::spec_pointrange(
-        x     = point_estimate,
-        xmin  = interval_estimate_raw$lower,
-        xmax  = interval_estimate_raw$upper,
-        vline = psi_0,
-        line_col = pal$diagram,
-        width = 300,
-        height = 150,
-        cex = 0.6
-      )
-    ) |>
-
-    kableExtra::column_spec(8, color = pal$length)     |>
-    kableExtra::column_spec(9, color = pal$lower_dev)  |>
-    kableExtra::column_spec(10, color = pal$upper_dev) |>
-
-    # --------------------------------------------------
-    # Coverage column
-    # --------------------------------------------------
-    kableExtra::column_spec(
-      11,
-      color = ifelse(
-        inference_df[[10]] %in% c("✅", "✔", "TRUE"),
-        pal$covers_ok,
-        pal$covers_no
+    header_groups = c(
+      "Point Estimates"    = 3,
+      "Truth"              = 1,
+      "Interval Estimates" = 7
       ),
-      width = "3em"
-    ) |>
-
-    # --------------------------------------------------
-    # Styling polish
-    # --------------------------------------------------
-    kableExtra::kable_styling(
-      full_width = FALSE,
-      position   = "center"
-    ) |>
-
-    kableExtra::column_spec(
-      1:11,
-      extra_css = "vertical-align: middle;"
-    ) |>
-
-    kableExtra::row_spec(
-      0:1,
-      extra_css = "vertical-align: middle;"
-    ) |>
-
-    kableExtra::collapse_rows(columns = 1:4)
+    header_bg = c(
+      table_group_header_bg("point_estimate"),
+      table_group_header_bg("truth"),
+      table_group_header_bg("interval_estimate")
+      ),
+    header_cols = list(
+      point    = 1:3,
+      truth    = 4,
+      interval = 5:11
+      ),
+    body_spec_fun = body_spec_fun,
+    stripe_bg     = bg_interval,
+    collapse_cols = 1:4,
+    include_pl    = FALSE,
+    pe_bg         = bg_pe
+  )
 }

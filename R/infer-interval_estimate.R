@@ -249,12 +249,12 @@ format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
       )
     ) |>
     dplyr::select(
-      Level,
       Interval,
       Length,
       `Lower Deviation`,
       `Upper Deviation`,
-      Status
+      Status,
+      Level,
     ) |>
     dplyr::mutate(
       dplyr::across(

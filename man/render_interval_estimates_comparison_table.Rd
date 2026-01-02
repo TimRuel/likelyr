@@ -42,6 +42,7 @@ Interval diagrams are rendered inline using \code{spec_pointrange()}.
 \seealso{
 Other inference-renderers: 
 \code{\link{render_estimates_comparison_table}()},
+\code{\link{render_point_estimate_table}()},
 \code{\link{render_point_estimates_comparison_table}()},
 \code{\link{synthesize_comparison}()}
 }

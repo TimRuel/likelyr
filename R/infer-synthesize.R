@@ -19,7 +19,6 @@
 #'   (e.g. `"profile"`, `"integrated"`). Used for labeling and rendering.
 #' @param expand_factor Numeric scalar controlling multiplicative expansion
 #'   of the search bounds for confidence interval root finding.
-#' @param render Logical; if TRUE, render kable summaries. Default TRUE.
 #'
 #' @return
 #' A named list containing:
@@ -28,9 +27,9 @@
 #'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, and SE(ψ̂).}
 #'   \item{interval_estimate_df}{Formatted confidence interval table.}
 #'   \item{inference_df}{Combined point and interval estimate summary table.}
-#'   \item{point_estimate_kable}{Rendered point estimate table (if `render`).}
-#'   \item{interval_estimate_kable}{Rendered interval estimate table (if `render`).}
-#'   \item{inference_kable}{Rendered combined inference table (if `render`).}
+#'   \item{point_estimate_table}{Rendered point estimate table}
+#'   \item{interval_estimate_table}{Rendered interval estimate table}
+#'   \item{estimate_table}{Rendered combined estimate table}
 #' }
 #'
 #' @keywords internal
@@ -38,9 +37,8 @@ synthesize_inference <- function(
     psi_ll_df,
     alpha_levels,
     psi_0,
-    expand_factor,
-    render = TRUE
-) {
+    expand_factor
+    ) {
 
   type <- attr(psi_ll_df, "type")
 
@@ -76,7 +74,7 @@ synthesize_inference <- function(
     psi_hat    = point_estimate,
     error      = point_estimate - psi_0,
     se_psi_hat = se_point_estimate
-  ) |>
+    ) |>
     round(2)
 
   attr(point_estimate_df, "type") <- type
@@ -93,44 +91,45 @@ synthesize_inference <- function(
     alpha_levels       = alpha_levels,
     expand_factor      = expand_factor,
     psi_0              = psi_0
-  )
+    )
 
   attr(interval_estimate_df, "type") <- type
 
   # --------------------------------------------------
   # Synthesis table (numeric only)
   # --------------------------------------------------
-  inference_df <- dplyr::bind_cols(
-    point_estimate_df,
-    interval_estimate_df
-  )
+  estimate_df <- point_estimate_df |>
+    dplyr::bind_cols(interval_estimate_df) |>
+    dplyr::select(
+      se_psi_hat,
+      error,
+      psi_hat,
+      psi_0,
+      Interval,
+      Length,
+      `Lower Deviation`,
+      `Upper Deviation`,
+      Status,
+      Level
+    )
 
-  attr(inference_df, "type") <- type
-  attr(inference_df, "interval_estimate_raw") <- attr(interval_estimate_df, "interval_estimate_raw")
+  attr(estimate_df, "type") <- type
+  attr(estimate_df, "interval_estimate_raw") <- attr(interval_estimate_df, "interval_estimate_raw")
 
-  # --------------------------------------------------
-  # Optional rendering
-  # --------------------------------------------------
-  point_estimate_kable     <- NULL
-  interval_estimate_kable <- NULL
-  inference_kable          <- NULL
+  point_estimate_table <- render_point_estimate_table(point_estimate_df)
 
-  if (isTRUE(render)) {
-    point_estimate_kable <- render_point_estimate_kable(point_estimate_df, show_caption = TRUE)
+  interval_estimate_table <- render_interval_estimate_table(interval_estimate_df)
 
-    interval_estimate_kable <- render_interval_estimate_kable(interval_estimate_df, show_caption = TRUE)
-
-    inference_kable <- render_inference_kable(inference_df)
-  }
+  estimate_table <- render_estimate_table(estimate_df)
 
   list(
     zero_max_psi_ll_fn      = zero_max_psi_ll_fn,
     psi_ll_df               = psi_ll_df,
     point_estimate_df       = point_estimate_df,
     interval_estimate_df    = interval_estimate_df,
-    inference_df            = inference_df,
-    point_estimate_kable    = point_estimate_kable,
-    interval_estimate_kable = interval_estimate_kable,
-    inference_kable         = inference_kable
+    estimate_df             = estimate_df,
+    point_estimate_table    = point_estimate_table,
+    interval_estimate_table = interval_estimate_table,
+    estimate_table          = estimate_table
   )
 }

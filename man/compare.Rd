@@ -4,10 +4,10 @@
 \alias{compare}
 \title{Compare Integrated and Profile Likelihood Inference}
 \usage{
-compare(x)
+compare(cal)
 }
 \arguments{
-\item{x}{A calibrated model specification.}
+\item{cal}{A calibrated model specification.}
 }
 \value{
 The input object with a comparison result attached.

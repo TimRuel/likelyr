@@ -33,6 +33,7 @@ Required columns:
 Other inference-renderers: 
 \code{\link{render_estimates_comparison_table}()},
 \code{\link{render_interval_estimates_comparison_table}()},
+\code{\link{render_point_estimate_table}()},
 \code{\link{synthesize_comparison}()}
 }
 \concept{inference-renderers}

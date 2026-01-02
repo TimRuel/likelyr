@@ -69,13 +69,11 @@ synthesize_comparison <- function(res) {
 
   point_estimates_df <- get_point_estimates_df(res)
 
-  point_estimates_comparison_table <-
-    render_point_estimates_comparison_table(point_estimates_df)
+  point_estimates_comparison_table <- render_point_estimates_comparison_table(point_estimates_df)
 
   interval_estimates_df <- get_interval_estimates_df(res)
 
-  interval_estimates_comparison_table <-
-    render_interval_estimates_comparison_table(interval_estimates_df)
+  interval_estimates_comparison_table <- render_interval_estimates_comparison_table(interval_estimates_df)
 
   n_levels <- interval_estimates_df |>
     dplyr::select(Level) |>
@@ -99,8 +97,7 @@ synthesize_comparison <- function(res) {
       Level
     )
 
-  estimates_comparison_table <-
-    render_estimates_comparison_table(estimates_df)
+  estimates_comparison_table <- render_estimates_comparison_table(estimates_df)
 
   list(
     point_estimates_df                  = point_estimates_df,

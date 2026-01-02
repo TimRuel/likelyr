@@ -122,3 +122,5 @@ plot_pseudolikelihood_curve <- function(
   invisible(p)
 }
 
+plot_pseudolikelihoods <- function(res) NULL
+

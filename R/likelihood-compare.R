@@ -23,27 +23,27 @@
 #' The result is the same calibrated model spec, augmented with a
 #' comparison object of class `"likelyr_comparison"`.
 #'
-#' @param x A calibrated model specification.
+#' @param cal A calibrated model specification.
 #'
 #' @return The input object with a comparison result attached.
 #'
 #' @export
-compare <- function(x) {
+compare <- function(cal) {
 
-  validate_compare_input(x)
+  validate_compare_input(cal)
 
-  pseudolikelihood_plot <- plot_pseudolikelihoods(x)
+  pseudolikelihood_plot <- plot_pseudolikelihoods(cal$results)
 
-  pseudolikelihood_tables <- synthesize_comparison(x)
+  pseudolikelihood_tables <- synthesize_comparison(cal$results)
 
   comparison <- list(
     tables = pseudolikelihood_tables,
-    plot   = pseudolikelihood_plot,
+    plot   = pseudolikelihood_plot
   )
 
-  x$comparison <- new_comparison_result(comparison)
+  cal$results$comparison <- new_comparison_result(comparison)
 
-  return(x)
+  return(cal)
 }
 
 # ======================================================================
@@ -54,30 +54,30 @@ compare <- function(x) {
 #'
 #' @keywords internal
 #' @noRd
-validate_compare_input <- function(x) {
+validate_compare_input <- function(cal) {
 
-  if (!inherits(x, "likelyr_calibrated")) {
+  if (!inherits(cal, "calibrated_model")) {
     stop(
       "compare() requires a calibrated model specification.",
       call. = FALSE
     )
   }
 
-  if (is.null(x$profile) || is.null(x$integrated)) {
+  if (is.null(cal$results$PL) || is.null(cal$results$IL)) {
     stop(
       "compare() requires both profile() and integrate() to have been run.",
       call. = FALSE
     )
   }
 
-  if (is.null(x$profile$inference)) {
+  if (is.null(cal$results$PL$inference)) {
     stop(
       "compare() requires infer() to be run on the profile likelihood.",
       call. = FALSE
     )
   }
 
-  if (is.null(x$integrated$inference)) {
+  if (is.null(cal$results$IL$inference)) {
     stop(
       "compare() requires infer() to be run on the integrated likelihood.",
       call. = FALSE

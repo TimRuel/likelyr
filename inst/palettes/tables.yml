@@ -14,12 +14,12 @@ text:
     psi_hat:          "#6FA3D9"
     error:            "#F0B51A"
     se:               "#E06C75"
-    level:            "#5FA8A8"
     interval:         "#6FA3D9"
     diagram:          "#88C0D0"
     length:           "#F0B51A"
     lower_dev:        "#E06C75"
     upper_dev:        "#C678DD"
+    level:            "#5FA8A8"
 
   # Header text
   header:

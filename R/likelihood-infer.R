@@ -103,9 +103,8 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
       psi_ll_df     = res$psi_ll_df,
       alpha_levels  = alpha_levels,
       psi_0         = psi_0,
-      expand_factor = expand_factor,
-      render        = TRUE
-    )
+      expand_factor = expand_factor
+      )
 
     cal$results[[name]]$inference <- new_inference_result(inference_synthesis)
   }

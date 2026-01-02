@@ -70,6 +70,7 @@ synthesis and rendering layer.
 Other inference-renderers: 
 \code{\link{render_estimates_comparison_table}()},
 \code{\link{render_interval_estimates_comparison_table}()},
+\code{\link{render_point_estimate_table}()},
 \code{\link{render_point_estimates_comparison_table}()}
 }
 \concept{inference-renderers}

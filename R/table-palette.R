@@ -10,10 +10,8 @@
 
 
 # ----------------------------------------------------------------------
-# Internal: load + cache palette
+# Internal: load palette
 # ----------------------------------------------------------------------
-
-.table_palette_cache <- NULL
 
 .load_table_palette <- function() {
   path <- system.file("palettes", "tables.yml", package = "likelyr")
@@ -23,20 +21,12 @@
   yaml::read_yaml(path)
 }
 
-.get_table_palette <- function() {
-  if (is.null(.table_palette_cache)) {
-    .table_palette_cache <<- .load_table_palette()
-  }
-  .table_palette_cache
-}
-
-
 # ----------------------------------------------------------------------
 # Internal helpers
 # ----------------------------------------------------------------------
 
 .get_palette_value <- function(path, key, label) {
-  pal <- .get_table_palette()
+  pal <- .load_table_palette()
   node <- pal
   for (p in path) node <- node[[p]]
 
@@ -166,7 +156,7 @@ table_column_bg <- function(key) {
 #' @export
 table_row_block_bg <- function(index, type = c("level", "pseudolikelihood")) {
   type <- match.arg(type)
-  pal  <- .get_table_palette()
+  pal  <- .load_table_palette()
 
   rows <- pal$background$row[[type]]
   .get_ab_value(rows, index)
@@ -234,7 +224,7 @@ table_pe_row_bg <- function(pseudolikelihood, levels = NULL) {
 #'
 #' @export
 flatten_table_palette <- function() {
-  pal <- .get_table_palette()
+  pal <- .load_table_palette()
 
   c(
     pal$text$body,

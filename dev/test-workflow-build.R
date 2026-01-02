@@ -130,7 +130,8 @@ fit <- model |>
   integrate() |>
   diagnose() |>
   infer()
-  # compare()
+
+fit <- compare(fit)
 
 
 

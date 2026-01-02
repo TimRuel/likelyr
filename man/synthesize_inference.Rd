@@ -4,13 +4,7 @@
 \alias{synthesize_inference}
 \title{Synthesize Likelihood-Based Inference Results}
 \usage{
-synthesize_inference(
-  psi_ll_df,
-  alpha_levels,
-  psi_0,
-  expand_factor,
-  render = TRUE
-)
+synthesize_inference(psi_ll_df, alpha_levels, psi_0, expand_factor)
 }
 \arguments{
 \item{psi_ll_df}{A data frame containing columns \code{psi} and \code{loglik}
@@ -23,8 +17,6 @@ representing the evaluated log-likelihood curve.}
 
 \item{expand_factor}{Numeric scalar controlling multiplicative expansion
 of the search bounds for confidence interval root finding.}
-
-\item{render}{Logical; if TRUE, render kable summaries. Default TRUE.}
 }
 \value{
 A named list containing:
@@ -33,9 +25,9 @@ A named list containing:
 \item{point_estimate_df}{Data frame with ψ₀, ψ̂, and SE(ψ̂).}
 \item{interval_estimate_df}{Formatted confidence interval table.}
 \item{inference_df}{Combined point and interval estimate summary table.}
-\item{point_estimate_kable}{Rendered point estimate table (if \code{render}).}
-\item{interval_estimate_kable}{Rendered interval estimate table (if \code{render}).}
-\item{inference_kable}{Rendered combined inference table (if \code{render}).}
+\item{point_estimate_table}{Rendered point estimate table}
+\item{interval_estimate_table}{Rendered interval estimate table}
+\item{estimate_table}{Rendered combined estimate table}
 }
 }
 \description{

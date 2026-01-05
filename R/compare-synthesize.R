@@ -1,12 +1,12 @@
 # =====================================================================
-# compare-synthesize.R — Synthesize pseudolikelihood comparison results
+# compare-synthesize.R — Synthesize pseudolikelihood comparison res_listults
 # =====================================================================
 
-#' Synthesize pseudolikelihood comparison results
+#' Synthesize pseudolikelihood comparison res_listults
 #'
 #' @description
 #' High-level orchestration helper that synthesizes point estimates and
-#' interval estimates from a fitted likelihood result object, and renders
+#' interval estimates from a fitted likelihood res_listult object, and renders
 #' a complete set of comparison tables.
 #'
 #' @details
@@ -29,7 +29,7 @@
 #' This function performs **no estimation** itself; it is purely a
 #' synthesis and rendering layer.
 #'
-#' @param res A fitted likelihood result object. Must be compatible with
+#' @param res_list A fitted likelihood res_listult object. Must be compatible with
 #'   \code{get_point_estimates_df()} and
 #'   \code{get_interval_estimates_df()}.
 #'
@@ -37,7 +37,7 @@
 #'
 #' \describe{
 #'   \item{\code{point_estimates_df}}{
-#'     Data frame of point estimates and uncertainty measures.
+#'     Data frame of point estimates and uncertainty measures_list.
 #'   }
 #'   \item{\code{interval_estimates_df}}{
 #'     Data frame of interval estimates and diagnostics, including attached
@@ -65,13 +65,13 @@
 #'
 #' @family inference-renderers
 #' @export
-synthesize_comparison <- function(res) {
+synthesize_comparison <- function(res_list) {
 
-  point_estimates_df <- get_point_estimates_df(res)
+  point_estimates_df <- get_point_estimates_df(res_list)
 
   point_estimates_comparison_table <- render_point_estimates_comparison_table(point_estimates_df)
 
-  interval_estimates_df <- get_interval_estimates_df(res)
+  interval_estimates_df <- get_interval_estimates_df(res_list)
 
   interval_estimates_comparison_table <- render_interval_estimates_comparison_table(interval_estimates_df)
 
@@ -98,6 +98,8 @@ synthesize_comparison <- function(res) {
     )
 
   estimates_comparison_table <- render_estimates_comparison_table(estimates_df)
+
+  pseudolikelihood_curves <- plot_pseudolikelihood_curves(res_list)
 
   list(
     point_estimates_df                  = point_estimates_df,

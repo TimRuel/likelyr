@@ -2,7 +2,7 @@
 % Please edit documentation in R/likelihood-diagnose.R
 \name{diagnose}
 \alias{diagnose}
-\title{Diagnostics for Likelyr Results (IL or PL)}
+\title{Diagnostics for Likelyr Results (integrated or profile)}
 \usage{
 diagnose(cal, verbose = TRUE)
 }
@@ -19,8 +19,8 @@ and diagnostics added to each result.
 \description{
 Scans all entries of \code{cal$results}, attaching a diagnostics object to
 each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
-(IL) receives full Monte Carlo diagnostics; Profile Log-Likelihood (PL)
-receives a placeholder for now.
+receives full Monte Carlo diagnostics; Profile Log-Likelihood receives a
+placeholder for now.
 
 Diagnostics are stored under:
 \preformatted{

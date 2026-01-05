@@ -5,8 +5,8 @@
 #' Integrated Log-Likelihood
 #'
 #' @description
-#' Computes the integrated likelihood (IL) and attaches it to the input
-#' `calibrated_model` under `$results$IL`. The updated object is returned.
+#' Computes the integrated log-likelihood and attaches it to the input
+#' `calibrated_model` under `$results$integrated`. The updated object is returned.
 #'
 #' This function is **silent by default** for pipe-friendly workflows.
 #' Set `verbose = TRUE` to display diagnostic messages.
@@ -17,7 +17,7 @@
 #'
 #' @return The SAME calibrated_model object, augmented with:
 #'         • class `"likelyr_integrated"`
-#'         • `$results$IL` — a `likelyr_il_result` object
+#'         • `$results$integrated` — a `likelyr_integrated` object
 #' @export
 integrate <- function(cal, ...) {
   UseMethod("integrate")
@@ -57,13 +57,13 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   if (is.null(cal$results)) cal$results <- list()
 
   # ------------------------------------------------------------------
-  # 1. Create IL working area inside results$IL
+  # 1. Create `integrated` working area inside results$integrated
   # ------------------------------------------------------------------
   constraint_fn    <- function(theta) psi_fn(theta) - psi_mle
   generate_init    <- make_omega_hat_initgen(cal)
   sample_omega_hat <- make_omega_hat_sampler(cal)
 
-  cal$results$IL <- list(
+  cal$results$integrated <- list(
     constraint_fn    = constraint_fn,
     generate_init    = generate_init,
     sample_omega_hat = sample_omega_hat
@@ -96,14 +96,14 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 4. Final aggregation (log-sum-exp)
   # ------------------------------------------------------------------
-  il_result <- tryCatch({
+  integrated_result <- tryCatch({
 
     branches    <- branch_result$branches
     omega_draws <- branch_result$omega_draws
 
     branch_avg <- average_branches(branches)
 
-    new_il_result(list(
+    new_integrated_result(list(
       psi_ll_df   = branch_avg$psi_ll_df,
       branch_mat  = branch_avg$branch_mat,
       branches    = branches,
@@ -118,7 +118,7 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
     if (verbose)
       cat("[integrate] WARNING: Final averaging failed.\n")
 
-    new_il_result(list(
+    new_integrated_result(list(
       status      = "failed",
       error_msg   = conditionMessage(e),
       branches    = branch_result$branches,
@@ -127,9 +127,9 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   })
 
   # ------------------------------------------------------------------
-  # 5. Replace IL working area with final result
+  # 5. Replace `integrated` working area with final result
   # ------------------------------------------------------------------
-  cal$results$IL <- il_result
+  cal$results$integrated <- integrated_result
 
   if (verbose) cat("[integrate] Finished.\n")
 
@@ -171,7 +171,7 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # ======================================================================
 
 #' @export
-print.likelyr_il_result <- function(x, ...) {
+print.likelyr_integrated <- function(x, ...) {
   cat("<Integrated Log-Likelihood Result>\n")
   cat("Status: ", x$status, "\n", sep = "")
 
@@ -190,7 +190,7 @@ print.likelyr_il_result <- function(x, ...) {
 }
 
 #' @export
-summary.likelyr_il_result <- function(object, ...) {
+summary.likelyr_integrated <- function(object, ...) {
   out <- list(
     status     = object$status,
     psi_mle    = object$psi_mle,
@@ -201,12 +201,12 @@ summary.likelyr_il_result <- function(object, ...) {
       length(object$branches) else NA_integer_
   )
 
-  class(out) <- "summary_likelyr_il_result"
+  class(out) <- "summary_likelyr_integrated"
   out
 }
 
 #' @export
-print.summary_likelyr_il_result <- function(x, ...) {
+print.summary_likelyr_integrated <- function(x, ...) {
   cat("<Summary: Integrated Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
@@ -221,7 +221,7 @@ print.summary_likelyr_il_result <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_il_result <- function(x) {
+plot.likelyr_integrated <- function(x) {
 
   p <- plot_pseudolikelihood_points(x$psi_ll_df)
 

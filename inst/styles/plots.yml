@@ -1,0 +1,140 @@
+# ==================================================
+# PLOT STYLE CONFIGURATION (DARK THEME)
+# ==================================================
+
+# --------------------------------------------------
+# Likelihood curve styling
+# --------------------------------------------------
+curve:
+  colors:
+    integrated: "#052880"   # Hylian blue
+    profile:    "#052880"   # Hylian blue
+
+  # Default (used by single-likelihood plots)
+  linetype: solid
+  linewidth: 1.5
+
+  # Comparison-only overrides
+  comparison:
+    linetype:
+      integrated: solid
+      profile:    "22"
+    colors:
+      integrated: "#052880"   # Hylian blue
+      profile:    "#A7B0C0"   # steel silver
+
+
+# --------------------------------------------------
+# Point cloud styling (evaluated likelihood points)
+# --------------------------------------------------
+points:
+  cloud:
+    size:  3
+    alpha: 0.7
+
+
+# --------------------------------------------------
+# Point estimate styling
+# --------------------------------------------------
+point_estimate:
+  colors:
+    integrated: "#941703"   # deep red
+    profile:    "#941703"   # deep red
+  size: 3
+  linetype: solid
+
+  # Comparison-only overrides (vertical lines)
+  comparison:
+    linetype:
+      integrated: solid
+      profile:    "22"
+    colors:
+      integrated: "#941703"   # deep red
+      profile:    "#A7B0C0"   # steel silver
+
+
+# --------------------------------------------------
+# Truth marker styling
+# --------------------------------------------------
+truth:
+  color:  "#C4A806"         # gold
+  shape:  4
+  size:   3
+  stroke: 1.2
+
+
+# --------------------------------------------------
+# Interval estimate styling
+# --------------------------------------------------
+interval_estimate:
+  description: >
+    Sequential HCL palette for likelihood-ratio confidence interval
+    endpoints. Designed to stay readable on dark backgrounds.
+
+  generator: sequential_hcl
+  params:
+    h: 150
+    c: [35, 65]
+    l: [92, 40]
+    power: 1.1
+  name_from: Level
+
+  line:
+    linetype: dashed
+    linewidth: 1
+
+
+# --------------------------------------------------
+# Reference lines (e.g., log-likelihood baseline)
+# --------------------------------------------------
+reference_lines:
+  loglik_zero:
+    linetype: dashed
+    linewidth: 0.8
+    color: "black"
+
+
+# --------------------------------------------------
+# Base ggplot theme (dark)
+# --------------------------------------------------
+theme:
+  base: minimal
+
+  background:
+    panel:
+      fill: "#444444"
+      color: null
+    plot:
+      fill: "#2A2A2A"
+      color: null
+    legend:
+      fill: "#444444"
+
+  grid:
+    major:
+      color: "#4C4C4C"
+    minor:
+      color: "#333333"
+
+  axis:
+    ticks:
+      color: "white"
+    text:
+      color: "white"
+    title:
+      color: "white"
+
+  strip:
+    text:
+      color: "white"
+
+  plot:
+    title:
+      color: "white"
+      face: "bold"
+
+  legend:
+    text:
+      color: "white"
+    title:
+      color: "white"

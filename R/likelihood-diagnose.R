@@ -1,14 +1,14 @@
-# ======================================================================
-# likelihood-diagnostics.R — Unified diagnostics for IL + PL results
-# ======================================================================
+# ================================================================================
+# likelihood-diagnostics.R — Unified diagnostics for integrated + profile results
+# ================================================================================
 
-#' Diagnostics for Likelyr Results (IL or PL)
+#' Diagnostics for Likelyr Results (integrated or profile)
 #'
 #' @description
 #' Scans all entries of `cal$results`, attaching a diagnostics object to
 #' each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
-#' (IL) receives full Monte Carlo diagnostics; Profile Log-Likelihood (PL)
-#' receives a placeholder for now.
+#' receives full Monte Carlo diagnostics; Profile Log-Likelihood receives a
+#' placeholder for now.
 #'
 #' Diagnostics are stored under:
 #' \preformatted{
@@ -55,9 +55,9 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
     # ------------------------------------------------------------
     # Integrated Log-Likelihood
     # ------------------------------------------------------------
-    if (inherits(res, "likelyr_il_result")) {
+    if (inherits(res, "likelyr_integrated")) {
 
-      diag_list <- .diagnose_il_object(res)
+      diag_list <- .diagnose_integrated_result(res)
 
       diag_obj <- new_diagnostics_result(diag_list)
 
@@ -69,9 +69,9 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
       # ------------------------------------------------------------
       # Profile Log-Likelihood
       # ------------------------------------------------------------
-    } else if (inherits(res, "likelyr_pl_result")) {
+    } else if (inherits(res, "likelyr_profiled")) {
 
-      diag_obj <- .diagnose_pl_object(res)
+      diag_obj <- .diagnose_profile_result(res)
 
       # ------------------------------------------------------------
       # Unknown result type
@@ -101,16 +101,16 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
 }
 
 # ======================================================================
-# IL Diagnostics Engine (full)
+# Integrated Log-Likelihood Diagnostics Engine (full)
 # ======================================================================
 
-#' Internal IL diagnostics engine
+#' Internal integrated log-likelihood diagnostics engine
 #'
 #' @keywords internal
-.diagnose_il_object <- function(il) {
+.diagnose_integrated_result <- function(res) {
 
-  branch_mat  <- il$branch_mat
-  omega_draws <- il$omega_draws %||% il$omega_hats
+  branch_mat  <- res$branch_mat
+  omega_draws <- res$omega_draws %||% res$omega_hats
 
   K <- nrow(branch_mat)
   R <- ncol(branch_mat)
@@ -230,18 +230,18 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
 }
 
 # ======================================================================
-# PL Diagnostics (placeholder)
+# Profile Log-Likelihood Diagnostics (placeholder)
 # ======================================================================
 
-#' Placeholder diagnostics for Profile Log-Likelihood
+#' Placeholder diagnostics for profile log-likelihood
 #'
 #' @keywords internal
-.diagnose_pl_object <- function(pl) {
+.diagnose_profile_result <- function(res) {
 
   diag <- list(
     type       = "Profile",
     supported  = FALSE,
-    message    = "Diagnostics for profile likelihood are not yet implemented.",
+    message    = "Diagnostics for profile log-likelihood are not yet implemented.",
     warnings   = "No diagnostic computations were performed."
   )
 
@@ -295,7 +295,7 @@ plot.likelyr_diagnostics <- function(x, ...) {
 
   plots <- list()
 
-  # PL results are empty
+  # Profile log-likelihood results are empty
   if (!is.null(x$type) && x$type == "Profile") {
     message("No diagnostic plots available for profile log-likelihood (placeholder).")
     return(invisible(plots))

@@ -7,7 +7,7 @@
 #' @description
 #' Computes the *profile log-likelihood* curve for the calibrated model.
 #'
-#' Unlike the integrated log-likelihood (IL), the profile log-likelihood (PL)
+#' Unlike the integrated log-likelihood, the profile log-likelihood
 #' does **not** involve ω̂–sampling or Monte Carlo methods. Instead,
 #' nuisance parameters are fixed at their MLE:
 #'
@@ -19,7 +19,7 @@
 #' deterministic branch*. The result is attached to:
 #'
 #' \preformatted{
-#'   cal$results$PL
+#'   cal$results$profile
 #' }
 #'
 #' @param cal A `calibrated_model` produced by [calibrate()].
@@ -28,14 +28,14 @@
 #'
 #' @return
 #' The SAME calibrated_model object, augmented with:
-#'   * `results$PL` — a `likelyr_profile_result` object
+#'   * `results$profile` — a `likelyr_profiled` object
 #'   * class `"likelyr_profiled"`
 #'
 #' @examples
 #' \dontrun{
 #' cal <- calibrate(model, data)
 #' cal <- profile(cal)
-#' plot(cal$results$PL)
+#' plot(cal$results$profile)
 #' }
 #'
 #' @export
@@ -129,7 +129,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 5. Wrap into likelyr_profile_result
   # ------------------------------------------------------------------
-  pl_result <- new_pl_result(list(
+  profile_result <- new_profile_result(list(
     psi_ll_df = psi_ll_df,
     psi_mle   = psi_mle,
     theta_mle = theta_mle,
@@ -140,7 +140,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # 6. Store and return
   # ------------------------------------------------------------------
   if (is.null(cal$results)) cal$results <- list()
-  cal$results$PL <- pl_result
+  cal$results$profile <- profile_result
 
   cal <- mark_profiled(cal)
 
@@ -180,7 +180,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # ======================================================================
 
 #' @export
-print.likelyr_pl_result <- function(x, ...) {
+print.likelyr_profile_result <- function(x, ...) {
   cat("<Profile Log-Likelihood Result>\n")
   if (!is.null(x$status))    cat("Status:     ", x$status, "\n", sep = "")
   if (!is.null(x$psi_mle))   cat("psi_MLE:    ", format(x$psi_mle), "\n", sep = "")
@@ -195,7 +195,7 @@ print.likelyr_pl_result <- function(x, ...) {
 # ----------------------------------------------------------------------
 
 #' @export
-summary.likelyr_pl_result <- function(object, ...) {
+summary.likelyr_profile_result <- function(object, ...) {
   out <- list(
     status     = object$status,
     psi_mle    = object$psi_mle,
@@ -203,12 +203,12 @@ summary.likelyr_pl_result <- function(object, ...) {
     n_grid     = if (!is.null(object$df))
       nrow(object$df) else NA_integer_
   )
-  class(out) <- "summary_likelyr_profile_result"
+  class(out) <- "summary_likelyr_profile"
   out
 }
 
 #' @export
-print.summary_likelyr_pl_result <- function(x, ...) {
+print.summary_likelyr_profile_result <- function(x, ...) {
   cat("<Summary: Profile Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
@@ -223,7 +223,7 @@ print.summary_likelyr_pl_result <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_pl_result <- function(x) {
+plot.likelyr_profile_result <- function(x) {
 
   p <- plot_pseudolikelihood_points(x$psi_ll_df)
 

@@ -146,10 +146,11 @@ print.likelyr_inference <- function(x, ...) {
     }
   }
 
-  if (!is.null(x$interval_estimate_df) &&
-      "Level" %in% names(x$interval_estimate_df)) {
+  if (!is.null(x$interval_estimate_df)) {
 
-    alpha_levels <- 1 - scales::parse_percent(x$interval_estimate_df$Level)
+    alpha_levels <- x$interval_estimate_df |>
+      attr("interval_estimate_raw") |>
+      dplyr::pull(alpha)
 
     cat(
       "  Alpha:    ",
@@ -222,12 +223,7 @@ print.summary_likelyr_inference <- function(x, ...) {
 #' @export
 plot.likelyr_inference <- function(x, ...) {
 
-  p <- plot_pseudolikelihood_curve(
-    psi_ll_df             = x$psi_ll_df,
-    zero_max_psi_ll_fn    = x$zero_max_psi_ll_fn,
-    point_estimate_df     = x$point_estimate_df,
-    interval_estimate_df = x$interval_estimate_df
-  )
+  p <- x$pseudolikelihood_curve
 
   print(p)
   invisible(p)

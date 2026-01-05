@@ -21,9 +21,9 @@ interval annotations.}
 A ggplot object.
 }
 \description{
-Visualizes a comparison between profile likelihood (PL) and
-integrated likelihood (IL) results. This plot is intended to
-\emph{contrast methods}, not to display within-method uncertainty.
+Visualizes a comparison between profile log-likelihood and
+integrated log-likelihood results. This plot is intended to
+\emph{contrast pseudolikelihoods}, not to display within-pseudolikelihood uncertainty.
 
 The input must be a \code{"likelyr_comparison"} object produced by
 \code{\link[=compare]{compare()}}.

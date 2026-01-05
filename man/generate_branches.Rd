@@ -22,8 +22,8 @@ each branch corresponding to a draw of ω̂ satisfying ψ(ω̂) = ψ_MLE.
 
 For each branch:
 \enumerate{
-\item Draw ω̂ via \code{cal$results$IL$generate_init()} and
-\code{cal$results$IL$sample_omega_hat()}.
+\item Draw ω̂ via \code{cal$results$integrated$generate_init()} and
+\code{cal$results$integrated$sample_omega_hat()}.
 \item Construct a ψ-conditioned evaluator via \code{\link[=build_eval_psi_fun]{build_eval_psi_fun()}}.
 \item Solve the branch mode: (ψ̂_branch, θ̂_branch).
 \item Compute a loglik cutoff using the LR criterion with an

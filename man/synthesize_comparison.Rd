@@ -2,12 +2,12 @@
 % Please edit documentation in R/compare-synthesize.R
 \name{synthesize_comparison}
 \alias{synthesize_comparison}
-\title{Synthesize pseudolikelihood comparison results}
+\title{Synthesize pseudolikelihood comparison res_listults}
 \usage{
-synthesize_comparison(res)
+synthesize_comparison(res_list)
 }
 \arguments{
-\item{res}{A fitted likelihood result object. Must be compatible with
+\item{res_list}{A fitted likelihood res_listult object. Must be compatible with
 \code{get_point_estimates_df()} and
 \code{get_interval_estimates_df()}.}
 }
@@ -16,7 +16,7 @@ A named list with the following elements:
 
 \describe{
 \item{\code{point_estimates_df}}{
-Data frame of point estimates and uncertainty measures.
+Data frame of point estimates and uncertainty measures_list.
 }
 \item{\code{interval_estimates_df}}{
 Data frame of interval estimates and diagnostics, including attached
@@ -39,7 +39,7 @@ for combined rendering.
 }
 \description{
 High-level orchestration helper that synthesizes point estimates and
-interval estimates from a fitted likelihood result object, and renders
+interval estimates from a fitted likelihood res_listult object, and renders
 a complete set of comparison tables.
 }
 \details{

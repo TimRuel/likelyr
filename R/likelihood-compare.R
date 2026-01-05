@@ -11,8 +11,8 @@
 #' Compare Integrated and Profile Likelihood Inference
 #'
 #' @description
-#' Orchestrates comparison between profile likelihood (PL) and
-#' integrated likelihood (IL) inference results for a calibrated
+#' Orchestrates comparison between profile likelihood and
+#' integrated likelihood inference results for a calibrated
 #' model specification.
 #'
 #' The input must already have:
@@ -30,9 +30,11 @@
 #' @export
 compare <- function(cal) {
 
+  cal$results$comparison <- NULL
+
   validate_compare_input(cal)
 
-  pseudolikelihood_plot <- plot_pseudolikelihoods(cal$results)
+  pseudolikelihood_plot <- plot_pseudolikelihood_curves(cal$results)
 
   pseudolikelihood_tables <- synthesize_comparison(cal$results)
 
@@ -63,21 +65,21 @@ validate_compare_input <- function(cal) {
     )
   }
 
-  if (is.null(cal$results$PL) || is.null(cal$results$IL)) {
+  if (is.null(cal$results$profile) || is.null(cal$results$integrated)) {
     stop(
       "compare() requires both profile() and integrate() to have been run.",
       call. = FALSE
     )
   }
 
-  if (is.null(cal$results$PL$inference)) {
+  if (is.null(cal$results$profile$inference)) {
     stop(
       "compare() requires infer() to be run on the profile likelihood.",
       call. = FALSE
     )
   }
 
-  if (is.null(cal$results$IL$inference)) {
+  if (is.null(cal$results$integrated$inference)) {
     stop(
       "compare() requires infer() to be run on the integrated likelihood.",
       call. = FALSE

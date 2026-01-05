@@ -6,8 +6,8 @@ get_interval_estimates_df <- function(res) {
     dplyr::bind_rows(.id = "Pseudolikelihood") |>
     dplyr::mutate(
       Pseudolikelihood = dplyr::recode(Pseudolikelihood,
-                                       PL = "Profile",
-                                       IL = "Integrated")
+                                       profile = "Profile",
+                                       integrated = "Integrated")
     ) |>
     dplyr::arrange(Level) |>
     dplyr::select(

@@ -6,9 +6,9 @@
 #' Plot Likelihood Comparison
 #'
 #' @description
-#' Visualizes a comparison between profile likelihood (PL) and
-#' integrated likelihood (IL) results. This plot is intended to
-#' *contrast methods*, not to display within-method uncertainty.
+#' Visualizes a comparison between profile log-likelihood and
+#' integrated log-likelihood results. This plot is intended to
+#' *contrast pseudolikelihoods*, not to display within-pseudolikelihood uncertainty.
 #'
 #' The input must be a `"likelyr_comparison"` object produced by
 #' [compare()].
@@ -79,7 +79,7 @@ validate_comparison_plot_input <- function(x) {
 extract_comparison_plot_data <- function(x) {
 
   # Placeholder:
-  # - likelihood curves for PL and IL
+  # - likelihood curves for integrated and profile log-likelihoods
   # - point estimates (psi_hat, psi_0)
   # - interval summaries (already computed in infer())
   list()
@@ -105,7 +105,7 @@ build_comparison_plot <- function(
 
   p <- plot_base()
 
-  # -- Likelihood curves (PL vs IL)
+  # -- Pseudolikelihood curves (profile vs integrated)
   # -- Interval annotations (optional)
   # -- Point estimate annotations (optional)
   # -- Legends and labels

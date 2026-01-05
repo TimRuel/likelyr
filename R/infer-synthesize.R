@@ -122,6 +122,13 @@ synthesize_inference <- function(
 
   estimate_table <- render_estimate_table(estimate_df)
 
+  pseudolikelihood_curve <- plot_pseudolikelihood_curve(
+    psi_ll_df             = psi_ll_df,
+    zero_max_psi_ll_fn    = zero_max_psi_ll_fn,
+    point_estimate_df     = point_estimate_df,
+    interval_estimate_df  = interval_estimate_df
+    )
+
   list(
     zero_max_psi_ll_fn      = zero_max_psi_ll_fn,
     psi_ll_df               = psi_ll_df,
@@ -130,6 +137,7 @@ synthesize_inference <- function(
     estimate_df             = estimate_df,
     point_estimate_table    = point_estimate_table,
     interval_estimate_table = interval_estimate_table,
-    estimate_table          = estimate_table
+    estimate_table          = estimate_table,
+    pseudolikelihood_curve  = pseudolikelihood_curve
   )
 }

@@ -16,14 +16,14 @@ profile(cal, ...)
 \value{
 The SAME calibrated_model object, augmented with:
 \itemize{
-\item \code{results$PL} — a \code{likelyr_profile_result} object
+\item \code{results$profile} — a \code{likelyr_profiled} object
 \item class \code{"likelyr_profiled"}
 }
 }
 \description{
 Computes the \emph{profile log-likelihood} curve for the calibrated model.
 
-Unlike the integrated log-likelihood (IL), the profile log-likelihood (PL)
+Unlike the integrated log-likelihood, the profile log-likelihood
 does \strong{not} involve ω̂–sampling or Monte Carlo methods. Instead,
 nuisance parameters are fixed at their MLE:
 
@@ -35,14 +35,14 @@ The log-likelihood is then evaluated along a ψ–grid, forming a \emph{single
 deterministic branch}. The result is attached to:
 
 \preformatted{
-  cal$results$PL
+  cal$results$profile
 }
 }
 \examples{
 \dontrun{
 cal <- calibrate(model, data)
 cal <- profile(cal)
-plot(cal$results$PL)
+plot(cal$results$profile)
 }
 
 }

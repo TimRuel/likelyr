@@ -2,7 +2,7 @@
 # table-palette.R
 #
 # Semantic accessors for table color palettes defined in
-# inst/palettes/tables.yml
+# inst/styles/tables.yml
 #
 # Tables should NEVER hard-code hex values.
 # They should ask for colors by meaning.
@@ -14,7 +14,7 @@
 # ----------------------------------------------------------------------
 
 .load_table_palette <- function() {
-  path <- system.file("palettes", "tables.yml", package = "likelyr")
+  path <- system.file("styles", "tables.yml", package = "likelyr")
   if (path == "") {
     stop("tables.yml not found in installed package.", call. = FALSE)
   }

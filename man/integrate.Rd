@@ -16,11 +16,11 @@ integrate(cal, ...)
 \value{
 The SAME calibrated_model object, augmented with:
 • class \code{"likelyr_integrated"}
-• \verb{$results$IL} — a \code{likelyr_il_result} object
+• \verb{$results$integrated} — a \code{likelyr_integrated} object
 }
 \description{
-Computes the integrated likelihood (IL) and attaches it to the input
-\code{calibrated_model} under \verb{$results$IL}. The updated object is returned.
+Computes the integrated log-likelihood and attaches it to the input
+\code{calibrated_model} under \verb{$results$integrated}. The updated object is returned.
 
 This function is \strong{silent by default} for pipe-friendly workflows.
 Set \code{verbose = TRUE} to display diagnostic messages.

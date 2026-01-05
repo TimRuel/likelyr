@@ -1,10 +1,10 @@
-# ======================================================================
-# branch-generate.R — IL Branch Construction (Monte Carlo)
-# ======================================================================
+# ================================================================================
+# branch-generate.R — Integrated Log-Likelihood Branch Construction (Monte Carlo)
+# ================================================================================
 #
 # Provides:
 #   * build_one_branch()   — full left+right sweep on the ψ-grid
-#   * generate_branches()  — Monte Carlo branch generation for IL
+#   * generate_branches()  — Monte Carlo branch generation for integrated log-likelihood
 #
 # cutoff_buffer is applied in generate_branches() when computing the
 # branch cutoff; build_one_branch() simply respects the cutoff it is
@@ -117,9 +117,9 @@ build_one_branch <- function(
 }
 
 
-# ======================================================================
-# INTERNAL: Generate Monte Carlo Branches (IL only)
-# ======================================================================
+# =========================================================================
+# INTERNAL: Generate Monte Carlo Branches (integrated log-likelihood only)
+# =========================================================================
 
 #' Generate Monte Carlo Branches (Integrated Log-Likelihood Only)
 #'
@@ -129,8 +129,8 @@ build_one_branch <- function(
 #'
 #' For each branch:
 #' \enumerate{
-#'   \item Draw ω̂ via \code{cal$results$IL$generate_init()} and
-#'         \code{cal$results$IL$sample_omega_hat()}.
+#'   \item Draw ω̂ via \code{cal$results$integrated$generate_init()} and
+#'         \code{cal$results$integrated$sample_omega_hat()}.
 #'   \item Construct a ψ-conditioned evaluator via [build_eval_psi_fun()].
 #'   \item Solve the branch mode: (ψ̂_branch, θ̂_branch).
 #'   \item Compute a loglik cutoff using the LR criterion with an
@@ -158,15 +158,15 @@ generate_branches <- function(cal, verbose = TRUE) {
   optimizer <- cal$optimizer
   execution <- cal$execution
 
-  # -------------------------------------------------------------------
-  # IL components now live in cal$results$IL (temporary storage)
-  # -------------------------------------------------------------------
-  il <- cal$results$IL
-  if (is.null(il) ||
-      is.null(il$generate_init) ||
-      is.null(il$sample_omega_hat)) {
+  # ------------------------------------------------------------------------
+  # Integrated log-likelihood components now live in cal$results$integrated
+  # ------------------------------------------------------------------------
+  integrated_result <- cal$results$integrated
+  if (is.null(integrated_result) ||
+      is.null(integrated_result$generate_init) ||
+      is.null(integrated_result$sample_omega_hat)) {
     stop(
-      "integrate() must set cal$results$IL$generate_init and $sample_omega_hat.",
+      "integrate() must set cal$results$integrated_result$generate_init and $sample_omega_hat.",
       call. = FALSE
     )
   }
@@ -238,8 +238,8 @@ generate_branches <- function(cal, verbose = TRUE) {
   ) %op% {
 
     # 1. Draw ω̂
-    init      <- il$generate_init()
-    omega_hat <- il$sample_omega_hat(init)
+    init      <- integrated_result$generate_init()
+    omega_hat <- integrated_result$sample_omega_hat(init)
 
     # 2. Build ψ evaluator for this ω̂
     eval_psi_fun <- eval_psi_builder(omega_hat)

@@ -91,13 +91,13 @@ new_likelyr_result <- function(x = list()) {
   x
 }
 
-new_il_result <- function(x = list()) {
-  class(x) <- c("likelyr_il_result", "likelyr_result", "likelyr")
+new_integrated_result <- function(x = list()) {
+  class(x) <- c("likelyr_integrated", "likelyr_result", "likelyr")
   x
 }
 
-new_pl_result <- function(x = list()) {
-  class(x) <- c("likelyr_pl_result", "likelyr_result", "likelyr")
+new_profile_result <- function(x = list()) {
+  class(x) <- c("likelyr_profiled", "likelyr_result", "likelyr")
   x
 }
 

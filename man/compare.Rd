@@ -13,8 +13,8 @@ compare(cal)
 The input object with a comparison result attached.
 }
 \description{
-Orchestrates comparison between profile likelihood (PL) and
-integrated likelihood (IL) inference results for a calibrated
+Orchestrates comparison between profile likelihood and
+integrated likelihood inference results for a calibrated
 model specification.
 
 The input must already have:

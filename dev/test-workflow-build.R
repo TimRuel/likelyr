@@ -129,19 +129,11 @@ fit <- model |>
   profile() |>
   integrate() |>
   diagnose() |>
-  infer()
+  infer() |>
+  compare()
 
-fit <- compare(fit)
+# fit <- fit |> compare()
 
-
-
-
-
-# plot(fit$results$IL$diagnostics)
-# plot(fit$results$IL)
-# plot(fit$results$PL)
-# plot(fit$results$IL$inference)
-# plot(fit$results$PL$inference)
 
 # plan(callr, workers = wf$execution$num_workers)
 # fit  <- fit_integrated(cal)

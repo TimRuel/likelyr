@@ -10,14 +10,14 @@ Authors@R:
       comment = c(ORCID = "0000-0002-1916-5003")
     )
 Description: 
-    A modular, extensible framework for computing integrated likelihoods (IL) 
+    A modular, extensible framework for computing integrated likelihoods
     under a zero-score expectation (ZSE) parameterization for arbitrary statistical 
-    models and scalar parameters of interest. The package decomposes IL computation 
-    into reusable components: model specifications, parameter-of-interest (psi) mappings,
-    ZSE parameter sampling, expected log-likelihood closures, constrained nuisance parameter
-    optimization via augmented Lagrangians, branch maximization and expansion, and 
+    models and scalar parameters of interest. The package decomposes integrated likelihood
+    computation into reusable components: model specifications, parameter-of-interest (psi) 
+    mappings, ZSE parameter sampling, expected log-likelihood closures, constrained nuisance 
+    parameter optimization via augmented Lagrangians, branch maximization and expansion, and 
     log-sum-exp averaging for Monte Carlo integral approximation. Includes a simulation 
-    engine for comparing IL and profile likelihood (PL) estimators. Designed for research, 
+    engine for comparing integrated and profile likelihood estimators. Designed for research, 
     teaching, and reproducible statistical methodology development.
 License: MIT + file LICENSE
 URL: https://github.com/TimRuel/likelyr, https://TimRuel.github.io/likelyr/

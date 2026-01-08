@@ -173,47 +173,54 @@ validate_integrate_input <- function(cal) {
 
 #' @export
 print.integrate <- function(x, ...) {
+
   cat("<Integrated Log-Likelihood Result>\n")
   cat("Status: ", x$status, "\n", sep = "")
+
+  # -----------------------------------------------------------
+  # Lifecycle flags (slot presence, not helpers)
+  # -----------------------------------------------------------
+
+  has_inference  <- !is.null(x$inference)
+  has_diagnostics <- !is.null(x$diagnostics)
+
+  cat("Lifecycle:\n")
+  cat(
+    "  inferred:   ",
+    if (has_inference)  "✓" else "×", "\n",
+    sep = ""
+  )
+  cat(
+    "  diagnosed:  ",
+    if (has_diagnostics) "✓" else "×", "\n",
+    sep = ""
+  )
+
+  # -----------------------------------------------------------
+  # Estimates
+  # -----------------------------------------------------------
 
   if (!is.null(x$psi_mle))
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
 
   if (!is.null(x$theta_mle))
-    cat("theta_MLE: (",
-        paste(format(x$theta_mle), collapse = ", "),
-        ")\n", sep = "")
+    cat(
+      "theta_MLE: (",
+      paste(format(x$theta_mle), collapse = ", "),
+      ")\n",
+      sep = ""
+    )
+
+  # -----------------------------------------------------------
+  # Grid information
+  # -----------------------------------------------------------
 
   if (!is.null(x$psi_ll_df))
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
 
-  invisible(x)
-}
+  if (!is.null(x$branches))
+    cat("# Branches:    ", length(x$branches), "\n", sep = "")
 
-#' @export
-summary.integrate <- function(object, ...) {
-  out <- list(
-    status     = object$status,
-    psi_mle    = object$psi_mle,
-    theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$psi_ll_df))
-      nrow(object$psi_ll_df) else NA_integer_,
-    n_branches = if (!is.null(object$branches))
-      length(object$branches) else NA_integer_
-  )
-
-  class(out) <- "summary_integrate"
-  out
-}
-
-#' @export
-print.summary_integrate <- function(x, ...) {
-  cat("<Summary: Integrated Log-Likelihood>\n")
-  cat("Status:        ", x$status, "\n", sep = "")
-  cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
-  cat("theta_MLE:     ", paste(format(x$theta_mle), collapse = ", "), "\n", sep = "")
-  cat("# Grid points: ", x$n_grid, "\n", sep = "")
-  cat("# Branches:    ", x$n_branches, "\n", sep = "")
   invisible(x)
 }
 

@@ -147,9 +147,6 @@ print.calibrated <- function(x, ...) {
   # state markers
   cat("- integrated:   ", if (is_integrated(x)) "✓" else "×", "\n", sep = "")
   cat("- profiled:     ", if (is_profiled(x))   "✓" else "×", "\n", sep = "")
-  cat("- diagnosed:    ", if (is_diagnosed(x))  "✓" else "×", "\n", sep = "")
-  cat("- inferred:     ", if (is_inferred(x))   "✓" else "×", "\n", sep = "")
-
 
   invisible(x)
 }

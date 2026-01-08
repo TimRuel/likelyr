@@ -183,40 +183,53 @@ validate_profile_input <- function(cal) {
 
 #' @export
 print.profile <- function(x, ...) {
+
   cat("<Profile Log-Likelihood Result>\n")
-  if (!is.null(x$status))    cat("Status:     ", x$status, "\n", sep = "")
-  if (!is.null(x$psi_mle))   cat("psi_MLE:    ", format(x$psi_mle), "\n", sep = "")
-  if (!is.null(x$theta_mle)) cat("theta_MLE: (",
-                                 paste(format(x$theta_mle), collapse = ", "),
-                                 ")\n", sep = "")
-  if (!is.null(x$psi_ll_df))
-    cat("Grid points:", nrow(x$psi_ll_df), "\n")
-  invisible(x)
-}
 
-# ----------------------------------------------------------------------
+  if (!is.null(x$status))
+    cat("Status: ", x$status, "\n", sep = "")
 
-#' @export
-summary.profile <- function(object, ...) {
-  out <- list(
-    status     = object$status,
-    psi_mle    = object$psi_mle,
-    theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$psi_ll_df))
-      nrow(object$psi_ll_df) else NA_integer_
+  # -----------------------------------------------------------
+  # Lifecycle flags (slot presence)
+  # -----------------------------------------------------------
+
+  has_inference   <- !is.null(x$inference)
+  has_diagnostics <- !is.null(x$diagnostics)
+
+  cat("Lifecycle:\n")
+  cat(
+    "  inferred:   ",
+    if (has_inference)   "✓" else "×", "\n",
+    sep = ""
   )
-  class(out) <- "summary_profile"
-  out
-}
+  cat(
+    "  diagnosed:  ",
+    if (has_diagnostics) "✓" else "×", "\n",
+    sep = ""
+  )
 
-#' @export
-print.summary_profile <- function(x, ...) {
-  cat("<Summary: Profile Log-Likelihood>\n")
-  cat("Status:        ", x$status, "\n", sep = "")
-  cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
-  cat("theta_MLE:     ",
-      paste(format(x$theta_mle), collapse = ", "), "\n", sep = "")
-  cat("# Grid points: ", x$n_grid, "\n", sep = "")
+  # -----------------------------------------------------------
+  # Estimates
+  # -----------------------------------------------------------
+
+  if (!is.null(x$psi_mle))
+    cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
+
+  if (!is.null(x$theta_mle))
+    cat(
+      "theta_MLE: (",
+      paste(format(x$theta_mle), collapse = ", "),
+      ")\n",
+      sep = ""
+    )
+
+  # -----------------------------------------------------------
+  # Grid information
+  # -----------------------------------------------------------
+
+  if (!is.null(x$psi_ll_df))
+    cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
+
   invisible(x)
 }
 

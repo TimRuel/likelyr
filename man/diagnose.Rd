@@ -12,13 +12,15 @@ diagnose(cal, verbose = TRUE)
 \item{verbose}{Logical; print diagnostic summaries.}
 }
 \value{
-The same \code{calibrated} model object with individual pseudolikelihood
-results each marked as diagnosed.
+The same \code{calibrated} model object, with each likelihood result
+marked as diagnosed.
 }
 \description{
 Attaches diagnostics to each likelihood result (integrated or profile)
-stored in a calibrated model. Integrated likelihood receives full Monte
-Carlo diagnostics; profile likelihood currently receives a placeholder.
+stored in a calibrated model.
+
+Integrated likelihood receives full Monte Carlo diagnostics; profile
+likelihood currently receives a placeholder diagnostics object.
 
 Diagnostics are attached at:
 \preformatted{

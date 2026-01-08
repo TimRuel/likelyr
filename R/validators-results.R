@@ -113,6 +113,9 @@ validate_diagnostics_result <- function(x) {
   if (!is.character(x$warnings))
     stop("'warnings' must be a character vector.", call. = FALSE)
 
+  if (!is.null(x$plots) && !is.list(x$plots))
+    stop("'plots' must be a list.", call. = FALSE)
+
   invisible(TRUE)
 }
 

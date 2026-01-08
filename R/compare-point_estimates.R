@@ -7,7 +7,7 @@ get_point_estimates_df <- function(res) {
     dplyr::mutate(
       pseudolikelihood = dplyr::recode(pseudolikelihood,
                                        profile = "Profile",
-                                       integrated = "Integrated")
+                                       integrate = "Integrated")
     ) |>
     dplyr::relocate(pseudolikelihood, .after = se_psi_hat)
 }

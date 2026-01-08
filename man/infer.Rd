@@ -6,43 +6,6 @@
 \usage{
 infer(cal, which = NULL, alpha_levels = NULL)
 }
-\arguments{
-\item{cal}{A \code{calibrated_model} produced by \code{calibrate()} and then
-\code{integrate()} or \code{profile()}.}
-
-\item{which}{Optional character vector naming entries in \code{cal$results}
-to perform inference on. Defaults to all available likelihood results.}
-
-\item{alpha_levels}{Optional numeric vector of α-levels
-(e.g. \code{c(0.05, 0.1)}). If \code{NULL}, derived from the estimand specification.}
-}
-\value{
-The same \code{calibrated_model}, augmented with inference results and
-assigned the additional class \code{"likelyr_inferred"}.
-}
 \description{
-Attaches likelihood-based inferential summaries—point estimates and
-likelihood-ratio confidence intervals—to previously computed likelihood
-results.
-
-This function does \strong{not} recompute likelihoods. It operates on likelihood
-objects (e.g. from \code{integrate()} or \code{profile()}) already stored in a
-calibrated model.
-
-For each selected likelihood result in \code{cal$results}, a
-\code{"likelyr_inference"} object is attached at:
-
-\preformatted{
-  cal$results[[name]]$inference
-}
-}
-\details{
-If \code{alpha_levels} is \strong{NULL}, values are derived from the estimand
-specification:
-
-\preformatted{
-  alpha_levels = 1 - estimand$confidence_levels
-}
-
-ensuring consistency between estimation and inference defaults.
+Likelihood-Based Inference for a Calibrated Model
 }

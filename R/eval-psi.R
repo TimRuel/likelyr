@@ -33,7 +33,7 @@
 #' out <- f2(psi_target, theta_init)
 #' }
 #'
-#' @param cal A `calibrated_model` object.
+#' @param cal A `likelyr_calibrated` model object.
 #'
 #' @return A nested function:
 #'

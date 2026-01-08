@@ -11,11 +11,6 @@
 # INTERNAL: Calibration Lock Helpers
 # ======================================================================
 
-# Check if model_spec has been calibrated
-.model_is_locked <- function(model) {
-  isTRUE(model$.__calibrated__)
-}
-
 # Structural specs cannot be modified post-calibration
 .slot_is_structural <- function(slot) {
   slot %in% c("parameter", "likelihood", "estimand", "nuisance")
@@ -28,7 +23,7 @@
 #' Create a Model Specification
 #'
 #' @description
-#' A likelyr model specification declares the structural and computational
+#' A model specification declares the structural and computational
 #' components needed for likelihood-based inference:
 #'
 #' **Structural components (must be present before calibration):**
@@ -62,10 +57,8 @@ model_spec <- function(parameter  = NULL,
     optimizer  = optimizer,
     execution  = execution,
     extra      = list(...)
-  )
-
-  x <- new_model_spec(x)
-  x$.__calibrated__ <- FALSE
+    ) |>
+    new_model_spec()
 
   .validate_structural_specs(x)
 
@@ -87,7 +80,7 @@ add.model_spec <- function(model, spec, ...) {
   slot <- .identify_model_slot(spec)
 
   # Structural specs cannot change after calibration
-  if (.model_is_locked(model) && .slot_is_structural(slot)) {
+  if (is_calibrated(model) && .slot_is_structural(slot)) {
     stop(sprintf("Cannot modify structural slot '%s' after calibration.", slot),
          call. = FALSE)
   }
@@ -165,7 +158,7 @@ add.default <- function(model, spec, ...) {
 
 #' @export
 print.model_spec <- function(x, ...) {
-  cat("<likelyr model_spec>\n")
+  cat("<model_spec>\n")
   if (!is.null(x$name))
     cat("Model:          ", x$name, "\n", sep = "")
   cat("Full Parameter: ", if (!is.null(x$parameter))  x$parameter$name  else "(missing)", "\n", sep = "")

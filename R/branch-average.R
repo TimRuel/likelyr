@@ -62,7 +62,7 @@ average_branches <- function(branches) {
     loglik = as.numeric(log_mean)
   )
 
-  attr(psi_ll_df, "type") <- "Integrated"
+  attr(psi_ll_df, "type") <- "integrate"
 
   list(psi_ll_df = psi_ll_df,
        branch_mat = branch_mat)

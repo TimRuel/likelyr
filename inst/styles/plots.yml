@@ -7,7 +7,7 @@
 # --------------------------------------------------
 curve:
   colors:
-    integrated: "#052880"   # Hylian blue
+    integrate: "#052880"   # Hylian blue
     profile:    "#052880"   # Hylian blue
 
   # Default (used by single-likelihood plots)
@@ -17,12 +17,11 @@ curve:
   # Comparison-only overrides
   comparison:
     linetype:
-      integrated: solid
+      integrate: solid
       profile:    "22"
     colors:
-      integrated: "#052880"   # Hylian blue
+      integrate: "#052880"   # Hylian blue
       profile:    "#A7B0C0"   # steel silver
-
 
 # --------------------------------------------------
 # Point cloud styling (evaluated likelihood points)
@@ -32,13 +31,12 @@ points:
     size:  3
     alpha: 0.7
 
-
 # --------------------------------------------------
 # Point estimate styling
 # --------------------------------------------------
 point_estimate:
   colors:
-    integrated: "#941703"   # deep red
+    integrate: "#941703"   # deep red
     profile:    "#941703"   # deep red
   size: 3
   linetype: solid
@@ -46,12 +44,11 @@ point_estimate:
   # Comparison-only overrides (vertical lines)
   comparison:
     linetype:
-      integrated: solid
+      integrate: solid
       profile:    "22"
     colors:
-      integrated: "#941703"   # deep red
+      integrate: "#941703"   # deep red
       profile:    "#A7B0C0"   # steel silver
-
 
 # --------------------------------------------------
 # Truth marker styling
@@ -61,7 +58,6 @@ truth:
   shape:  4
   size:   3
   stroke: 1.2
-
 
 # --------------------------------------------------
 # Interval estimate styling
@@ -83,7 +79,6 @@ interval_estimate:
     linetype: dashed
     linewidth: 1
 
-
 # --------------------------------------------------
 # Reference lines (e.g., log-likelihood baseline)
 # --------------------------------------------------
@@ -92,7 +87,6 @@ reference_lines:
     linetype: dashed
     linewidth: 0.8
     color: "black"
-
 
 # --------------------------------------------------
 # Base ggplot theme (dark)

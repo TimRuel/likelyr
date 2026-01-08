@@ -19,23 +19,23 @@
 #' deterministic branch*. The result is attached to:
 #'
 #' \preformatted{
-#'   cal$results$profile
+#'   cal$workspace$profile
 #' }
 #'
-#' @param cal A `calibrated_model` produced by [calibrate()].
+#' @param cal A `calibrated` model object produced by [calibrate()].
 #' @param verbose Logical; print diagnostic messages (default FALSE).
 #' @param ... Additional arguments forwarded to [generate_profile()].
 #'
 #' @return
-#' The SAME calibrated_model object, augmented with:
-#'   * `results$profile` — a `likelyr_profiled` object
-#'   * class `"likelyr_profiled"`
+#' The SAME `calibrated` model object object, augmented with:
+#'    * class `profiled`
+#'   * `workspace$profile` — a `profile` object
 #'
 #' @examples
 #' \dontrun{
 #' cal <- calibrate(model, data)
 #' cal <- profile(cal)
-#' plot(cal$results$profile)
+#' plot(cal$workspace$profile)
 #' }
 #'
 #' @export
@@ -47,24 +47,24 @@ profile <- function(cal, ...) {
 
 #' @export
 profile.default <- function(cal, ...) {
-  stop("profile() requires a calibrated_model.", call. = FALSE)
+  stop("profile() requires a 'calibrated' model object", call. = FALSE)
 }
 
 # ----------------------------------------------------------------------
 
 #' @export
-profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
+profile.calibrated <- function(cal, verbose = FALSE, ...) {
 
   # ------------------------------------------------------------------
   # 0A. Ensure calibration has occurred
   # ------------------------------------------------------------------
-  if (!isTRUE(cal$.__calibrated__))
+  if (!is_calibrated(cal))
     stop("profile() requires calibrate() first.", call. = FALSE)
 
   # ------------------------------------------------------------------
   # 0B. Profile log-likelihood does NOT require optimizer/execution specs
   # ------------------------------------------------------------------
-  .validate_model_for_profile(cal)
+  validate_profile_input(cal)
 
   # ------------------------------------------------------------------
   # 1. Extract calibrated quantities
@@ -126,21 +126,23 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
     }
   )
 
+  pseudolikelihood_points <- plot_pseudolikelihood_points(psi_ll_df)
+
   # ------------------------------------------------------------------
-  # 5. Wrap into likelyr_profile_result
+  # 5. Wrap into profile_result
   # ------------------------------------------------------------------
   profile_result <- new_profile_result(list(
-    psi_ll_df = psi_ll_df,
-    psi_mle   = psi_mle,
-    theta_mle = theta_mle,
-    status    = if (!is.null(psi_ll_df)) "success" else "failed"
+    psi_ll_df               = psi_ll_df,
+    psi_mle                 = psi_mle,
+    theta_mle               = theta_mle,
+    status                  = if (!is.null(psi_ll_df)) "success" else "failed",
+    pseudolikelihood_points = pseudolikelihood_points
   ))
 
   # ------------------------------------------------------------------
   # 6. Store and return
   # ------------------------------------------------------------------
-  if (is.null(cal$results)) cal$results <- list()
-  cal$results$profile <- profile_result
+  cal$workspace$profile <- profile_result
 
   cal <- mark_profiled(cal)
 
@@ -158,7 +160,7 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
 #   • estimand spec
 #   • nuisance spec
 # but NOT optimizer or execution specs.
-.validate_model_for_profile <- function(cal) {
+validate_profile_input <- function(cal) {
 
   if (!inherits(cal$parameter, "parameter_spec"))
     stop("model$parameter must be a 'parameter_spec' object.")
@@ -180,35 +182,35 @@ profile.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # ======================================================================
 
 #' @export
-print.likelyr_profile_result <- function(x, ...) {
+print.profile <- function(x, ...) {
   cat("<Profile Log-Likelihood Result>\n")
   if (!is.null(x$status))    cat("Status:     ", x$status, "\n", sep = "")
   if (!is.null(x$psi_mle))   cat("psi_MLE:    ", format(x$psi_mle), "\n", sep = "")
   if (!is.null(x$theta_mle)) cat("theta_MLE: (",
                                  paste(format(x$theta_mle), collapse = ", "),
                                  ")\n", sep = "")
-  if (!is.null(x$df))
-    cat("Grid points:", nrow(x$df), "\n")
+  if (!is.null(x$psi_ll_df))
+    cat("Grid points:", nrow(x$psi_ll_df), "\n")
   invisible(x)
 }
 
 # ----------------------------------------------------------------------
 
 #' @export
-summary.likelyr_profile_result <- function(object, ...) {
+summary.profile <- function(object, ...) {
   out <- list(
     status     = object$status,
     psi_mle    = object$psi_mle,
     theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$df))
-      nrow(object$df) else NA_integer_
+    n_grid     = if (!is.null(object$psi_ll_df))
+      nrow(object$psi_ll_df) else NA_integer_
   )
-  class(out) <- "summary_likelyr_profile"
+  class(out) <- "summary_profile"
   out
 }
 
 #' @export
-print.summary_likelyr_profile_result <- function(x, ...) {
+print.summary_profile <- function(x, ...) {
   cat("<Summary: Profile Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
@@ -223,10 +225,12 @@ print.summary_likelyr_profile_result <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_profile_result <- function(x) {
+plot.profile <- function(x, ...) {
 
-  p <- plot_pseudolikelihood_points(x$psi_ll_df)
+  if (is.null(x$pseudolikelihood_points)) {
+    stop("No plot available in profile log-likelihood result.", call. = FALSE)
+  }
 
-  print(p)
-  invisible(p)
+  x$pseudolikelihood_points
 }
+

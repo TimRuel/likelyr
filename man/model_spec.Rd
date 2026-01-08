@@ -16,7 +16,7 @@ model_spec(
 )
 }
 \description{
-A likelyr model specification declares the structural and computational
+A model specification declares the structural and computational
 components needed for likelihood-based inference:
 
 \strong{Structural components (must be present before calibration):}

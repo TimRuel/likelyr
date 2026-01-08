@@ -74,7 +74,7 @@
 #' The result is far more uniform exploration of the manifold
 #' ψ(ω̂) = ψ_MLE before projecting with auglag().
 #'
-#' @param cal A `calibrated_model`.
+#' @param cal A `likelyr_calibrated` model object.
 #'
 #' @return A function \code{f(history, p_recenter = 0.1)} returning
 #'         high-dispersion initial guesses.
@@ -155,7 +155,7 @@ make_omega_hat_initgen <- function(cal) {
 #'   • Jacobians for constraints (if supplied)
 #'   • optimizer_spec settings only for SLSQP/local solver
 #'
-#' @param cal A `calibrated_model`.
+#' @param cal A `likelyr_calibrated` model object.
 #'
 #' @return A function \code{f(init_guess)} returning ω̂.
 #' @export

@@ -1,136 +1,164 @@
 # ======================================================================
-# class-system.R — Unified Class System (Constructors + Class Tools Only)
+# class-system.R — Unified Class System (S3, domain-first)
 # ======================================================================
 
 # ======================================================================
-# Utility: Add / Drop / Check Classes
+# Utilities
 # ======================================================================
 
-.add_class <- function(x, class_name) {
+.prepend_class <- function(x, class_name) {
   class(x) <- unique(c(class_name, class(x)))
   x
 }
 
-.drop_class <- function(x, class_name) {
-  class(x) <- setdiff(class(x), class_name)
-  x
-}
-
-.has_classes <- function(x, classes) {
-  all(classes %in% class(x))
-}
-
 # ======================================================================
-# SPECIFICATION CLASS CONSTRUCTORS
+# SPECIFICATION OBJECTS (IDENTITY)
 # ======================================================================
 
-new_parameter_spec <- function(x) {
-  class(x) <- c("parameter_spec", "likelyr")
-  x
+.new_spec <- function(x, class_name) {
+  if (!is.list(x)) {
+    stop("'", class_name, "' object must be a list.", call. = FALSE)
+  }
+  structure(x, class = c(class_name, "likelyr"))
 }
 
-new_likelihood_spec <- function(x) {
-  class(x) <- c("likelihood_spec", "likelyr")
-  x
-}
-
-new_estimand_spec <- function(x) {
-  class(x) <- c("estimand_spec", "likelyr")
-  x
-}
-
-new_nuisance_spec <- function(x) {
-  class(x) <- c("nuisance_spec", "likelyr")
-  x
-}
-
-new_optimizer_spec <- function(x) {
-  class(x) <- c("optimizer_spec", "likelyr")
-  x
-}
-
-new_execution_spec <- function(x) {
-  class(x) <- c("execution_spec", "likelyr")
-  x
-}
+new_parameter_spec  <- function(x) .new_spec(x, "parameter_spec")
+new_likelihood_spec <- function(x) .new_spec(x, "likelihood_spec")
+new_estimand_spec   <- function(x) .new_spec(x, "estimand_spec")
+new_nuisance_spec   <- function(x) .new_spec(x, "nuisance_spec")
+new_optimizer_spec  <- function(x) .new_spec(x, "optimizer_spec")
+new_execution_spec  <- function(x) .new_spec(x, "execution_spec")
 
 new_serial_spec <- function(x) {
-  class(x) <- c("serial_spec", "execution_spec", "likelyr")
-  x
+  if (!is.list(x)) stop("'serial_spec' object must be a list.", call. = FALSE)
+  structure(x, class = c("serial_spec", "execution_spec", "likelyr"))
 }
 
 new_parallel_spec <- function(x) {
-  class(x) <- c("parallel_spec", "execution_spec", "likelyr")
-  x
+  if (!is.list(x)) stop("'parallel_spec' object must be a list.", call. = FALSE)
+  structure(x, class = c("parallel_spec", "execution_spec", "likelyr"))
 }
 
 # ======================================================================
-# MODEL SPECIFICATION OBJECT
+# MODEL OBJECTS (IDENTITY)
 # ======================================================================
 
 new_model_spec <- function(x = list()) {
-  class(x) <- c("model_spec", "likelyr")
-  x
+  if (!is.list(x)) stop("'model_spec' object must be a list.", call. = FALSE)
+  structure(x, class = c("model_spec", "likelyr"))
+}
+
+new_calibrated_model <- function(x) {
+  if (!is.list(x)) stop("'calibrated' model object must be a list.", call. = FALSE)
+  structure(x, class = c("calibrated", "likelyr"))
 }
 
 # ======================================================================
-# CALIBRATED MODEL
+# RESULTS CONTAINER (WORKSPACE)
 # ======================================================================
 
-new_calibrated_model <- function(x = list()) {
-  class(x) <- c("calibrated_model", "likelyr")
-  x
-}
-
-# ======================================================================
-# RESULT OBJECT CLASSES
-# ======================================================================
-
-new_likelyr_result <- function(x = list()) {
-  class(x) <- c("likelyr_result", "likelyr")
-  x
-}
-
-new_integrated_result <- function(x = list()) {
-  class(x) <- c("likelyr_integrated", "likelyr_result", "likelyr")
-  x
-}
-
-new_profile_result <- function(x = list()) {
-  class(x) <- c("likelyr_profiled", "likelyr_result", "likelyr")
-  x
-}
-
-new_diagnostics_result <- function(x = list()) {
-  class(x) <- c("likelyr_diagnostics", "likelyr_result", "likelyr")
-  x
-}
-
-new_inference_result <- function(x = list()) {
-  class(x) <- c("likelyr_inference", "likelyr_result", "likelyr")
-  x
-}
-
-new_comparison_result <- function(x = list()) {
-  class(x) <- c("likelyr_comparison", "likelyr_result", "likelyr")
-  x
+new_workspace <- function(x = list()) {
+  if (!is.list(x)) stop("'workspace' object must be a list.", call. = FALSE)
+  structure(x, class = c("workspace", "likelyr"))
 }
 
 # ======================================================================
-# STATE MARKERS
+# RESULT OBJECTS (IDENTITY + CONTRACT)
 # ======================================================================
 
-mark_integrated <- function(x) .add_class(x, "likelyr_integrated")
-mark_profiled   <- function(x) .add_class(x, "likelyr_profiled")
-mark_diagnosed  <- function(x) .add_class(x, "likelyr_diagnosed")
-mark_inferred   <- function(x) .add_class(x, "likelyr_inferred")
-mark_compared   <- function(x) .add_class(x, "likelyr_compared")
+new_result <- function(x) {
+  if (!is.list(x)) stop("'result' object must be a list.", call. = FALSE)
+  structure(x, class = c("result", "likelyr"))
+}
 
-is_integrated <- function(x) inherits(x, "likelyr_integrated")
-is_profiled   <- function(x) inherits(x, "likelyr_profiled")
-is_diagnosed  <- function(x) inherits(x, "likelyr_diagnosed")
-is_inferred   <- function(x) inherits(x, "likelyr_inferred")
-is_compared   <- function(x) inherits(x, "likelyr_compared")
+.new_typed_result <- function(x, type, validator = NULL) {
+  if (!is.null(validator)) validator(x)
+  x <- new_result(x)
+  .prepend_class(x, type)
+}
+
+new_profile_result <- function(x) {
+  .new_typed_result(x, "profile", validate_profile_result)
+}
+
+new_integrate_result <- function(x) {
+  .new_typed_result(x, "integrate", validate_integrate_result)
+}
+
+new_comparison_result <- function(x) {
+  .new_typed_result(x, "comparison", validate_comparison_result)
+}
+
+# ---- sub-results (inherit parent result) ----
+
+new_diagnostics_result <- function(x) {
+  .new_typed_result(x, "diagnostics", validate_diagnostics_result)
+}
+
+new_inference_result <- function(x) {
+  validate_inference_result(x)
+  .prepend_class(x, "inference")
+}
+
+# ======================================================================
+# ADJECTIVAL STATE MARKERS (PIPELINE PROGRESSION)
+# ======================================================================
+
+# ---- model-level ----
+
+mark_profiled <- function(x) {
+  if (!inherits(x, "calibrated"))
+    stop("mark_profiled() requires a calibrated model.", call. = FALSE)
+  .prepend_class(x, "profiled")
+}
+
+mark_integrated <- function(x) {
+  if (!inherits(x, "calibrated"))
+    stop("mark_integrated() requires a calibrated model.", call. = FALSE)
+  .prepend_class(x, "integrated")
+}
+
+# ---- result-level ----
+
+mark_inferred <- function(x) {
+  if (!inherits(x, "result"))
+    stop("mark_inferred() requires a result object.", call. = FALSE)
+  .prepend_class(x, "inferred")
+}
+
+mark_diagnosed <- function(x) {
+  if (!inherits(x, "result"))
+    stop("mark_diagnosed() requires a result object.", call. = FALSE)
+  .prepend_class(x, "diagnosed")
+}
+
+# ---- workspace-level ----
+
+mark_compared <- function(x) {
+  if (!inherits(x, "workspace"))
+    stop("mark_compared() requires a workspace.", call. = FALSE)
+  .prepend_class(x, "compared")
+}
+
+# ======================================================================
+# STATE QUERIES
+# ======================================================================
+
+# model-level
+is_calibrated <- function(x) inherits(x, "calibrated")
+is_profiled   <- function(x) inherits(x, "profiled")
+is_integrated <- function(x) inherits(x, "integrated")
+
+# container-level
+is_workspace  <- function(x) inherits(x, "workspace")
+is_compared   <- function(x) inherits(x, "compared")
+
+# result-level
+is_result      <- function(x) inherits(x, "result")
+is_profile     <- function(x) inherits(x, "profile")
+is_integrate   <- function(x) inherits(x, "integrate")
+is_inferred   <- function(x) inherits(x, "inference")
+is_diagnosed   <- function(x) inherits(x, "diagnostics")
 
 # ======================================================================
 # END class-system.R

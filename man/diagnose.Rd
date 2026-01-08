@@ -2,28 +2,26 @@
 % Please edit documentation in R/likelihood-diagnose.R
 \name{diagnose}
 \alias{diagnose}
-\title{Diagnostics for Likelyr Results (integrated or profile)}
+\title{Diagnostics for Likelyr Results}
 \usage{
 diagnose(cal, verbose = TRUE)
 }
 \arguments{
-\item{cal}{A \code{calibrated_model} that has undergone integrate() or
-profile().}
+\item{cal}{A \code{calibrated} model object with pseudolikelihood results.}
 
 \item{verbose}{Logical; print diagnostic summaries.}
 }
 \value{
-The same calibrated model, with class \code{"likelyr_diagnosed"}
-and diagnostics added to each result.
+The same \code{calibrated} model object with individual pseudolikelihood
+results each marked as diagnosed.
 }
 \description{
-Scans all entries of \code{cal$results}, attaching a diagnostics object to
-each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
-receives full Monte Carlo diagnostics; Profile Log-Likelihood receives a
-placeholder for now.
+Attaches diagnostics to each likelihood result (integrated or profile)
+stored in a calibrated model. Integrated likelihood receives full Monte
+Carlo diagnostics; profile likelihood currently receives a placeholder.
 
-Diagnostics are stored under:
+Diagnostics are attached at:
 \preformatted{
-  cal$results[[name]]$diagnostics
+  cal$workspace[[name]]$diagnostics
 }
 }

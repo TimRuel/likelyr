@@ -7,20 +7,20 @@
 integrate(cal, ...)
 }
 \arguments{
-\item{cal}{A calibrated_model.}
+\item{cal}{A \code{calibrated} model object.}
 
 \item{...}{Additional arguments passed to \code{generate_branches()}.}
 
 \item{verbose}{Logical; print diagnostics. Default: FALSE.}
 }
 \value{
-The SAME calibrated_model object, augmented with:
-• class \code{"likelyr_integrated"}
-• \verb{$results$integrated} — a \code{likelyr_integrated} object
+The SAME \code{calibrated} model object, augmented with:
+• class \code{integrated}
+• \verb{$workspace$integrate} — an \code{integrate} object
 }
 \description{
 Computes the integrated log-likelihood and attaches it to the input
-\code{calibrated_model} under \verb{$results$integrated}. The updated object is returned.
+\code{calibrated} model object under \verb{$workspace$integrate}. The updated object is returned.
 
 This function is \strong{silent by default} for pipe-friendly workflows.
 Set \code{verbose = TRUE} to display diagnostic messages.

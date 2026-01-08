@@ -6,18 +6,18 @@
 #'
 #' @description
 #' Computes the integrated log-likelihood and attaches it to the input
-#' `calibrated_model` under `$results$integrated`. The updated object is returned.
+#' `calibrated` model object under `$workspace$integrate`. The updated object is returned.
 #'
 #' This function is **silent by default** for pipe-friendly workflows.
 #' Set `verbose = TRUE` to display diagnostic messages.
 #'
-#' @param cal A calibrated_model.
+#' @param cal A `calibrated` model object.
 #' @param verbose Logical; print diagnostics. Default: FALSE.
 #' @param ... Additional arguments passed to `generate_branches()`.
 #'
-#' @return The SAME calibrated_model object, augmented with:
-#'         • class `"likelyr_integrated"`
-#'         • `$results$integrated` — a `likelyr_integrated` object
+#' @return The SAME `calibrated` model object, augmented with:
+#'         • class `integrated`
+#'         • `$workspace$integrate` — an `integrate` object
 #' @export
 integrate <- function(cal, ...) {
   UseMethod("integrate")
@@ -27,18 +27,18 @@ integrate <- function(cal, ...) {
 
 #' @export
 integrate.default <- function(cal, ...) {
-  stop("integrate() requires a calibrated_model.", call. = FALSE)
+  stop("integrate() requires a 'calibrated' model object.", call. = FALSE)
 }
 
 # ----------------------------------------------------------------------
 
 #' @export
-integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
+integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 
   # ------------------------------------------------------------------
   # 0A. Ensure object has been calibrated properly
   # ------------------------------------------------------------------
-  if (!isTRUE(cal$.__calibrated__)) {
+  if (!is_calibrated(cal)) {
     stop("integrate() requires a model that has been calibrated via calibrate().",
          call. = FALSE)
   }
@@ -46,24 +46,21 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 0B. Ensure model_spec is complete for likelihood integration
   # ------------------------------------------------------------------
-  .validate_model_for_integration(cal)
+  validate_integrate_input(cal)
 
   # Pull calibrated quantities
   psi_fn    <- cal$estimand$psi_fn
   psi_mle   <- cal$estimand$psi_mle
   theta_mle <- cal$parameter$theta_mle
 
-  # Ensure results list is present
-  if (is.null(cal$results)) cal$results <- list()
-
   # ------------------------------------------------------------------
-  # 1. Create `integrated` working area inside results$integrated
+  # 1. Create `integrate` working area inside workspace$integrated
   # ------------------------------------------------------------------
   constraint_fn    <- function(theta) psi_fn(theta) - psi_mle
   generate_init    <- make_omega_hat_initgen(cal)
   sample_omega_hat <- make_omega_hat_sampler(cal)
 
-  cal$results$integrated <- list(
+  cal$workspace$integrate <- list(
     constraint_fn    = constraint_fn,
     generate_init    = generate_init,
     sample_omega_hat = sample_omega_hat
@@ -96,21 +93,24 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 4. Final aggregation (log-sum-exp)
   # ------------------------------------------------------------------
-  integrated_result <- tryCatch({
+  integrate_result <- tryCatch({
 
     branches    <- branch_result$branches
     omega_draws <- branch_result$omega_draws
 
     branch_avg <- average_branches(branches)
 
-    new_integrated_result(list(
-      psi_ll_df   = branch_avg$psi_ll_df,
-      branch_mat  = branch_avg$branch_mat,
-      branches    = branches,
-      omega_draws = omega_draws,
-      theta_mle   = theta_mle,
-      psi_mle     = psi_mle,
-      status      = "success"
+    pseudolikelihood_points <- plot_pseudolikelihood_points(branch_avg$psi_ll_df)
+
+    new_integrate_result(list(
+      psi_ll_df               = branch_avg$psi_ll_df,
+      branch_mat              = branch_avg$branch_mat,
+      branches                = branches,
+      omega_draws             = omega_draws,
+      theta_mle               = theta_mle,
+      psi_mle                 = psi_mle,
+      status                  = "success",
+      pseudolikelihood_points = pseudolikelihood_points
     ))
 
   }, error = function(e) {
@@ -118,7 +118,7 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
     if (verbose)
       cat("[integrate] WARNING: Final averaging failed.\n")
 
-    new_integrated_result(list(
+    new_integrate_result(list(
       status      = "failed",
       error_msg   = conditionMessage(e),
       branches    = branch_result$branches,
@@ -127,9 +127,10 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
   })
 
   # ------------------------------------------------------------------
-  # 5. Replace `integrated` working area with final result
+  # 5. Replace `integrate` working area with final result
   # ------------------------------------------------------------------
-  cal$results$integrated <- integrated_result
+  if (is.null(cal$workspace)) cal$workspace <- list()
+  cal$workspace$integrate <- integrate_result
 
   if (verbose) cat("[integrate] Finished.\n")
 
@@ -140,9 +141,9 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # INTERNAL VALIDATION FOR LIKELIHOOD INTEGRATION WRT NUISANCE PARAMETER
 # ======================================================================
 
-.validate_model_for_integration <- function(cal) {
+validate_integrate_input <- function(cal) {
 
-  model <- cal  # a calibrated_model inherits model_spec fields
+  model <- cal
 
   if (!.is_model_spec_complete(model)) {
 
@@ -171,7 +172,7 @@ integrate.calibrated_model <- function(cal, verbose = FALSE, ...) {
 # ======================================================================
 
 #' @export
-print.likelyr_integrated <- function(x, ...) {
+print.integrate <- function(x, ...) {
   cat("<Integrated Log-Likelihood Result>\n")
   cat("Status: ", x$status, "\n", sep = "")
 
@@ -183,30 +184,30 @@ print.likelyr_integrated <- function(x, ...) {
         paste(format(x$theta_mle), collapse = ", "),
         ")\n", sep = "")
 
-  if (!is.null(x$df))
-    cat("Grid points: ", nrow(x$df), "\n", sep = "")
+  if (!is.null(x$psi_ll_df))
+    cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
 
   invisible(x)
 }
 
 #' @export
-summary.likelyr_integrated <- function(object, ...) {
+summary.integrate <- function(object, ...) {
   out <- list(
     status     = object$status,
     psi_mle    = object$psi_mle,
     theta_mle  = object$theta_mle,
-    n_grid     = if (!is.null(object$df))
-      nrow(object$df) else NA_integer_,
+    n_grid     = if (!is.null(object$psi_ll_df))
+      nrow(object$psi_ll_df) else NA_integer_,
     n_branches = if (!is.null(object$branches))
       length(object$branches) else NA_integer_
   )
 
-  class(out) <- "summary_likelyr_integrated"
+  class(out) <- "summary_integrate"
   out
 }
 
 #' @export
-print.summary_likelyr_integrated <- function(x, ...) {
+print.summary_integrate <- function(x, ...) {
   cat("<Summary: Integrated Log-Likelihood>\n")
   cat("Status:        ", x$status, "\n", sep = "")
   cat("psi_MLE:       ", format(x$psi_mle), "\n", sep = "")
@@ -221,10 +222,11 @@ print.summary_likelyr_integrated <- function(x, ...) {
 # =====================================================================
 
 #' @export
-plot.likelyr_integrated <- function(x) {
+plot.integrate <- function(x, ...) {
 
-  p <- plot_pseudolikelihood_points(x$psi_ll_df)
+  if (is.null(x$pseudolikelihood_points)) {
+    stop("No plot available in integrated log-likelihood result.", call. = FALSE)
+  }
 
-  print(p)
-  invisible(p)
+  x$pseudolikelihood_points
 }

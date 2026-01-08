@@ -7,7 +7,7 @@
 generate_branches(cal, verbose = TRUE)
 }
 \arguments{
-\item{cal}{A \code{calibrated_model} used by \code{\link[=integrate]{integrate()}}.}
+\item{cal}{A \code{calibrated} model object used by \code{\link[=integrate]{integrate()}}.}
 
 \item{verbose}{Logical; if TRUE, prints progress messages.}
 }
@@ -22,8 +22,8 @@ each branch corresponding to a draw of ω̂ satisfying ψ(ω̂) = ψ_MLE.
 
 For each branch:
 \enumerate{
-\item Draw ω̂ via \code{cal$results$integrated$generate_init()} and
-\code{cal$results$integrated$sample_omega_hat()}.
+\item Draw ω̂ via \code{cal$workspace$integratd$generate_init()} and
+\code{cal$workspace$integrate$sample_omega_hat()}.
 \item Construct a ψ-conditioned evaluator via \code{\link[=build_eval_psi_fun]{build_eval_psi_fun()}}.
 \item Solve the branch mode: (ψ̂_branch, θ̂_branch).
 \item Compute a loglik cutoff using the LR criterion with an

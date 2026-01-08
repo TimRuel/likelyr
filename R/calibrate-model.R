@@ -17,7 +17,7 @@
 #' @param data    User data.
 #' @param verbose Logical; print calibration diagnostics.
 #'
-#' @return A `calibrated_model` object.
+#' @return A `calibrated` model object.
 #' @export
 calibrate <- function(model, data, verbose = FALSE) {
   UseMethod("calibrate")
@@ -36,29 +36,26 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # -------------------------------------------------------------------
   # 1. Validate structural model specification before calibration
   # -------------------------------------------------------------------
-  .validate_model_for_calibration(model)
+  validate_calibrate_input(model)
 
-  # Attach data (kept in calibrated_model)
+  # Attach data
   model$data <- data
 
   # -------------------------------------------------------------------
   # 2. Modular calibration of each spec component
   # -------------------------------------------------------------------
 
-  # 2a. Parameter — dimension, bounds, θ₀, θ̂_MLE, constraints
   model$parameter <- calibrate_parameter(
     parameter  = model$parameter,
     likelihood = model$likelihood,
     data       = data
   )
 
-  # 2b. Likelihood — bind loglik(theta, data)
   model$likelihood <- calibrate_likelihood(
     likelihood = model$likelihood,
     data       = data
   )
 
-  # 2c. Estimand — bind ψ(), compute ψ̂_MLE, ψ₀, and search interval
   model$estimand <- calibrate_estimand(
     estimand   = model$estimand,
     data       = data,
@@ -66,29 +63,27 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
     theta_0    = model$parameter$theta_0
   )
 
-  # 2d. Nuisance — bind E_loglik(), gradient structure, etc.
   model$nuisance <- calibrate_nuisance(
     nuisance = model$nuisance,
     data     = data
   )
 
-  # 2e. Execution — allowed to be NULL at calibration time
   if (!is.null(model$execution)) {
     model$execution <- calibrate_execution(model$execution)
   }
 
-  # (Optimizer is data-independent and not validated here.)
-
   # -------------------------------------------------------------------
-  # 3. Wrap into calibrated_model
+  # 3. Wrap into calibrated model object
   # -------------------------------------------------------------------
   cal <- new_calibrated_model(model)
 
-  # Mark calibration lock: structural specs can no longer be modified
-  cal$.__calibrated__ <- TRUE
+  # -------------------------------------------------------------------
+  # 4. Initialize results workspace (ALWAYS present)
+  # -------------------------------------------------------------------
+  cal$workspace <- new_workspace()
 
   # -------------------------------------------------------------------
-  # 4. Optional console output
+  # 5. Optional console output
   # -------------------------------------------------------------------
   if (verbose) print(cal)
 
@@ -107,7 +102,7 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 #
 # optimizer_spec() and execution_spec() are NOT required here,
 # and will be validated later by integrate() or profile().
-.validate_model_for_calibration <- function(model) {
+validate_calibrate_input <- function(model) {
 
   if (!inherits(model$parameter, "parameter_spec"))
     stop("model$parameter must be a parameter_spec() before calibration.",
@@ -133,11 +128,10 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 # ======================================================================
 
 #' @export
-print.calibrated_model <- function(x, ...) {
+print.calibrated <- function(x, ...) {
 
   theta_mle <- x$parameter$theta_mle
   psi_mle   <- x$estimand$psi_mle
-  interval  <- x$estimand$search_interval
 
   cat("# Calibrated Model (likelyr)\n")
 
@@ -149,14 +143,13 @@ print.calibrated_model <- function(x, ...) {
   }
 
   cat("- ψ̂:            ", format(psi_mle), "\n", sep = "")
-  cat("- interval:    [", interval[1], ", ", interval[2], "]\n", sep = "")
 
   # state markers
   cat("- integrated:   ", if (is_integrated(x)) "✓" else "×", "\n", sep = "")
   cat("- profiled:     ", if (is_profiled(x))   "✓" else "×", "\n", sep = "")
   cat("- diagnosed:    ", if (is_diagnosed(x))  "✓" else "×", "\n", sep = "")
   cat("- inferred:     ", if (is_inferred(x))   "✓" else "×", "\n", sep = "")
-  cat("- compared:     ", if (is_compared(x))   "✓" else "×", "\n", sep = "")
+
 
   invisible(x)
 }

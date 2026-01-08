@@ -14,7 +14,7 @@ calibrate(model, data, verbose = FALSE)
 \item{verbose}{Logical; print calibration diagnostics.}
 }
 \value{
-A \code{calibrated_model} object.
+A \code{calibrated} model object.
 }
 \description{
 Prepares a model for computing profile or integrated likelihoods.

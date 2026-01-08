@@ -2,25 +2,27 @@
 # likelihood-diagnostics.R — Unified diagnostics for integrated + profile results
 # ================================================================================
 
-#' Diagnostics for Likelyr Results (integrated or profile)
+# ================================================================================
+# Public API
+# ================================================================================
+
+#' Diagnostics for Likelyr Results
 #'
 #' @description
-#' Scans all entries of `cal$results`, attaching a diagnostics object to
-#' each pseudolikelihood result (Integrated or Profile). Integrated Log-Likelihood
-#' receives full Monte Carlo diagnostics; Profile Log-Likelihood receives a
-#' placeholder for now.
+#' Attaches diagnostics to each likelihood result (integrated or profile)
+#' stored in a calibrated model. Integrated likelihood receives full Monte
+#' Carlo diagnostics; profile likelihood currently receives a placeholder.
 #'
-#' Diagnostics are stored under:
+#' Diagnostics are attached at:
 #' \preformatted{
-#'   cal$results[[name]]$diagnostics
+#'   cal$workspace[[name]]$diagnostics
 #' }
 #'
-#' @param cal A `calibrated_model` that has undergone integrate() or
-#'   profile().
+#' @param cal A `calibrated` model object with pseudolikelihood results.
 #' @param verbose Logical; print diagnostic summaries.
 #'
-#' @return The same calibrated model, with class `"likelyr_diagnosed"`
-#'   and diagnostics added to each result.
+#' @return The same `calibrated` model object with individual pseudolikelihood
+#' results each marked as diagnosed.
 #'
 #' @export
 diagnose <- function(cal, verbose = TRUE) {
@@ -29,64 +31,39 @@ diagnose <- function(cal, verbose = TRUE) {
 
 #' @export
 diagnose.default <- function(cal, ...) {
-  stop("diagnose() requires a calibrated_model.", call. = FALSE)
+  stop("diagnose() requires a 'calibrated' model object.", call. = FALSE)
 }
 
-# ======================================================================
-# Main dispatcher
-# ======================================================================
-
 #' @export
-diagnose.calibrated_model <- function(cal, verbose = TRUE) {
+diagnose.calibrated <- function(cal, verbose = TRUE) {
 
-  if (!isTRUE(cal$.__calibrated__))
-    stop("diagnose() requires a calibrated_model.", call. = FALSE)
+  validate_diagnose_input(cal)
 
-  if (is.null(cal$results) || length(cal$results) == 0)
-    stop("diagnose(): No pseudolikelihood results found. Run integrate() or profile().",
-         call. = FALSE)
+  for (name in names(cal$workspace)) {
 
-  # Loop over ALL results
-  for (name in names(cal$results)) {
+    res <- cal$workspace[[name]]
 
-    res <- cal$results[[name]]
-    diag_obj <- NULL
-
-    # ------------------------------------------------------------
-    # Integrated Log-Likelihood
-    # ------------------------------------------------------------
-    if (inherits(res, "likelyr_integrated")) {
-
-      diag_list <- .diagnose_integrated_result(res)
-
-      diag_obj <- new_diagnostics_result(diag_list)
-
-      # Attach omega matrix for PCA plotting
-      omega_mat <- attr(diag_list, "omega_matrix", exact = TRUE)
-      if (!is.null(omega_mat))
-        attr(diag_obj, "omega_matrix") <- omega_mat
-
-      # ------------------------------------------------------------
-      # Profile Log-Likelihood
-      # ------------------------------------------------------------
-    } else if (inherits(res, "likelyr_profiled")) {
-
-      diag_obj <- .diagnose_profile_result(res)
-
-      # ------------------------------------------------------------
-      # Unknown result type
-      # ------------------------------------------------------------
+    diag_list <- if (inherits(res, "integrate")) {
+      .diagnose_integrate_result(res)
+    } else if (inherits(res, "profile")) {
+      .diagnose_profile_result(res)
     } else {
-
-      warning(sprintf(
-        "diagnose(): No diagnostic routine registered for result '%s'. Skipping.",
-        name
-      ))
-      next
+      stop(
+        "diagnose(): Unsupported result type for '", name, "'.",
+        call. = FALSE
+      )
     }
 
-    # Attach diagnostics to cal$results
-    cal$results[[name]]$diagnostics <- diag_obj
+    diag_obj <- new_diagnostics_result(diag_list)
+
+    # propagate omega matrix if present
+    omega_mat <- attr(diag_list, "omega_matrix", exact = TRUE)
+    if (!is.null(omega_mat))
+      attr(diag_obj, "omega_matrix") <- omega_mat
+
+    res$diagnostics <- diag_obj
+
+    cal$workspace[[name]] <- mark_diagnosed(res)
 
     if (verbose) {
       cat("\n[diagnose] Diagnostics for result:", name, "\n")
@@ -94,20 +71,36 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
     }
   }
 
-  # Mark the model as diagnosed
-  cal <- mark_diagnosed(cal)
-
   cal
 }
 
-# ======================================================================
-# Integrated Log-Likelihood Diagnostics Engine (full)
-# ======================================================================
+# ================================================================================
+# Validation
+# ================================================================================
 
-#' Internal integrated log-likelihood diagnostics engine
+validate_diagnose_input <- function(cal) {
+
+  if (!is_calibrated(cal))
+    stop("diagnose() requires a calibrated model.", call. = FALSE)
+
+  if (is.null(cal$workspace) || length(cal$workspace) == 0)
+    stop(
+      "diagnose(): No pseudolikelihood results found. ",
+      "Run integrate() or profile() first.",
+      call. = FALSE
+    )
+
+  invisible(TRUE)
+}
+
+# ================================================================================
+# Diagnostics Engines
+# ================================================================================
+
+#' Integrated log-likelihood diagnostics (full)
 #'
 #' @keywords internal
-.diagnose_integrated_result <- function(res) {
+.diagnose_integrate_result <- function(res) {
 
   branch_mat  <- res$branch_mat
   omega_draws <- res$omega_draws %||% res$omega_hats
@@ -115,9 +108,6 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
   K <- nrow(branch_mat)
   R <- ncol(branch_mat)
 
-  # ------------------------------------------------------------
-  # 1. Likelihood-scale MC diagnostics
-  # ------------------------------------------------------------
   L_mat <- exp(branch_mat)
   L_hat <- matrixStats::rowMeans2(L_mat)
 
@@ -137,7 +127,6 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
   ess <- R / (1 + cv2)
 
   warnings <- character()
-
   if (any(ess < 0.10 * R, na.rm = TRUE))
     warnings <- c(warnings, "ESS < 10% of R at some ψ values.")
   if (any(outlier_frac > 0.25, na.rm = TRUE))
@@ -145,80 +134,60 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
   if (any(rel_se > 0.10, na.rm = TRUE))
     warnings <- c(warnings, "Relative Monte Carlo error > 10% at some ψ grid points.")
 
-  # ------------------------------------------------------------
-  # 2. Omega-hat manifold diagnostics
-  # ------------------------------------------------------------
-  omega_diag <- NULL
+  omega_diag   <- NULL
   omega_matrix <- NULL
 
-  if (!is.null(omega_draws)) {
+  if (!is.null(omega_draws) &&
+      is.list(omega_draws) &&
+      length(omega_draws) == R &&
+      all(lengths(omega_draws) == length(omega_draws[[1]]))) {
 
-    if (is.list(omega_draws) &&
-        length(omega_draws) == R &&
-        all(lengths(omega_draws) == length(omega_draws[[1]]))) {
+    J <- length(omega_draws[[1]])
+    Omega <- do.call(rbind, omega_draws)
+    omega_matrix <- Omega
 
-      J <- length(omega_draws[[1]])
+    mu <- colMeans(Omega)
+    Z  <- sweep(Omega, 2, mu)
 
-      Omega <- do.call(rbind, omega_draws)  # R × J
-      omega_matrix <- Omega
+    S <- crossprod(Z) / max(1, R - 1)
+    eig <- eigen(S, symmetric = TRUE)
+    values <- pmax(eig$values, 0)
 
-      # Centered
-      mu <- colMeans(Omega)
-      Z  <- sweep(Omega, 2, mu)
+    p <- values / (sum(values) + 1e-15)
+    eff_rank <- exp(-sum(p * log(p + 1e-15)))
 
-      S <- crossprod(Z) / max(1, (R - 1))
-      eig <- eigen(S, symmetric = TRUE)
-      values <- pmax(eig$values, 0)
+    collapsed <- eff_rank < max(1, 0.20 * J)
 
-      # Effective rank
-      p <- values / (sum(values) + 1e-15)
-      eff_rank <- exp(-sum(p * log(p + 1e-15)))
-
-      # Distances
-      if (R <= 300) {
-        D <- as.matrix(dist(Omega))
-        dist_mean <- mean(D)
-        dist_min  <- min(D[D > 0])
-      } else {
-        dist_mean <- NA_real_
-        dist_min  <- NA_real_
-      }
-
-      collapsed <- eff_rank < max(1, 0.20 * J)
-
-      if (collapsed) {
-        warnings <- c(
-          warnings,
-          sprintf("ω̂ manifold collapse detected: effective rank = %.2f.", eff_rank)
-        )
-      }
-
-      omega_diag <- list(
-        covariance_eigenvalues = values,
-        effective_rank         = eff_rank,
-        mean_pairwise_dist     = dist_mean,
-        min_nonzero_dist       = dist_min,
-        center                 = mu,
-        collapsed              = collapsed
+    if (collapsed)
+      warnings <- c(
+        warnings,
+        sprintf("ω̂ manifold collapse detected: effective rank = %.2f.", eff_rank)
       )
-    }
+
+    omega_diag <- list(
+      covariance_eigenvalues = values,
+      effective_rank         = eff_rank,
+      center                 = mu,
+      collapsed              = collapsed
+    )
   }
 
   out <- list(
-    R                = R,
-    se_L             = se_L,
-    rel_se           = rel_se,
-    se_logL          = se_logL,
-    ess              = ess,
-    cv2              = cv2,
+    supported = TRUE,
+    R         = R,
+    se_L      = se_L,
+    rel_se    = rel_se,
+    se_logL   = se_logL,
+    ess       = ess,
+    cv2       = cv2,
     outlier_fraction = outlier_frac,
-    warnings         = warnings,
+    warnings  = warnings,
     summary = list(
-      ess_min      = min(ess, na.rm = TRUE),
-      ess_median   = stats::median(ess, na.rm = TRUE),
-      rel_se_max   = max(rel_se, na.rm = TRUE),
-      outlier_max  = max(outlier_frac, na.rm = TRUE),
-      se_logL_max  = max(se_logL, na.rm = TRUE)
+      ess_min     = min(ess, na.rm = TRUE),
+      ess_median  = stats::median(ess, na.rm = TRUE),
+      rel_se_max  = max(rel_se, na.rm = TRUE),
+      outlier_max = max(outlier_frac, na.rm = TRUE),
+      se_logL_max = max(se_logL, na.rm = TRUE)
     ),
     omega_dispersion = omega_diag
   )
@@ -229,35 +198,31 @@ diagnose.calibrated_model <- function(cal, verbose = TRUE) {
   out
 }
 
-# ======================================================================
-# Profile Log-Likelihood Diagnostics (placeholder)
-# ======================================================================
-
-#' Placeholder diagnostics for profile log-likelihood
+#' Profile log-likelihood diagnostics (placeholder)
 #'
 #' @keywords internal
 .diagnose_profile_result <- function(res) {
-
-  diag <- list(
-    type       = "Profile",
-    supported  = FALSE,
-    message    = "Diagnostics for profile log-likelihood are not yet implemented.",
-    warnings   = "No diagnostic computations were performed."
+  list(
+    supported = FALSE,
+    message   = "Diagnostics for profile log-likelihood are not yet implemented.",
+    warnings  = "No diagnostic computations were performed."
   )
-
-  new_diagnostics_result(diag)
 }
 
-# ======================================================================
-# S3 Print Method
-# ======================================================================
+# ================================================================================
+# S3 Methods
+# ================================================================================
+
+# ----------------------------------------------------------------------
+# Print
+# ----------------------------------------------------------------------
 
 #' @export
-print.likelyr_diagnostics <- function(x, ...) {
+print.diagnostics <- function(x, ...) {
 
-  cat("<likelyr_diagnostics>\n")
+  cat("<diagnostics>\n")
 
-  if (!is.null(x$type) && x$type == "Profile") {
+  if (!isTRUE(x$supported)) {
     cat("  Type: Profile Log-Likelihood (placeholder)\n")
     cat("  Message: ", x$message, "\n", sep = "")
     return(invisible(x))
@@ -286,80 +251,116 @@ print.likelyr_diagnostics <- function(x, ...) {
   invisible(x)
 }
 
-# ======================================================================
-# S3 Plot Method
-# ======================================================================
+# ----------------------------------------------------------------------
+# Summary
+# ----------------------------------------------------------------------
 
 #' @export
-plot.likelyr_diagnostics <- function(x, ...) {
+summary.diagnostics <- function(object, ...) {
+
+  out <- list(
+    supported = object$supported,
+    summary   = object$summary %||% NULL,
+    warnings  = object$warnings
+  )
+
+  class(out) <- "summary_diagnostics"
+  out
+}
+
+#' @export
+print.summary_diagnostics <- function(x, ...) {
+
+  cat("<summary of diagnostics>\n\n")
+
+  if (!isTRUE(x$supported)) {
+    cat("Diagnostics not supported for this likelihood.\n")
+    return(invisible(x))
+  }
+
+  if (!is.null(x$summary)) {
+    for (nm in names(x$summary)) {
+      cat("• ", nm, ": ", format(x$summary[[nm]]), "\n", sep = "")
+    }
+  }
+
+  if (length(x$warnings) > 0) {
+    cat("\nWarnings:\n")
+    for (w in x$warnings)
+      cat(" • ", w, "\n", sep = "")
+  }
+
+  invisible(x)
+}
+
+# ----------------------------------------------------------------------
+# Plot (unified with plot utilities)
+# ----------------------------------------------------------------------
+
+#' @export
+plot.diagnostics <- function(x, ...) {
+
+  if (!isTRUE(x$supported))
+    return(list())
 
   plots <- list()
 
-  # Profile log-likelihood results are empty
-  if (!is.null(x$type) && x$type == "Profile") {
-    message("No diagnostic plots available for profile log-likelihood (placeholder).")
-    return(invisible(plots))
-  }
+  idx <- seq_along(x$ess)
 
-  R            <- x$R
-  ess          <- x$ess
-  rel_se       <- x$rel_se
-  outlier_frac <- x$outlier_fraction
-  omega_diag   <- x$omega_dispersion
-  Omega        <- attr(x, "omega_matrix", exact = TRUE)
+  plots$ess <- plot_base() +
+    ggplot2::geom_line(
+      data = tibble::tibble(idx = idx, ess = x$ess),
+      ggplot2::aes(x = idx, y = ess)
+    ) +
+    ggplot2::labs(title = "Effective Sample Size", x = "Grid index", y = "ESS")
 
-  # ESS ---------------------------------------------------------
-  if (!is.null(ess)) {
-    df <- tibble::tibble(idx = seq_along(ess), ess = ess)
-    p <- plot_base() +
-      ggplot2::geom_line(data = df, ggplot2::aes(x = idx, y = ess), color = "#66d9ef") +
-      ggplot2::labs(title = "Effective Sample Size", x = "Grid index", y = "ESS")
-    print(p); plots$ess <- p
-  }
+  plots$rel_se <- plot_base() +
+    ggplot2::geom_line(
+      data = tibble::tibble(idx = idx, rel_se = x$rel_se),
+      ggplot2::aes(x = idx, y = rel_se)
+    ) +
+    ggplot2::labs(title = "Relative Monte Carlo SE", x = "Grid index", y = "Rel SE")
 
-  # Relative SE ------------------------------------------------
-  if (!is.null(rel_se)) {
-    df <- tibble::tibble(idx = seq_along(rel_se), rel_se = rel_se)
-    p <- plot_base() +
-      ggplot2::geom_line(data = df, ggplot2::aes(x = idx, y = rel_se), color = "#a6e22e") +
-      ggplot2::labs(title = "Relative Monte Carlo SE", x = "Grid index", y = "Rel SE")
-    print(p); plots$rel_se <- p
-  }
+  plots$outliers <- plot_base() +
+    ggplot2::geom_line(
+      data = tibble::tibble(idx = idx, outlier = x$outlier_fraction),
+      ggplot2::aes(x = idx, y = outlier)
+    ) +
+    ggplot2::labs(title = "Outlier Fraction", x = "Grid index", y = "Fraction")
 
-  # Outliers ----------------------------------------------------
-  if (!is.null(outlier_frac)) {
-    df <- tibble::tibble(idx = seq_along(outlier_frac), outliers = outlier_frac)
-    p <- plot_base() +
-      ggplot2::geom_line(data = df, ggplot2::aes(x = idx, y = outliers), color = "#fd971f") +
-      ggplot2::labs(title = "Outlier Fraction", x = "Grid index", y = "Fraction")
-    print(p); plots$outliers <- p
-  }
+  omega_diag <- x$omega_dispersion
+  Omega      <- attr(x, "omega_matrix", exact = TRUE)
 
-  # Eigenvalues -------------------------------------------------
   if (!is.null(omega_diag) && !is.null(omega_diag$covariance_eigenvalues)) {
     eig <- omega_diag$covariance_eigenvalues
-    df <- tibble::tibble(k = seq_along(eig), eig = eig)
-    p <- plot_base() +
-      ggplot2::geom_point(data = df, ggplot2::aes(x = k, y = eig), color = "#ff5d00") +
-      ggplot2::geom_line(data = df, ggplot2::aes(x = k, y = eig), color = "#ff5d00") +
-      ggplot2::labs(title = "Omega-Hat Covariance Eigenvalues",
-                    x = "Eigenvalue index", y = "Eigenvalue")
-    print(p); plots$eigenvalues <- p
+    plots$eigenvalues <- plot_base() +
+      ggplot2::geom_point(
+        data = tibble::tibble(k = seq_along(eig), eig = eig),
+        ggplot2::aes(x = k, y = eig)
+      ) +
+      ggplot2::geom_line(
+        data = tibble::tibble(k = seq_along(eig), eig = eig),
+        ggplot2::aes(x = k, y = eig)
+      ) +
+      ggplot2::labs(
+        title = "Omega-Hat Covariance Eigenvalues",
+        x = "Index", y = "Eigenvalue"
+      )
   }
 
-  # PCA Scatter -------------------------------------------------
   if (!is.null(Omega) && ncol(Omega) >= 2) {
     pca <- stats::prcomp(Omega, scale. = TRUE)
-    df <- tibble::tibble(PC1 = pca$x[,1], PC2 = pca$x[,2])
-    p <- plot_base() +
-      ggplot2::geom_point(data = df, ggplot2::aes(x = PC1, y = PC2), color = "#ae81ff") +
+    plots$omega_pca <- plot_base() +
+      ggplot2::geom_point(
+        data = tibble::tibble(PC1 = pca$x[,1], PC2 = pca$x[,2]),
+        ggplot2::aes(x = PC1, y = PC2)
+      ) +
       ggplot2::labs(title = "Omega-Hat PCA Scatter", x = "PC1", y = "PC2")
-    print(p); plots$omega_pca <- p
   }
 
-  invisible(plots)
+  plots
 }
 
-# ======================================================================
+# ================================================================================
 # END likelihood-diagnostics.R
-# ======================================================================
+# ================================================================================

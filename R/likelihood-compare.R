@@ -1,94 +1,150 @@
 # ======================================================================
-# likelihood-compare.R
-#
-# Defines compare(), which constructs and attaches a likelihood
-# comparison object to a calibrated model specification.
-#
-# compare() is an orchestrator only. All substantive comparison
-# construction is delegated to helpers.
+# likelihood-compare.R — Likelihood comparison for likelyr
 # ======================================================================
 
 #' Compare Integrated and Profile Likelihood Inference
-#'
-#' @description
-#' Orchestrates comparison between profile likelihood and
-#' integrated likelihood inference results for a calibrated
-#' model specification.
-#'
-#' The input must already have:
-#'   • been calibrated via [calibrate()]
-#'   • had both [profile()] and [integrate()] applied
-#'   • had [infer()] run on *both* likelihood components
-#'
-#' The result is the same calibrated model spec, augmented with a
-#' comparison object of class `"likelyr_comparison"`.
-#'
-#' @param cal A calibrated model specification.
-#'
-#' @return The input object with a comparison result attached.
-#'
 #' @export
 compare <- function(cal) {
 
-  cal$results$comparison <- NULL
-
   validate_compare_input(cal)
 
-  pseudolikelihood_plot <- plot_pseudolikelihood_curves(cal$results)
-
-  pseudolikelihood_tables <- synthesize_comparison(cal$results)
+  cal$workspace$comparison <- NULL
 
   comparison <- list(
-    tables = pseudolikelihood_tables,
-    plot   = pseudolikelihood_plot
+    tables = synthesize_comparison(cal$workspace),
+    pseudolikelihood_curves = plot_pseudolikelihood_curves(cal$workspace)
   )
 
-  cal$results$comparison <- new_comparison_result(comparison)
+  cal$workspace$comparison <- new_comparison_result(comparison)
 
-  return(cal)
+  cal$workspace <- mark_compared(cal$workspace)
+
+  cal
 }
 
-# ======================================================================
+# ---------------------------------------------------------------------
 # Validation
-# ======================================================================
+# ---------------------------------------------------------------------
 
-#' Validate input for compare()
-#'
-#' @keywords internal
-#' @noRd
 validate_compare_input <- function(cal) {
 
-  if (!inherits(cal, "calibrated_model")) {
-    stop(
-      "compare() requires a calibrated model specification.",
-      call. = FALSE
-    )
-  }
+  if (!is_calibrated(cal))
+    stop("compare() requires a model that has been calibrated.", call. = FALSE)
 
-  if (is.null(cal$results$profile) || is.null(cal$results$integrated)) {
-    stop(
-      "compare() requires both profile() and integrate() to have been run.",
-      call. = FALSE
-    )
-  }
+  if (is.null(cal$workspace$profile) || is.null(cal$workspace$integrate))
+    stop("compare() requires profile() and integrate().", call. = FALSE)
 
-  if (is.null(cal$results$profile$inference)) {
-    stop(
-      "compare() requires infer() to be run on the profile likelihood.",
-      call. = FALSE
-    )
-  }
-
-  if (is.null(cal$results$integrated$inference)) {
-    stop(
-      "compare() requires infer() to be run on the integrated likelihood.",
-      call. = FALSE
-    )
-  }
+  if (is.null(cal$workspace$profile$inference) ||
+      is.null(cal$workspace$integrate$inference))
+    stop("compare() requires infer() on both likelihoods.", call. = FALSE)
 
   invisible(TRUE)
 }
 
+# ---------------------------------------------------------------------
+# Print
+# ---------------------------------------------------------------------
 
+#' @export
+print.comparison <- function(x, ...) {
 
+  cat("<comparison result>\n\n")
 
+  dfs <- Filter(is.data.frame, x$tables)
+  if (length(dfs)) {
+    cat("Data frames:\n")
+    for (nm in names(dfs)) {
+      df <- dfs[[nm]]
+      cat("•", nm, "(", nrow(df), "x", ncol(df), ")\n")
+    }
+  }
+
+  html <- Filter(Negate(is.data.frame), x$tables)
+  if (length(html)) {
+    cat("\nHTML tables available: use view()\n")
+  }
+
+  if (!is.null(x$plot)) {
+    cat("Plot available: use plot()\n")
+  }
+
+  invisible(x)
+}
+
+# ---------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------
+
+#' @export
+summary.comparison <- function(object, ...) {
+
+  out <- list(
+    data_frames = Filter(is.data.frame, object$tables),
+    tables      = Filter(Negate(is.data.frame), object$tables),
+    plot        = object$pseudolikelihood_curves
+  )
+
+  class(out) <- "summary_comparison"
+  out
+}
+
+#' @export
+print.summary_comparison <- function(x, ...) {
+
+  cat("<summary of comparison>\n\n")
+
+  if (length(x$data_frames)) {
+    cat("Data frames:\n")
+    for (nm in names(x$data_frames)) {
+      df <- x$data_frames[[nm]]
+      cat("•", nm, "(", nrow(df), "x", ncol(df), ")\n")
+    }
+  }
+
+  if (length(x$tables)) {
+    cat("\nHTML tables:\n")
+    for (nm in names(x$tables)) {
+      cat("•", nm, "\n")
+    }
+  }
+
+  if (!is.null(x$plot)) {
+    cat("\nPlot available: use plot()\n")
+  }
+
+  invisible(x)
+}
+
+# ---------------------------------------------------------------------
+# View
+# ---------------------------------------------------------------------
+
+#' @export
+view.comparison <- function(x, ...) {
+
+  tables <- Filter(Negate(is.data.frame), x$tables)
+
+  if (!length(tables)) {
+    stop("No HTML tables to render.", call. = FALSE)
+  }
+
+  for (tbl in tables) {
+    print(tbl)
+  }
+
+  invisible(x)
+}
+
+# ---------------------------------------------------------------------
+# Plot
+# ---------------------------------------------------------------------
+
+#' @export
+plot.comparison <- function(x, ...) {
+
+  if (is.null(x$pseudolikelihood_curves)) {
+    stop("No plot available in pseudolikelihood comparison result", call. = FALSE)
+  }
+
+  x$pseudolikelihood_curves
+}

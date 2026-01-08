@@ -6,22 +6,6 @@
 \usage{
 compare(cal)
 }
-\arguments{
-\item{cal}{A calibrated model specification.}
-}
-\value{
-The input object with a comparison result attached.
-}
 \description{
-Orchestrates comparison between profile likelihood and
-integrated likelihood inference results for a calibrated
-model specification.
-
-The input must already have:
-• been calibrated via \code{\link[=calibrate]{calibrate()}}
-• had both \code{\link[=profile]{profile()}} and \code{\link[=integrate]{integrate()}} applied
-• had \code{\link[=infer]{infer()}} run on \emph{both} likelihood components
-
-The result is the same calibrated model spec, augmented with a
-comparison object of class \code{"likelyr_comparison"}.
+Compare Integrated and Profile Likelihood Inference
 }

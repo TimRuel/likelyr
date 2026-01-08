@@ -194,16 +194,16 @@ plot_pseudolikelihood_curves <- function(res_list) {
         value  = c(
           x$inference$point_estimate_df$psi_hat,
           x$inference$point_estimate_df$psi_0
-        ),
+          ),
         label  = c(
           paste0("hat(psi)[", suffix, "]"),
           "psi[0]"
-        ),
+          ),
         color = c(
           plot_point_estimate_color(key, comparison = TRUE),
           plot_truth_color()
+          )
         )
-      )
     }
   ) |>
     dplyr::distinct() |>

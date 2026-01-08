@@ -7,17 +7,17 @@
 profile(cal, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated_model} produced by \code{\link[=calibrate]{calibrate()}}.}
+\item{cal}{A \code{calibrated} model object produced by \code{\link[=calibrate]{calibrate()}}.}
 
 \item{...}{Additional arguments forwarded to \code{\link[=generate_profile]{generate_profile()}}.}
 
 \item{verbose}{Logical; print diagnostic messages (default FALSE).}
 }
 \value{
-The SAME calibrated_model object, augmented with:
+The SAME \code{calibrated} model object object, augmented with:
 \itemize{
-\item \code{results$profile} — a \code{likelyr_profiled} object
-\item class \code{"likelyr_profiled"}
+\item class \code{profiled}
+\item \code{workspace$profile} — a \code{profile} object
 }
 }
 \description{
@@ -35,14 +35,14 @@ The log-likelihood is then evaluated along a ψ–grid, forming a \emph{single
 deterministic branch}. The result is attached to:
 
 \preformatted{
-  cal$results$profile
+  cal$workspace$profile
 }
 }
 \examples{
 \dontrun{
 cal <- calibrate(model, data)
 cal <- profile(cal)
-plot(cal$results$profile)
+plot(cal$workspace$profile)
 }
 
 }

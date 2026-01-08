@@ -129,8 +129,8 @@ build_one_branch <- function(
 #'
 #' For each branch:
 #' \enumerate{
-#'   \item Draw ω̂ via \code{cal$results$integrated$generate_init()} and
-#'         \code{cal$results$integrated$sample_omega_hat()}.
+#'   \item Draw ω̂ via \code{cal$workspace$integratd$generate_init()} and
+#'         \code{cal$workspace$integrate$sample_omega_hat()}.
 #'   \item Construct a ψ-conditioned evaluator via [build_eval_psi_fun()].
 #'   \item Solve the branch mode: (ψ̂_branch, θ̂_branch).
 #'   \item Compute a loglik cutoff using the LR criterion with an
@@ -139,7 +139,7 @@ build_one_branch <- function(
 #'   \item Sweep left and right along the ψ-grid via [build_one_branch()].
 #' }
 #'
-#' @param cal A `calibrated_model` used by [integrate()].
+#' @param cal A `calibrated` model object used by [integrate()].
 #' @param verbose Logical; if TRUE, prints progress messages.
 #'
 #' @return A list with components:
@@ -149,8 +149,8 @@ build_one_branch <- function(
 #' @keywords internal
 generate_branches <- function(cal, verbose = TRUE) {
 
-  if (!inherits(cal, "calibrated_model"))
-    stop("generate_branches() requires a calibrated_model.", call. = FALSE)
+  if (!inherits(cal, "calibrated"))
+    stop("generate_branches() requires a 'calibrated' model object.", call. = FALSE)
 
   param     <- cal$parameter
   lik       <- cal$likelihood
@@ -158,15 +158,15 @@ generate_branches <- function(cal, verbose = TRUE) {
   optimizer <- cal$optimizer
   execution <- cal$execution
 
-  # ------------------------------------------------------------------------
-  # Integrated log-likelihood components now live in cal$results$integrated
-  # ------------------------------------------------------------------------
-  integrated_result <- cal$results$integrated
-  if (is.null(integrated_result) ||
-      is.null(integrated_result$generate_init) ||
-      is.null(integrated_result$sample_omega_hat)) {
+  # -------------------------------------------------------------------------
+  # Integrated log-likelihood components now live in cal$workspace$integrate
+  # -------------------------------------------------------------------------
+  integrate_result <- cal$workspace$integrate
+  if (is.null(integrate_result) ||
+      is.null(integrate_result$generate_init) ||
+      is.null(integrate_result$sample_omega_hat)) {
     stop(
-      "integrate() must set cal$results$integrated_result$generate_init and $sample_omega_hat.",
+      "integrate() must set cal$workspace$integrate_result$generate_init and $sample_omega_hat.",
       call. = FALSE
     )
   }
@@ -238,8 +238,8 @@ generate_branches <- function(cal, verbose = TRUE) {
   ) %op% {
 
     # 1. Draw ω̂
-    init      <- integrated_result$generate_init()
-    omega_hat <- integrated_result$sample_omega_hat(init)
+    init      <- integrate_result$generate_init()
+    omega_hat <- integrate_result$sample_omega_hat(init)
 
     # 2. Build ψ evaluator for this ω̂
     eval_psi_fun <- eval_psi_builder(omega_hat)

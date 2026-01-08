@@ -7,7 +7,7 @@
 make_omega_hat_initgen(cal)
 }
 \arguments{
-\item{cal}{A \code{calibrated_model}.}
+\item{cal}{A \code{likelyr_calibrated} model object.}
 }
 \value{
 A function \code{f(history, p_recenter = 0.1)} returning

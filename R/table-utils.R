@@ -3,28 +3,37 @@
 #' @description
 #' Internal helper that constructs a styled HTML caption for
 #' `kableExtra` tables. Supports an optional secondary subtitle,
-#' typically used to indicate likelihood type (e.g., Profile or Integrated).
+#' typically used to indicate likelihood type.
 #'
 #' @details
 #' The caption consists of a primary title rendered in bold text, with an
 #' optional italicized subtitle displayed on a new line beneath the title.
-#' This allows consistent caption styling across tables while avoiding
-#' manual HTML construction in calling code.
 #'
 #' @param text Character scalar giving the primary caption title.
-#' @param type Optional character scalar giving a likelihood type label
-#'   (e.g., \code{"Profile"}, \code{"Integrated"}). If supplied, the subtitle
-#'   is rendered as \code{"(<type> Log-Likelihood)"} on a separate line.
+#' @param type Optional character scalar giving a likelihood type label.
+#'   Accepted special values:
+#'   \itemize{
+#'     \item \code{"integrate"} → "Integrated Log-Likelihood"
+#'     \item \code{"profile"}   → "Profile Log-Likelihood"
+#'   }
+#'   Other values are used verbatim.
 #'
-#' @return A length-1 character string containing HTML suitable for the
-#'   \code{caption} argument of \code{kableExtra::kbl()}.
+#' @return Length-1 HTML character string for `kableExtra::kbl()`.
 #'
 #' @keywords internal
 #' @noRd
 .table_caption <- function(text, type = NULL) {
-
   subtitle <- if (!is.null(type)) {
-    paste0("<em>(", type, " Log-Likelihood)</em>")
+    type_norm <- tolower(type)
+
+    type_label <- switch(
+      type_norm,
+      integrate = "Integrated",
+      profile = "Profile",
+      type # fallback
+    )
+
+    paste0("<em>(", type_label, " Log-Likelihood)</em>")
   } else {
     ""
   }
@@ -55,8 +64,8 @@
     kableExtra::row_spec(
       0,
       background = table_accent("header_row"),
-      color      = table_text_header("column"),
-      bold       = TRUE
+      color = table_text_header("column"),
+      bold = TRUE
     )
 }
 
@@ -78,7 +87,7 @@
     f = function(acc, i) {
       kableExtra::row_spec(acc, i, background = bg_vec[i])
     },
-    x    = seq_along(bg_vec),
+    x = seq_along(bg_vec),
     init = tbl
   )
 }
@@ -134,7 +143,7 @@
 .apply_vertical_centering <- function(tbl, n_rows) {
   kableExtra::row_spec(
     tbl,
-    row       = seq_len(n_rows),
+    row = seq_len(n_rows),
     extra_css = "vertical-align: middle;"
   )
 }
@@ -143,26 +152,25 @@
 # Internal: render base point-estimate table
 # ------------------------------------------------------------------
 .render_point_estimate_base <- function(
-    df,
-    col_names,
-    header_groups,
-    caption,
-    stripe_bg = NULL,
-    collapse_truth = FALSE
+  df,
+  col_names,
+  header_groups,
+  caption,
+  stripe_bg = NULL,
+  collapse_truth = FALSE
 ) {
-
   tbl <- df |>
     kableExtra::kbl(
       col.names = col_names,
-      caption   = caption,
-      escape    = FALSE,
-      align     = "c"
+      caption = caption,
+      escape = FALSE,
+      align = "c"
     ) |>
     kableExtra::add_header_above(
       header_groups,
-      bold       = TRUE,
+      bold = TRUE,
       background = table_accent("group_row"),
-      color      = table_text_header("group")
+      color = table_text_header("group")
     ) |>
     kableExtra::kable_material_dark(font_size = 17) |>
     .apply_standard_headers() |>
@@ -176,8 +184,12 @@
 
     # Text coloring
     kableExtra::column_spec(1, color = table_text_body("psi_0"), bold = TRUE) |>
-    kableExtra::column_spec(2, color = table_text_body("psi_hat"), bold = TRUE) |>
-    kableExtra::column_spec(3, color = table_text_body("error"), bold = TRUE)   |>
+    kableExtra::column_spec(
+      2,
+      color = table_text_body("psi_hat"),
+      bold = TRUE
+    ) |>
+    kableExtra::column_spec(3, color = table_text_body("error"), bold = TRUE) |>
     kableExtra::column_spec(4, color = table_text_body("se"), bold = TRUE)
 
   # Optional pseudolikelihood column
@@ -186,7 +198,7 @@
       kableExtra::column_spec(
         5,
         color = table_text_body("pseudolikelihood"),
-        bold  = TRUE
+        bold = TRUE
       )
   }
 
@@ -213,31 +225,30 @@
 # Internal: render base interval-estimate table
 # ------------------------------------------------------------------
 .render_interval_estimate_base <- function(
-    df,
-    col_names,
-    header_groups,
-    caption,
-    stripe_bg,
-    diagram_x,
-    diagram_lower,
-    diagram_upper,
-    vline,
-    include_pl = FALSE,
-    collapse_cols
+  df,
+  col_names,
+  header_groups,
+  caption,
+  stripe_bg,
+  diagram_x,
+  diagram_lower,
+  diagram_upper,
+  vline,
+  include_pl = FALSE,
+  collapse_cols
 ) {
-
   tbl <- df |>
     kableExtra::kbl(
       col.names = col_names,
-      caption   = caption,
-      escape    = FALSE,
-      align     = "c"
+      caption = caption,
+      escape = FALSE,
+      align = "c"
     ) |>
     kableExtra::add_header_above(
       header_groups,
-      bold       = TRUE,
+      bold = TRUE,
       background = table_accent("group_row"),
-      color      = table_text_header("group")
+      color = table_text_header("group")
     ) |>
     kableExtra::kable_material_dark(font_size = 17) |>
     .apply_standard_headers() |>
@@ -259,7 +270,7 @@
       kableExtra::column_spec(
         3,
         color = table_text_body("pseudolikelihood"),
-        bold  = TRUE
+        bold = TRUE
       )
   }
 
@@ -267,35 +278,35 @@
     kableExtra::column_spec(
       if (include_pl) 4 else 3,
       image = kableExtra::spec_pointrange(
-        x     = diagram_x,
-        xmin  = diagram_lower,
-        xmax  = diagram_upper,
+        x = diagram_x,
+        xmin = diagram_lower,
+        xmax = diagram_upper,
         vline = vline,
         line_col = table_text_body("diagram"),
-        width  = 300,
+        width = 300,
         height = 150,
-        cex    = 0.6
+        cex = 0.6
       )
     ) |>
     kableExtra::column_spec(
       if (include_pl) 5 else 4,
       color = table_text_body("length"),
-      bold  = TRUE
+      bold = TRUE
     ) |>
     kableExtra::column_spec(
       if (include_pl) 6 else 5,
       color = table_text_body("lower_dev"),
-      bold  = TRUE
+      bold = TRUE
     ) |>
     kableExtra::column_spec(
       if (include_pl) 7 else 6,
       color = table_text_body("upper_dev"),
-      bold  = TRUE
+      bold = TRUE
     ) |>
     kableExtra::column_spec(
       if (include_pl) 9 else 8,
       color = table_text_body("level"),
-      bold  = TRUE
+      bold = TRUE
     ) |>
     kableExtra::column_spec(1, background = table_column_bg("truth")) |>
     kableExtra::collapse_rows(collapse_cols)
@@ -307,18 +318,17 @@
 # Internal: render combined estimates base table
 # ------------------------------------------------------------------
 .render_estimates_base <- function(
-    df_render,
-    caption,
-    header_groups,
-    header_bg,
-    header_cols,
-    body_spec_fun,
-    stripe_bg,
-    collapse_cols,
-    include_pl = FALSE,
-    pe_bg = NULL
+  df_render,
+  caption,
+  header_groups,
+  header_bg,
+  header_cols,
+  body_spec_fun,
+  stripe_bg,
+  collapse_cols,
+  include_pl = FALSE,
+  pe_bg = NULL
 ) {
-
   # --------------------------------------------------
   # Column names depend on whether pseudolikelihood
   # columns are present
@@ -338,38 +348,38 @@
       "Upper<br/>Deviation",
       "Covers $\\psi_0$",
       "Confidence<br/>Level"
-      )
-    } else {
-      c(
-        "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$",
-        "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
-        "$\\hat{\\psi}$",
-        "$\\psi_0$",
-        "Interval",
-        "Diagram",
-        "Length",
-        "Lower<br/>Deviation",
-        "Upper<br/>Deviation",
-        "Covers $\\psi_0$",
-        "Confidence<br/>Level"
-      )
-    }
+    )
+  } else {
+    c(
+      "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$",
+      "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
+      "$\\hat{\\psi}$",
+      "$\\psi_0$",
+      "Interval",
+      "Diagram",
+      "Length",
+      "Lower<br/>Deviation",
+      "Upper<br/>Deviation",
+      "Covers $\\psi_0$",
+      "Confidence<br/>Level"
+    )
+  }
 
   tbl <- df_render |>
     kableExtra::kbl(
       booktabs = TRUE,
-      escape   = FALSE,
-      align    = "c",
+      escape = FALSE,
+      align = "c",
       col.names = col_names,
-      caption   = caption
-      ) |>
+      caption = caption
+    ) |>
 
     kableExtra::add_header_above(
       header_groups,
-      bold       = TRUE,
+      bold = TRUE,
       background = header_bg,
-      color      = table_text_header("group")
-      ) |>
+      color = table_text_header("group")
+    ) |>
 
     kableExtra::kable_material_dark(font_size = 17) |>
     .apply_standard_headers() |>
@@ -383,21 +393,21 @@
       bold = TRUE,
       color = table_text_header("column"),
       include_thead = TRUE
-      ) |>
+    ) |>
     kableExtra::column_spec(
       header_cols$truth,
       background = table_column_header_bg("truth"),
       bold = TRUE,
       color = table_text_header("column"),
       include_thead = TRUE
-      ) |>
+    ) |>
     kableExtra::column_spec(
       header_cols$interval,
       background = table_column_header_bg("interval_estimate"),
       bold = TRUE,
       color = table_text_header("column"),
       include_thead = TRUE
-      ) |>
+    ) |>
 
     # --------------------------------------------------
     # Body specs (delegated)
@@ -414,15 +424,10 @@
       } else {
         x
       }
-    }
-    )() |>
+    })() |>
     kableExtra::column_spec(
       header_cols$truth,
       background = table_column_bg("truth")
-      ) |>
+    ) |>
     kableExtra::collapse_rows(columns = collapse_cols)
 }
-
-
-
-

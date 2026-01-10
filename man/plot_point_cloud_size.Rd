@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_point_cloud_size}
 \alias{plot_point_cloud_size}
-\title{Get point cloud size}
+\title{Point cloud size}
 \usage{
 plot_point_cloud_size()
 }
@@ -10,5 +10,5 @@ plot_point_cloud_size()
 Numeric size
 }
 \description{
-Get point cloud size
+Point cloud size
 }

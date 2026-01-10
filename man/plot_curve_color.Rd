@@ -2,18 +2,18 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_curve_color}
 \alias{plot_curve_color}
-\title{Get curve color by pseudolikelihood}
+\title{Curve color}
 \usage{
 plot_curve_color(pseudolikelihood, comparison = FALSE)
 }
 \arguments{
-\item{pseudolikelihood}{One of "integrated", "profile"}
+\item{pseudolikelihood}{"integrate" or "profile"}
 
-\item{comparison}{Logical; use comparison styling?}
+\item{comparison}{Logical}
 }
 \value{
-Hex color string
+Hex color
 }
 \description{
-Get curve color by pseudolikelihood
+Curve color
 }

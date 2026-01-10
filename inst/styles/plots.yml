@@ -7,57 +7,59 @@
 # --------------------------------------------------
 curve:
   colors:
-    integrate: "#052880"   # Hylian blue
-    profile:    "#052880"   # Hylian blue
+    integrate: "#052880"
+    profile:    "#052880"
 
-  # Default (used by single-likelihood plots)
   linetype: solid
   linewidth: 1.5
 
-  # Comparison-only overrides
   comparison:
     linetype:
       integrate: solid
       profile:    "22"
     colors:
-      integrate: "#052880"   # Hylian blue
-      profile:    "#A7B0C0"   # steel silver
+      integrate: "#052880"
+      profile:    "#A7B0C0"
+
 
 # --------------------------------------------------
-# Point cloud styling (evaluated likelihood points)
+# Point cloud styling
 # --------------------------------------------------
 points:
   cloud:
     size:  3
     alpha: 0.7
 
+
 # --------------------------------------------------
 # Point estimate styling
 # --------------------------------------------------
 point_estimate:
   colors:
-    integrate: "#941703"   # deep red
-    profile:    "#941703"   # deep red
+    integrate: "#941703"
+    profile:    "#941703"
+
   size: 3
   linetype: solid
 
-  # Comparison-only overrides (vertical lines)
   comparison:
     linetype:
       integrate: solid
       profile:    "22"
     colors:
-      integrate: "#941703"   # deep red
-      profile:    "#A7B0C0"   # steel silver
+      integrate: "#941703"
+      profile:    "#A7B0C0"
+
 
 # --------------------------------------------------
 # Truth marker styling
 # --------------------------------------------------
 truth:
-  color:  "#C4A806"         # gold
+  color:  "#C4A806"
   shape:  4
   size:   3
   stroke: 1.2
+
 
 # --------------------------------------------------
 # Interval estimate styling
@@ -79,8 +81,9 @@ interval_estimate:
     linetype: dashed
     linewidth: 1
 
+
 # --------------------------------------------------
-# Reference lines (e.g., log-likelihood baseline)
+# Reference lines
 # --------------------------------------------------
 reference_lines:
   loglik_zero:
@@ -88,8 +91,9 @@ reference_lines:
     linewidth: 0.8
     color: "black"
 
+
 # --------------------------------------------------
-# Base ggplot theme (dark)
+# Base ggplot theme (global defaults)
 # --------------------------------------------------
 theme:
   base: minimal
@@ -113,22 +117,228 @@ theme:
   axis:
     ticks:
       color: "white"
+
     text:
       color: "white"
+      size: 11
+
     title:
       color: "white"
+      size: 13
 
   strip:
     text:
       color: "white"
+      size: 12
 
   plot:
     title:
       color: "white"
       face: "bold"
+      size: 16
+
+    subtitle:
+      size: 13
+
+    caption:
+      size: 10
 
   legend:
     text:
       color: "white"
+      size: 11
+
     title:
       color: "white"
+      size: 12
+
+  labels:
+    text:
+      size: 7
+
+  # --------------------------------------------------
+  # Plot-specific text overrides
+  # (used by plot_base(plot = "..."))
+  # --------------------------------------------------
+  plots:
+
+    # -------------------------------
+    # Diagnostic plots
+    # -------------------------------
+    omega_branches:
+      plot:
+        title:
+          size: 16
+      axis:
+        text:
+          size: 9
+
+    ess:
+      plot:
+        title:
+          size: 18
+      axis:
+        text:
+          size: 12
+
+    rel_se:
+      plot:
+        title:
+          size: 17
+
+    outliers:
+      plot:
+        title:
+          size: 17
+
+    omega_eigen:
+      axis:
+        text:
+          size: 10
+
+    omega_pca:
+      axis:
+        text:
+          size: 9
+
+
+    # -------------------------------
+    # Point cloud plots
+    # -------------------------------
+    points:
+      plot:
+        title:
+          size: 15
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+
+    # -------------------------------
+    # Single-likelihood curve
+    # -------------------------------
+    single_curve:
+      plot:
+        title:
+          size: 16
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+
+    # -------------------------------
+    # Comparison plot
+    # -------------------------------
+    comparison:
+      plot:
+        title:
+          size: 17
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+
+# --------------------------------------------------
+# Diagnostics plot styling
+# --------------------------------------------------
+diagnostics:
+
+  defaults:
+    line:
+      color: "#88C0D0"
+      linewidth: 1.2
+      linetype: solid
+
+    point:
+      color: "#E5C07B"
+      size: 2.5
+      alpha: 0.8
+      shape: 16
+
+
+  by_method:
+
+    integrate:
+      line:
+        color: "#6FA3D9"
+        linewidth: 1.4
+      point:
+        color: "#6FA3D9"
+        size: 3
+
+    profile:
+      line:
+        color: "#A7B0C0"
+        linewidth: 1.2
+        linetype: "22"
+      point:
+        color: "#A7B0C0"
+        size: 2.5
+
+
+  plots:
+
+    omega_branches:
+
+      color_by_curve: true
+
+      line:
+        color: "#6FA3D9"
+        linewidth: 1
+        alpha: 0.8
+
+      palette:
+        type: discrete
+        name: "viridis"
+        direction: 1
+
+
+    ess:
+      line:
+        linewidth: 1.6
+      point:
+        size: 3
+
+
+    rel_se:
+      line:
+        linetype: dashed
+
+
+    outliers:
+      point:
+        color: "#E06C75"
+
+
+    omega_eigen:
+      line:
+        linewidth: 1.1
+      point:
+        shape: 17
+
+
+    omega_pca:
+      point:
+        size: 2.5
+        alpha: 0.7

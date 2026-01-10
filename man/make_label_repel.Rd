@@ -4,7 +4,7 @@
 \alias{make_label_repel}
 \title{Repelled labels for point annotations}
 \usage{
-make_label_repel(label_data, y)
+make_label_repel(label_data, y, plot = NULL)
 }
 \description{
 Repelled labels for point annotations

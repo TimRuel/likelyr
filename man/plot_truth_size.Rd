@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_truth_size}
 \alias{plot_truth_size}
-\title{Get truth marker size}
+\title{Truth marker size}
 \usage{
 plot_truth_size()
 }
-\value{
-Numeric size
-}
 \description{
-Get truth marker size
+Truth marker size
 }

@@ -4,7 +4,10 @@
 \alias{plot_base}
 \title{Base Dark Theme for Log-Likelihood Plots}
 \usage{
-plot_base()
+plot_base(plot = NULL)
+}
+\arguments{
+\item{plot}{Optional plot name for text-size overrides}
 }
 \value{
 A ggplot2 object representing the base plotting surface.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_curve_linewidth}
 \alias{plot_curve_linewidth}
-\title{Get curve linewidth}
+\title{Curve linewidth}
 \usage{
 plot_curve_linewidth()
 }
@@ -10,5 +10,5 @@ plot_curve_linewidth()
 Numeric linewidth
 }
 \description{
-Get curve linewidth
+Curve linewidth
 }

@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_truth_stroke}
 \alias{plot_truth_stroke}
-\title{Get truth marker stroke width}
+\title{Truth marker stroke}
 \usage{
 plot_truth_stroke()
 }
-\value{
-Numeric stroke width
-}
 \description{
-Get truth marker stroke width
+Truth marker stroke
 }

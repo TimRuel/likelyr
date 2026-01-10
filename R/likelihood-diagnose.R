@@ -14,7 +14,7 @@
 #' stored in a calibrated model.
 #'
 #' Integrated likelihood receives full Monte Carlo diagnostics; profile
-#' likelihood currently receives a placeholder diagnostics object.
+#' likelihood receives its own diagnostics implementation.
 #'
 #' Diagnostics are attached at:
 #' \preformatted{
@@ -39,33 +39,27 @@ diagnose.default <- function(cal, ...) {
 
 #' @export
 diagnose.calibrated <- function(cal, verbose = FALSE) {
-
   validate_diagnose_input(cal)
 
   for (name in names(cal$workspace)) {
-
     res <- cal$workspace[[name]]
 
     # ------------------------------------------------------------------
-    # Run diagnostics engine
+    # Run diagnostics engine (type-dispatched)
     # ------------------------------------------------------------------
 
-    diag_raw <- if (inherits(res, "integrate")) {
-      diagnose_integrate(res)
-    } else if (inherits(res, "profile")) {
-      diagnose_profile(res)
+    if (is_integrate(res)) {
+      diag_raw <- diagnose_integrate(res)
+    } else if (is_profile(res)) {
+      diag_raw <- diagnose_profile(res)
     } else {
       stop(
-        "diagnose(): Unsupported result type for '", name, "'.",
+        "diagnose(): Unsupported result type for '",
+        name,
+        "'.",
         call. = FALSE
       )
     }
-
-    # ------------------------------------------------------------------
-    # Build plots (once, at diagnose-time)
-    # ------------------------------------------------------------------
-
-    diag_raw$plots <- build_diagnostics_plots(diag_raw)
 
     # ------------------------------------------------------------------
     # Attach and mark result
@@ -88,16 +82,17 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
 # ================================================================================
 
 validate_diagnose_input <- function(cal) {
-
-  if (!is_calibrated(cal))
+  if (!is_calibrated(cal)) {
     stop("diagnose() requires a calibrated model.", call. = FALSE)
+  }
 
-  if (is.null(cal$workspace) || length(cal$workspace) == 0)
+  if (is.null(cal$workspace) || length(cal$workspace) == 0) {
     stop(
       "diagnose(): No pseudolikelihood results found. ",
       "Run integrate() or profile() first.",
       call. = FALSE
     )
+  }
 
   invisible(TRUE)
 }
@@ -109,8 +104,7 @@ validate_diagnose_input <- function(cal) {
 #   • Diagnostics computation lives in:
 #       - likelihood-diagnose-integrate.R
 #       - likelihood-diagnose-profile.R
-#   • Plot construction lives in:
-#       - likelihood-diagnose-plots.R
+#   • Plot construction is handled *inside* those files.
 #   • This file contains only dispatch, orchestration, and presentation.
 # ================================================================================
 
@@ -120,7 +114,6 @@ validate_diagnose_input <- function(cal) {
 
 #' @export
 print.diagnostics <- function(x, ...) {
-
   cat("<diagnostics>\n")
 
   if (!isTRUE(x$supported)) {
@@ -133,26 +126,34 @@ print.diagnostics <- function(x, ...) {
   cat("  ESS (min):    ", sprintf("%.1f", x$summary$ess_min), "\n", sep = "")
   cat("  ESS (median): ", sprintf("%.1f", x$summary$ess_median), "\n", sep = "")
   cat("  Rel SE max:   ", sprintf("%.3f", x$summary$rel_se_max), "\n", sep = "")
-  cat("  Outlier max:  ", sprintf("%.3f", x$summary$outlier_max), "\n", sep = "")
+  cat(
+    "  Outlier max:  ",
+    sprintf("%.3f", x$summary$outlier_max),
+    "\n",
+    sep = ""
+  )
 
   if (!is.null(x$omega_dispersion)) {
     cat("  Omega-hat manifold:\n")
     cat(
       "    Effective rank: ",
-      sprintf("%.2f", x$omega_dispersion$effective_rank), "\n",
+      sprintf("%.2f", x$omega_dispersion$effective_rank),
+      "\n",
       sep = ""
     )
     cat(
       "    Collapsed:      ",
-      if (x$omega_dispersion$collapsed) "YES" else "no", "\n",
+      if (x$omega_dispersion$collapsed) "YES" else "no",
+      "\n",
       sep = ""
     )
   }
 
   if (length(x$warnings) > 0) {
     cat("\n  Warnings:\n")
-    for (w in x$warnings)
+    for (w in x$warnings) {
       cat("   • ", w, "\n", sep = "")
+    }
   }
 
   invisible(x)
@@ -164,11 +165,10 @@ print.diagnostics <- function(x, ...) {
 
 #' @export
 summary.diagnostics <- function(diag, ...) {
-
   out <- list(
     supported = diag$supported,
-    summary   = diag$summary %||% NULL,
-    warnings  = diag$warnings
+    summary = diag$summary %||% NULL,
+    warnings = diag$warnings
   )
 
   class(out) <- "summary_diagnostics"
@@ -177,7 +177,6 @@ summary.diagnostics <- function(diag, ...) {
 
 #' @export
 print.summary_diagnostics <- function(x, ...) {
-
   cat("<summary of diagnostics>\n\n")
 
   if (!isTRUE(x$supported)) {
@@ -193,8 +192,9 @@ print.summary_diagnostics <- function(x, ...) {
 
   if (length(x$warnings) > 0) {
     cat("\nWarnings:\n")
-    for (w in x$warnings)
+    for (w in x$warnings) {
       cat(" • ", w, "\n", sep = "")
+    }
   }
 
   invisible(x)

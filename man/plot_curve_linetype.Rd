@@ -2,18 +2,18 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_curve_linetype}
 \alias{plot_curve_linetype}
-\title{Get curve linetype}
+\title{Curve linetype}
 \usage{
 plot_curve_linetype(pseudolikelihood, comparison = FALSE)
 }
 \arguments{
-\item{pseudolikelihood}{One of "integrated", "profile"}
+\item{pseudolikelihood}{"integrate" or "profile"}
 
-\item{comparison}{Logical; use comparison styling?}
+\item{comparison}{Logical}
 }
 \value{
 Character linetype
 }
 \description{
-Get curve linetype
+Curve linetype
 }

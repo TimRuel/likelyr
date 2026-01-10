@@ -54,12 +54,12 @@ profile.default <- function(cal, ...) {
 
 #' @export
 profile.calibrated <- function(cal, verbose = FALSE, ...) {
-
   # ------------------------------------------------------------------
   # 0A. Ensure calibration has occurred
   # ------------------------------------------------------------------
-  if (!is_calibrated(cal))
+  if (!is_calibrated(cal)) {
     stop("profile() requires calibrate() first.", call. = FALSE)
+  }
 
   # ------------------------------------------------------------------
   # 0B. Profile log-likelihood does NOT require optimizer/execution specs
@@ -69,16 +69,18 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 1. Extract calibrated quantities
   # ------------------------------------------------------------------
-  estimand   <- cal$estimand
-  psi_mle    <- estimand$psi_mle
-  psi_fn     <- estimand$psi_fn
-  theta_mle  <- cal$parameter$theta_mle
-  loglik_fn  <- cal$likelihood$loglik
+  estimand <- cal$estimand
+  psi_mle <- estimand$psi_mle
+  psi_fn <- estimand$psi_fn
+  theta_mle <- cal$parameter$theta_mle
+  loglik_fn <- cal$likelihood$loglik
 
   # ------------------------------------------------------------------
   # 2. Execution summary
   # ------------------------------------------------------------------
-  if (verbose) cat("[profile] Profile Log-Likelihood\n")
+  if (verbose) {
+    cat("[profile] Profile Log-Likelihood\n")
+  }
 
   # ------------------------------------------------------------------
   # 3. Compute branch cutoff from confidence levels
@@ -88,7 +90,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   alpha_target <- min(1 - estimand$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
 
-  cutoff_buffer  <- estimand$cutoff_buffer %||% 0
+  cutoff_buffer <- estimand$cutoff_buffer %||% 0
   effective_crit <- crit * (1 + cutoff_buffer)
 
   cutoff <- loglik_at_mle - effective_crit
@@ -101,19 +103,18 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
 
   # increment & max_retries must come from execution or default settings
-  increment   <- cal$execution$increment   %||% 0.05
+  increment <- cal$execution$increment %||% 0.05
   max_retries <- cal$execution$max_retries %||% 4
 
   psi_ll_df <- tryCatch(
-
     generate_profile(
-      psi_mle       = psi_mle,
-      theta_mle     = theta_mle,
+      psi_mle = psi_mle,
+      theta_mle = theta_mle,
       loglik_at_mle = loglik_at_mle,
-      increment     = increment,
-      cutoff        = cutoff,
-      eval_psi_fun  = eval_psi_fun,
-      max_retries   = max_retries,
+      increment = increment,
+      cutoff = cutoff,
+      eval_psi_fun = eval_psi_fun,
+      max_retries = max_retries,
       ...
     ),
 
@@ -126,16 +127,18 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
     }
   )
 
+  attr(psi_ll_df, "type") <- "profile"
+
   pseudolikelihood_points <- plot_pseudolikelihood_points(psi_ll_df)
 
   # ------------------------------------------------------------------
   # 5. Wrap into profile_result
   # ------------------------------------------------------------------
   profile_result <- new_profile_result(list(
-    psi_ll_df               = psi_ll_df,
-    psi_mle                 = psi_mle,
-    theta_mle               = theta_mle,
-    status                  = if (!is.null(psi_ll_df)) "success" else "failed",
+    psi_ll_df = psi_ll_df,
+    psi_mle = psi_mle,
+    theta_mle = theta_mle,
+    status = if (!is.null(psi_ll_df)) "success" else "failed",
     pseudolikelihood_points = pseudolikelihood_points
   ))
 
@@ -146,7 +149,9 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 
   cal <- mark_profiled(cal)
 
-  if (verbose) cat("[profile] Finished.\n")
+  if (verbose) {
+    cat("[profile] Finished.\n")
+  }
 
   cal
 }
@@ -161,18 +166,21 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 #   • nuisance spec
 # but NOT optimizer or execution specs.
 validate_profile_input <- function(cal) {
-
-  if (!inherits(cal$parameter, "parameter_spec"))
+  if (!inherits(cal$parameter, "parameter_spec")) {
     stop("model$parameter must be a 'parameter_spec' object.")
+  }
 
-  if (!inherits(cal$likelihood, "likelihood_spec"))
+  if (!inherits(cal$likelihood, "likelihood_spec")) {
     stop("model$likelihood must be a 'likelihood_spec' object.")
+  }
 
-  if (!inherits(cal$estimand, "estimand_spec"))
+  if (!inherits(cal$estimand, "estimand_spec")) {
     stop("model$estimand must be an 'estimand_spec' object.")
+  }
 
-  if (!inherits(cal$nuisance, "nuisance_spec"))
+  if (!inherits(cal$nuisance, "nuisance_spec")) {
     stop("model$nuisance must be a 'nuisance_spec' object.")
+  }
 
   invisible(cal)
 }
@@ -183,28 +191,30 @@ validate_profile_input <- function(cal) {
 
 #' @export
 print.profile <- function(x, ...) {
-
   cat("<Profile Log-Likelihood Result>\n")
 
-  if (!is.null(x$status))
+  if (!is.null(x$status)) {
     cat("Status: ", x$status, "\n", sep = "")
+  }
 
   # -----------------------------------------------------------
   # Lifecycle flags (slot presence)
   # -----------------------------------------------------------
 
-  has_inference   <- !is.null(x$inference)
+  has_inference <- !is.null(x$inference)
   has_diagnostics <- !is.null(x$diagnostics)
 
   cat("Lifecycle:\n")
   cat(
     "  inferred:   ",
-    if (has_inference)   "✓" else "×", "\n",
+    if (has_inference) "✓" else "×",
+    "\n",
     sep = ""
   )
   cat(
     "  diagnosed:  ",
-    if (has_diagnostics) "✓" else "×", "\n",
+    if (has_diagnostics) "✓" else "×",
+    "\n",
     sep = ""
   )
 
@@ -212,23 +222,26 @@ print.profile <- function(x, ...) {
   # Estimates
   # -----------------------------------------------------------
 
-  if (!is.null(x$psi_mle))
+  if (!is.null(x$psi_mle)) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
+  }
 
-  if (!is.null(x$theta_mle))
+  if (!is.null(x$theta_mle)) {
     cat(
       "theta_MLE: (",
       paste(format(x$theta_mle), collapse = ", "),
       ")\n",
       sep = ""
     )
+  }
 
   # -----------------------------------------------------------
   # Grid information
   # -----------------------------------------------------------
 
-  if (!is.null(x$psi_ll_df))
+  if (!is.null(x$psi_ll_df)) {
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
+  }
 
   invisible(x)
 }
@@ -239,11 +252,9 @@ print.profile <- function(x, ...) {
 
 #' @export
 plot.profile <- function(x, ...) {
-
   if (is.null(x$pseudolikelihood_points)) {
     stop("No plot available in profile log-likelihood result.", call. = FALSE)
   }
 
   x$pseudolikelihood_points
 }
-

@@ -64,8 +64,12 @@ estimand <- estimand_spec(
 # ============================================================
 # Specify nuisance parameter
 # ============================================================
-E_loglik <- function(theta, omega_hat, data) sum(data$t * (omega_hat * log(theta) - theta))
-E_loglik_grad <- function(theta, omega_hat, data) data$t * (omega_hat / theta - 1)
+E_loglik <- function(theta, omega_hat, data) {
+  sum(data$t * (omega_hat * log(theta) - theta))
+}
+E_loglik_grad <- function(theta, omega_hat, data) {
+  data$t * (omega_hat / theta - 1)
+}
 
 nuisance <- nuisance_spec(
   E_loglik = E_loglik,
@@ -77,7 +81,7 @@ nuisance <- nuisance_spec(
 # Specify optimizer
 # ============================================================
 localsolver <- "SLSQP"
-control <- list(xtol_rel = 1e-8, maxeval  = 1000)
+control <- list(xtol_rel = 1e-8, maxeval = 1000)
 localtol <- 1e-6
 max_retries <- 10
 
@@ -118,10 +122,12 @@ weights <- runif(J, 1, 3)
 t <- do.call(runif, list(n = J, min = J * 1, max = J * 5))
 mu_0 <- theta_0 * t
 Y <- rpois(J, mu_0)
-data <- dplyr::tibble(process = factor(process_labels),
-               t = t,
-               Y = Y,
-               weights = weights) |>
+data <- dplyr::tibble(
+  process = factor(process_labels),
+  t = t,
+  Y = Y,
+  weights = weights
+) |>
   dplyr::group_by(process)
 
 fit <- model |>
@@ -132,14 +138,11 @@ fit <- model |>
   infer() |>
   compare()
 
-# fit <- fit |> compare()
+fit$workspace$comparison |> plot()
 
+fit$workspace$integrate$inference |> plot()
 
+fit$workspace$profile$inference |> view()
 # plan(callr, workers = wf$execution$num_workers)
 # fit  <- fit_integrated(cal)
 # plan(sequential)
-
-
-
-
-

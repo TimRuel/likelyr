@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_truth_shape}
 \alias{plot_truth_shape}
-\title{Get truth marker shape}
+\title{Truth marker shape}
 \usage{
 plot_truth_shape()
 }
-\value{
-Integer shape code
-}
 \description{
-Get truth marker shape
+Truth marker shape
 }

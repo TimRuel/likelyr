@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_ci_linetype}
 \alias{plot_ci_linetype}
-\title{Get CI line linetype}
+\title{CI linetype}
 \usage{
 plot_ci_linetype()
 }
-\value{
-Character linetype
-}
 \description{
-Get CI line linetype
+CI linetype
 }

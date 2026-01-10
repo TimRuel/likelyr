@@ -20,7 +20,7 @@ Attaches diagnostics to each likelihood result (integrated or profile)
 stored in a calibrated model.
 
 Integrated likelihood receives full Monte Carlo diagnostics; profile
-likelihood currently receives a placeholder diagnostics object.
+likelihood receives its own diagnostics implementation.
 
 Diagnostics are attached at:
 \preformatted{

@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_ci_linewidth}
 \alias{plot_ci_linewidth}
-\title{Get CI line linewidth}
+\title{CI linewidth}
 \usage{
 plot_ci_linewidth()
 }
-\value{
-Numeric linewidth
-}
 \description{
-Get CI line linewidth
+CI linewidth
 }

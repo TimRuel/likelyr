@@ -2,18 +2,18 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_point_estimate_linetype}
 \alias{plot_point_estimate_linetype}
-\title{Get point estimate linetype}
+\title{Point estimate linetype}
 \usage{
 plot_point_estimate_linetype(pseudolikelihood, comparison = FALSE)
 }
 \arguments{
-\item{pseudolikelihood}{One of "integrated", "profile"}
+\item{pseudolikelihood}{"integrate" or "profile"}
 
-\item{comparison}{Logical; use comparison styling?}
+\item{comparison}{Logical}
 }
 \value{
 Character linetype
 }
 \description{
-Get point estimate linetype
+Point estimate linetype
 }

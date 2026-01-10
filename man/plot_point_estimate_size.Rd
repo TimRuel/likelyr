@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_point_estimate_size}
 \alias{plot_point_estimate_size}
-\title{Get point estimate marker size}
+\title{Point estimate size}
 \usage{
 plot_point_estimate_size()
 }
@@ -10,5 +10,5 @@ plot_point_estimate_size()
 Numeric size
 }
 \description{
-Get point estimate marker size
+Point estimate size
 }

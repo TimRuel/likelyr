@@ -34,12 +34,11 @@
 #'
 #' @keywords internal
 synthesize_inference <- function(
-    psi_ll_df,
-    alpha_levels,
-    psi_0,
-    expand_factor
-    ) {
-
+  psi_ll_df,
+  alpha_levels,
+  psi_0,
+  expand_factor
+) {
   type <- attr(psi_ll_df, "type")
 
   # --------------------------------------------------
@@ -65,16 +64,16 @@ synthesize_inference <- function(
   psi_ll_max_point <- get_psi_ll_max_point(psi_ll_fn, psi_ll_df)
 
   point_estimate <- psi_ll_max_point$argmax
-  max_loglik     <- psi_ll_max_point$maximum
+  max_loglik <- psi_ll_max_point$maximum
 
   se_point_estimate <- get_se_point_estimate(point_estimate, psi_ll_df)
 
   point_estimate_df <- tibble::tibble(
-    psi_0      = psi_0,
-    psi_hat    = point_estimate,
-    error      = point_estimate - psi_0,
+    psi_0 = psi_0,
+    psi_hat = point_estimate,
+    error = point_estimate - psi_0,
     se_psi_hat = se_point_estimate
-    ) |>
+  ) |>
     round(2)
 
   attr(point_estimate_df, "type") <- type
@@ -85,13 +84,13 @@ synthesize_inference <- function(
   zero_max_psi_ll_fn <- shift_psi_ll_fn(psi_ll_fn, max_loglik)
 
   interval_estimate_df <- get_interval_estimate_df(
-    point_estimate     = point_estimate,
+    point_estimate = point_estimate,
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
-    psi_ll_df          = psi_ll_df,
-    alpha_levels       = alpha_levels,
-    expand_factor      = expand_factor,
-    psi_0              = psi_0
-    )
+    psi_ll_df = psi_ll_df,
+    alpha_levels = alpha_levels,
+    expand_factor = expand_factor,
+    psi_0 = psi_0
+  )
 
   attr(interval_estimate_df, "type") <- type
 
@@ -114,30 +113,34 @@ synthesize_inference <- function(
     )
 
   attr(estimate_df, "type") <- type
-  attr(estimate_df, "interval_estimate_raw") <- attr(interval_estimate_df, "interval_estimate_raw")
+  attr(estimate_df, "interval_estimate_raw") <- attr(
+    interval_estimate_df,
+    "interval_estimate_raw"
+  )
 
   point_estimate_table <- render_point_estimate_table(point_estimate_df)
 
-  interval_estimate_table <- render_interval_estimate_table(interval_estimate_df)
+  interval_estimate_table <- render_interval_estimate_table(
+    interval_estimate_df
+  )
 
   estimate_table <- render_estimate_table(estimate_df)
 
   pseudolikelihood_curve <- plot_pseudolikelihood_curve(
-    psi_ll_df             = psi_ll_df,
-    zero_max_psi_ll_fn    = zero_max_psi_ll_fn,
-    point_estimate_df     = point_estimate_df,
-    interval_estimate_df  = interval_estimate_df
-    )
+    psi_ll_df = psi_ll_df,
+    zero_max_psi_ll_fn = zero_max_psi_ll_fn,
+    point_estimate_df = point_estimate_df,
+    interval_estimate_df = interval_estimate_df
+  )
 
   list(
-    zero_max_psi_ll_fn      = zero_max_psi_ll_fn,
-    psi_ll_df               = psi_ll_df,
-    point_estimate_df       = point_estimate_df,
-    interval_estimate_df    = interval_estimate_df,
-    estimate_df             = estimate_df,
-    point_estimate_table    = point_estimate_table,
+    zero_max_psi_ll_fn = zero_max_psi_ll_fn,
+    point_estimate_df = point_estimate_df,
+    interval_estimate_df = interval_estimate_df,
+    estimate_df = estimate_df,
+    point_estimate_table = point_estimate_table,
     interval_estimate_table = interval_estimate_table,
-    estimate_table          = estimate_table,
-    pseudolikelihood_curve  = pseudolikelihood_curve
+    estimate_table = estimate_table,
+    pseudolikelihood_curve = pseudolikelihood_curve
   )
 }

@@ -2,16 +2,16 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_reference_line_style}
 \alias{plot_reference_line_style}
-\title{Get reference line style by name}
+\title{Reference line style}
 \usage{
 plot_reference_line_style(name)
 }
 \arguments{
-\item{name}{Reference line key (e.g. "loglik_zero")}
+\item{name}{Style key}
 }
 \value{
-Named list with linetype, linewidth, and color
+Named list
 }
 \description{
-Get reference line style by name
+Reference line style
 }

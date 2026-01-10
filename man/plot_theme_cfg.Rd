@@ -2,13 +2,13 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_theme_cfg}
 \alias{plot_theme_cfg}
-\title{Get full ggplot theme configuration}
+\title{Full theme configuration}
 \usage{
 plot_theme_cfg()
 }
 \value{
-Named list corresponding to styles/plots.yml$theme
+Named list
 }
 \description{
-Get full ggplot theme configuration
+Full theme configuration
 }

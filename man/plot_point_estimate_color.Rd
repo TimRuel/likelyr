@@ -2,18 +2,18 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_point_estimate_color}
 \alias{plot_point_estimate_color}
-\title{Get point estimate color by pseudolikelihood}
+\title{Point estimate color}
 \usage{
 plot_point_estimate_color(pseudolikelihood, comparison = FALSE)
 }
 \arguments{
-\item{pseudolikelihood}{One of "integrated", "profile"}
+\item{pseudolikelihood}{"integrate" or "profile"}
 
-\item{comparison}{Logical; use comparison styling?}
+\item{comparison}{Logical}
 }
 \value{
-Hex color string
+Hex color
 }
 \description{
-Get point estimate color by pseudolikelihood
+Point estimate color
 }

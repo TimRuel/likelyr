@@ -2,16 +2,16 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_ci_palette}
 \alias{plot_ci_palette}
-\title{Generate CI color palette}
+\title{CI color palette}
 \usage{
 plot_ci_palette(interval_estimate_df)
 }
 \arguments{
-\item{interval_estimate_df}{Data frame containing interval metadata.}
+\item{interval_estimate_df}{Data frame}
 }
 \value{
-Named character vector of colors.
+Named character vector
 }
 \description{
-Generate CI color palette
+CI color palette
 }

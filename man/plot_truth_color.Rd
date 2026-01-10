@@ -2,13 +2,10 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_truth_color}
 \alias{plot_truth_color}
-\title{Get truth marker color}
+\title{Truth marker color}
 \usage{
 plot_truth_color()
 }
-\value{
-Hex color string
-}
 \description{
-Get truth marker color
+Truth marker color
 }

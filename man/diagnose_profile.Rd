@@ -10,17 +10,18 @@ diagnose_profile(res)
 \item{res}{A \code{profile} result object.}
 }
 \value{
-A named list describing unsupported diagnostics.
+A named list containing placeholder diagnostics fields.
 }
 \description{
-Diagnostics for profile log-likelihood results.
+Computes diagnostics for a profile log-likelihood result.
 
-Profile likelihood diagnostics are currently \strong{not implemented}.
-This function exists to:
+This is currently a \strong{barebones skeleton} that mirrors the integrated
+diagnostics engine. All metric and plotting helpers will be wired in
+here once implemented.
+
+The function exists to:
 • provide a consistent diagnostics interface
-• allow downstream code to rely on the presence of diagnostics
+• allow downstream code to rely on diagnostics structure
 • make future implementation drop-in
-
-No computation, plotting, or attachment is performed here.
 }
 \keyword{internal}

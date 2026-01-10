@@ -19,9 +19,9 @@
 # ======================================================================
 
 validate_integrate_result <- function(x) {
-
-  if (!is.list(x))
+  if (!is.list(x)) {
     stop("Integrated log-likelihood result must be a list.", call. = FALSE)
+  }
 
   required <- c("status")
 
@@ -34,15 +34,23 @@ validate_integrate_result <- function(x) {
     )
   }
 
-  if (!x$status %in% c("success", "failed"))
+  if (!x$status %in% c("success", "failed")) {
     stop("status must be 'success' or 'failed'.", call. = FALSE)
+  }
 
-  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df))
+  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df)) {
     stop("psi_ll_df must be a data.frame.", call. = FALSE)
+  }
 
-  if (!is.null(x$pseudolikelihood_points) &&
-      !inherits(x$pseudolikelihood_points, "ggplot"))
-    stop("pseudolikelihood_points must be a ggplot object if present.", call. = FALSE)
+  if (
+    !is.null(x$pseudolikelihood_points) &&
+      !inherits(x$pseudolikelihood_points, "ggplot")
+  ) {
+    stop(
+      "pseudolikelihood_points must be a ggplot object if present.",
+      call. = FALSE
+    )
+  }
 
   invisible(TRUE)
 }
@@ -53,9 +61,9 @@ validate_integrate_result <- function(x) {
 # ======================================================================
 
 validate_profile_result <- function(x) {
-
-  if (!is.list(x))
+  if (!is.list(x)) {
     stop("Profile log-likelihood result must be a list.", call. = FALSE)
+  }
 
   required <- c("psi_ll_df", "psi_mle", "theta_mle", "status")
 
@@ -68,21 +76,28 @@ validate_profile_result <- function(x) {
     )
   }
 
-  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df))
+  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df)) {
     stop("psi_ll_df must be a data.frame.", call. = FALSE)
+  }
 
-  if (!is.numeric(x$psi_mle))
+  if (!is.numeric(x$psi_mle)) {
     stop("psi_mle must be numeric.", call. = FALSE)
+  }
 
-  if (!is.numeric(x$theta_mle))
+  if (!is.numeric(x$theta_mle)) {
     stop("theta_mle must be numeric.", call. = FALSE)
+  }
 
-  if (!x$status %in% c("success", "failed"))
+  if (!x$status %in% c("success", "failed")) {
     stop("status must be 'success' or 'failed'.", call. = FALSE)
+  }
 
-  if (!is.null(x$profile_plot) &&
-      !inherits(x$profile_plot, "ggplot"))
+  if (
+    !is.null(x$profile_plot) &&
+      !inherits(x$profile_plot, "ggplot")
+  ) {
     stop("pseudolikelihood_points must be a ggplot if present.", call. = FALSE)
+  }
 
   invisible(TRUE)
 }
@@ -92,12 +107,12 @@ validate_profile_result <- function(x) {
 # ----------------------------------------------------------------------
 
 validate_diagnostics_result <- function(x) {
-
-  if (!is.list(x))
+  if (!is.list(x)) {
     stop("Diagnostics result must be a list.", call. = FALSE)
+  }
 
   required <- c("supported", "warnings")
-  missing  <- setdiff(required, names(x))
+  missing <- setdiff(required, names(x))
 
   if (length(missing)) {
     stop(
@@ -107,14 +122,17 @@ validate_diagnostics_result <- function(x) {
     )
   }
 
-  if (!is.logical(x$supported) || length(x$supported) != 1)
+  if (!is.logical(x$supported) || length(x$supported) != 1) {
     stop("'supported' must be a single logical.", call. = FALSE)
+  }
 
-  if (!is.character(x$warnings))
+  if (!is.character(x$warnings)) {
     stop("'warnings' must be a character vector.", call. = FALSE)
+  }
 
-  if (!is.null(x$plots) && !is.list(x$plots))
+  if (!is.null(x$plots) && !is.list(x$plots)) {
     stop("'plots' must be a list.", call. = FALSE)
+  }
 
   invisible(TRUE)
 }
@@ -124,7 +142,6 @@ validate_diagnostics_result <- function(x) {
 # ======================================================================
 
 validate_inference_result <- function(x) {
-
   if (!is.list(x)) {
     stop("Inference result must be a list.", call. = FALSE)
   }
@@ -132,7 +149,7 @@ validate_inference_result <- function(x) {
   # --------------------------------------------------
   # Required fields
   # --------------------------------------------------
-  required <- c("psi_ll_df", "estimate_df", "estimate_table")
+  required <- c("estimate_df", "estimate_table")
 
   missing <- setdiff(required, names(x))
   if (length(missing)) {
@@ -146,10 +163,6 @@ validate_inference_result <- function(x) {
   # --------------------------------------------------
   # Type checks
   # --------------------------------------------------
-  if (!.is_df(x$psi_ll_df)) {
-    stop("psi_ll_df must be a data.frame.", call. = FALSE)
-  }
-
   if (!.is_df(x$estimate_df)) {
     stop("estimate_df must be a data.frame.", call. = FALSE)
   }
@@ -161,8 +174,10 @@ validate_inference_result <- function(x) {
     )
   }
 
-  if (!is.null(x$pseudolikelihood_curve) &&
-      !.is_plot(x$pseudolikelihood_curve)) {
+  if (
+    !is.null(x$pseudolikelihood_curve) &&
+      !.is_plot(x$pseudolikelihood_curve)
+  ) {
     stop(
       "pseudolikelihood_curve must be a ggplot object if present.",
       call. = FALSE
@@ -177,7 +192,6 @@ validate_inference_result <- function(x) {
 # ======================================================================
 
 validate_comparison_result <- function(x) {
-
   if (!is.list(x)) {
     stop("Comparison result must be a list.", call. = FALSE)
   }
@@ -198,12 +212,12 @@ validate_comparison_result <- function(x) {
   # Validate table contents
   # --------------------------------------------------
   for (nm in names(x$tables)) {
-
     obj <- x$tables[[nm]]
 
     if (!.is_df(obj) && !.is_table(obj)) {
       stop(
-        "tables[['", nm,
+        "tables[['",
+        nm,
         "']] must be a data.frame or HTML table.",
         call. = FALSE
       )
@@ -213,10 +227,14 @@ validate_comparison_result <- function(x) {
   # --------------------------------------------------
   # Plot validation
   # --------------------------------------------------
-  if (!is.null(x$pseudolikelihood_curves) && !.is_plot(x$pseudolikelihood_curves)) {
-    stop("pseudolikelihood_curves must be a ggplot object if present.", call. = FALSE)
+  if (
+    !is.null(x$pseudolikelihood_curves) && !.is_plot(x$pseudolikelihood_curves)
+  ) {
+    stop(
+      "pseudolikelihood_curves must be a ggplot object if present.",
+      call. = FALSE
+    )
   }
 
   invisible(TRUE)
 }
-

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot-style.R
 \name{plot_point_cloud_alpha}
 \alias{plot_point_cloud_alpha}
-\title{Get point cloud alpha}
+\title{Point cloud alpha}
 \usage{
 plot_point_cloud_alpha()
 }
@@ -10,5 +10,5 @@ plot_point_cloud_alpha()
 Numeric alpha
 }
 \description{
-Get point cloud alpha
+Point cloud alpha
 }

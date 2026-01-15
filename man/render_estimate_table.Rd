@@ -15,3 +15,4 @@ A kableExtra object.
 \description{
 Render combined estimate table
 }
+\keyword{internal}

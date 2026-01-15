@@ -42,3 +42,4 @@ multiple confidence levels.
 The returned table includes interval endpoints, lengths, deviations
 from the MLE, and optional truth coverage diagnostics.
 }
+\keyword{internal}

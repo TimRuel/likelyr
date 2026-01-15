@@ -31,10 +31,9 @@
 #'
 #' @keywords internal
 find_interval_endpoint <- function(zero_max_psi_ll_fn, crit, search_range) {
-
   tryCatch(
     stats::uniroot(
-      f        = function(psi) zero_max_psi_ll_fn(psi) + crit,
+      f = function(psi) zero_max_psi_ll_fn(psi) + crit,
       interval = search_range
     )$root,
     error = function(e) NA_real_
@@ -62,7 +61,6 @@ find_interval_endpoint <- function(zero_max_psi_ll_fn, crit, search_range) {
 #'
 #' @keywords internal
 expand_psi_bounds <- function(psi_grid, point_estimate, expand_factor) {
-
   psi_min0 <- min(psi_grid)
   psi_max0 <- max(psi_grid)
 
@@ -120,14 +118,13 @@ shift_psi_ll_fn <- function(psi_ll_fn, shift_val) {
 #'
 #' @keywords internal
 estimate_interval <- function(
-    point_estimate,
-    zero_max_psi_ll_fn,
-    psi_grid,
-    alpha,
-    expand_factor
+  point_estimate,
+  zero_max_psi_ll_fn,
+  psi_grid,
+  alpha,
+  expand_factor
 ) {
-
-  crit   <- 0.5 * stats::qchisq(1 - alpha, df = 1)
+  crit <- 0.5 * stats::qchisq(1 - alpha, df = 1)
   bounds <- expand_psi_bounds(psi_grid, point_estimate, expand_factor)
 
   lower <- find_interval_endpoint(
@@ -170,11 +167,10 @@ estimate_interval <- function(
 #'
 #' @keywords internal
 add_interval_diagnostics <- function(
-    interval_estimate_df,
-    point_estimate,
-    psi_0 = NA_real_
+  interval_estimate_df,
+  point_estimate,
+  psi_0 = NA_real_
 ) {
-
   interval_estimate_df <- interval_estimate_df |>
     dplyr::mutate(
       Length = dplyr::if_else(
@@ -197,14 +193,13 @@ add_interval_diagnostics <- function(
 
       contains_truth = dplyr::case_when(
         is.na(psi_0) ~ NA,
-        TRUE ~ (!is.na(lower) & !is.na(upper) &
-                  lower <= psi_0 & upper >= psi_0)
+        TRUE ~ (!is.na(lower) & !is.na(upper) & lower <= psi_0 & upper >= psi_0)
       ),
 
       Status = dplyr::case_when(
         is.na(contains_truth) ~ NA_character_,
-        contains_truth        ~ "✅",
-        TRUE                  ~ "❌"
+        contains_truth ~ "✅",
+        TRUE ~ "❌"
       )
     )
 
@@ -237,7 +232,6 @@ add_interval_diagnostics <- function(
 #'
 #' @keywords internal
 format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
-
   formatted_df <- interval_estimate_df |>
     dplyr::mutate(
       Level = scales::percent(1 - alpha),
@@ -270,7 +264,7 @@ format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
 }
 
 # ----------------------------------------------------------------------
-# Public API
+# Internal: Compute confidence intervals
 # ----------------------------------------------------------------------
 
 #' Compute Confidence Intervals for a Scalar Parameter Psi
@@ -298,27 +292,28 @@ format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
 #' A formatted data frame containing confidence interval summaries for
 #' each confidence level.
 #'
-#' @export
+#' @keywords internal
 get_interval_estimate_df <- function(
-    point_estimate,
-    zero_max_psi_ll_fn,
-    psi_ll_df,
-    alpha_levels,
-    expand_factor,
-    psi_0 = NA_real_
+  point_estimate,
+  zero_max_psi_ll_fn,
+  psi_ll_df,
+  alpha_levels,
+  expand_factor,
+  psi_0 = NA_real_
 ) {
-
   psi_grid <- psi_ll_df$psi
 
   alpha_levels |>
     purrr::map_dfr(
-      \(alpha) estimate_interval(
-        point_estimate     = point_estimate,
-        zero_max_psi_ll_fn = zero_max_psi_ll_fn,
-        psi_grid           = psi_grid,
-        alpha              = alpha,
-        expand_factor      = expand_factor
-      )
+      \(alpha) {
+        estimate_interval(
+          point_estimate = point_estimate,
+          zero_max_psi_ll_fn = zero_max_psi_ll_fn,
+          psi_grid = psi_grid,
+          alpha = alpha,
+          expand_factor = expand_factor
+        )
+      }
     ) |>
     add_interval_diagnostics(point_estimate, psi_0) |>
     format_interval_estimate_df()

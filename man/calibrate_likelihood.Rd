@@ -13,8 +13,9 @@ calibrate_likelihood(likelihood, data)
 }
 \value{
 The SAME likelihood_spec object, enriched with:
-• $loglik — a closure(theta) that captures \code{data}
+• $loglik — a closure(param) that captures \code{data}
 }
 \description{
 Binds data to the likelihood's log-likelihood closure.
 }
+\keyword{internal}

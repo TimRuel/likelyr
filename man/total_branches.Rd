@@ -9,3 +9,4 @@ total_branches(x)
 \description{
 Total Number of Monte Carlo Branches
 }
+\keyword{internal}

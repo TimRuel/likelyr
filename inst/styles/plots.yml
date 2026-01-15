@@ -6,21 +6,24 @@
 # Likelihood curve styling
 # --------------------------------------------------
 curve:
-  colors:
-    integrate: "#052880"
-    profile:    "#052880"
-
   linetype: solid
   linewidth: 1.5
 
-  comparison:
-    linetype:
-      integrate: solid
-      profile:    "22"
-    colors:
-      integrate: "#052880"
-      profile:    "#A7B0C0"
+  by_method:
+    integrate:
+      color: "#052880"
+      linetype: solid
+    profile:
+      color: "#052880"
+      linetype: solid
 
+  comparison:
+    integrate:
+      color: "#052880"
+      linetype: solid
+    profile:
+      color: "#941703"
+      linetype: "22"
 
 # --------------------------------------------------
 # Point cloud styling
@@ -30,57 +33,51 @@ points:
     size:  3
     alpha: 0.7
 
-
 # --------------------------------------------------
-# Point estimate styling
+# Point estimate marker styling
 # --------------------------------------------------
 point_estimate:
-  colors:
-    integrate: "#941703"
-    profile:    "#941703"
-
-  size: 3
+  color: "#941703"
+  linewidth: 1.5
   linetype: solid
 
   comparison:
-    linetype:
-      integrate: solid
-      profile:    "22"
-    colors:
-      integrate: "#941703"
-      profile:    "#A7B0C0"
-
+    integrate:
+      color: "#052880"
+      linetype: solid
+      linewidth: 1.5
+    profile:
+      color: "#941703"
+      linetype: solid
+      linewidth: 1.5
 
 # --------------------------------------------------
-# Truth marker styling
+# Truth marker styling (KOKIRI FOREST GREEN)
 # --------------------------------------------------
 truth:
-  color:  "#C4A806"
-  shape:  4
-  size:   3
-  stroke: 1.2
-
+  color:     "#3A8F4E"   # deep forest green
+  linetype:  solid
+  linewidth: 1.5
 
 # --------------------------------------------------
-# Interval estimate styling
+# Interval estimate styling (TRIFORCE GOLD)
 # --------------------------------------------------
 interval_estimate:
   description: >
-    Sequential HCL palette for likelihood-ratio confidence interval
-    endpoints. Designed to stay readable on dark backgrounds.
+    Triforce-inspired golden HCL palette for likelihood-ratio
+    confidence interval endpoints. Warm, luminous yellow tones.
 
   generator: sequential_hcl
   params:
-    h: 150
-    c: [35, 65]
-    l: [92, 40]
-    power: 1.1
+    h: 85          # golden yellow hue
+    c: [30, 75]    # soft -> vivid gold
+    l: [96, 45]    # glow -> deep gold
+    power: 1.05
   name_from: Level
 
   line:
     linetype: dashed
     linewidth: 1
-
 
 # --------------------------------------------------
 # Reference lines
@@ -90,7 +87,6 @@ reference_lines:
     linetype: dashed
     linewidth: 0.8
     color: "black"
-
 
 # --------------------------------------------------
 # Base ggplot theme (global defaults)
@@ -158,13 +154,9 @@ theme:
 
   # --------------------------------------------------
   # Plot-specific text overrides
-  # (used by plot_base(plot = "..."))
   # --------------------------------------------------
   plots:
 
-    # -------------------------------
-    # Diagnostic plots
-    # -------------------------------
     omega_branches:
       plot:
         title:
@@ -201,10 +193,6 @@ theme:
         text:
           size: 9
 
-
-    # -------------------------------
-    # Point cloud plots
-    # -------------------------------
     points:
       plot:
         title:
@@ -220,10 +208,6 @@ theme:
         title:
           size: 20
 
-
-    # -------------------------------
-    # Single-likelihood curve
-    # -------------------------------
     single_curve:
       plot:
         title:
@@ -239,10 +223,6 @@ theme:
         title:
           size: 20
 
-
-    # -------------------------------
-    # Comparison plot
-    # -------------------------------
     comparison:
       plot:
         title:
@@ -257,7 +237,6 @@ theme:
           size: 18
         title:
           size: 20
-
 
 # --------------------------------------------------
 # Diagnostics plot styling
@@ -275,7 +254,6 @@ diagnostics:
       size: 2.5
       alpha: 0.8
       shape: 16
-
 
   by_method:
 
@@ -296,7 +274,6 @@ diagnostics:
         color: "#A7B0C0"
         size: 2.5
 
-
   plots:
 
     omega_branches:
@@ -313,30 +290,25 @@ diagnostics:
         name: "viridis"
         direction: 1
 
-
     ess:
       line:
         linewidth: 1.6
       point:
         size: 3
 
-
     rel_se:
       line:
         linetype: dashed
 
-
     outliers:
       point:
         color: "#E06C75"
-
 
     omega_eigen:
       line:
         linewidth: 1.1
       point:
         shape: 17
-
 
     omega_pca:
       point:

@@ -9,17 +9,17 @@ calibrate_parameter(parameter, likelihood, data)
 \arguments{
 \item{parameter}{A \code{parameter_spec} object.}
 
-\item{likelihood}{A \code{likelihood_spec} object (provides theta_mle_fn).}
+\item{likelihood}{A \code{likelihood_spec} object (provides param_mle_fn).}
 
 \item{data}{The user data passed to calibrate().}
 }
 \value{
 The SAME parameter_spec object with added field:
-• \verb{$theta_mle}
+• \verb{$param_mle}
 }
 \description{
 Computes the analytic MLE for θ using the likelihood's
-\code{theta_mle_fn(data)} and stores it inside the parameter_spec.
+\code{param_mle_fn(data)} and stores it inside the parameter_spec.
 
 This function is called internally by \code{calibrate()}.
 }

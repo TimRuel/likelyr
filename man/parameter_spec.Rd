@@ -5,10 +5,10 @@
 \title{Specify the Parameter Space for a Likelihood Model}
 \usage{
 parameter_spec(
-  theta_0 = NULL,
-  theta_dim = NULL,
-  theta_lower = NULL,
-  theta_upper = NULL,
+  param_0 = NULL,
+  param_dim = NULL,
+  param_lower = NULL,
+  param_upper = NULL,
   ineq = NULL,
   ineq_jac = NULL,
   name = NULL,
@@ -16,17 +16,17 @@ parameter_spec(
 )
 }
 \arguments{
-\item{theta_0}{Optional numeric vector giving the true θ.}
+\item{param_0}{Optional numeric vector OR 1-column matrix giving true parameters.}
 
-\item{theta_dim}{Optional integer giving the parameter dimension.}
+\item{param_dim}{Optional integer giving the parameter dimension.}
 
-\item{theta_lower}{Optional numeric scalar or vector of lower bounds.}
+\item{param_lower}{Optional numeric scalar or vector of lower bounds.}
 
-\item{theta_upper}{Optional numeric scalar or vector of upper bounds.}
+\item{param_upper}{Optional numeric scalar or vector of upper bounds.}
 
-\item{ineq}{Optional function(theta) → numeric vector ≤ 0.}
+\item{ineq}{Optional function(param) → numeric vector ≤ 0.}
 
-\item{ineq_jac}{Optional Jacobian function(theta) → matrix.}
+\item{ineq_jac}{Optional Jacobian function(param) → matrix.}
 
 \item{name}{Optional descriptive name.}
 
@@ -36,12 +36,12 @@ parameter_spec(
 A \code{parameter_spec} object.
 }
 \description{
-Defines the parameter space for θ, including:
+Defines the parameter space, including:
 
-• dimension of θ
-• optional true value θ₀
-• box constraints (θ_lower, θ_upper)
-• inequality constraints h(θ) ≤ 0 and Jacobian
+• dimension
+• optional true value
+• box constraints (lower, upper)
+• inequality constraints h(param) ≤ 0 and Jacobian
 
-Exactly one of \code{theta_0} or \code{theta_dim} must be supplied.
+Exactly one of \code{param_0} or \code{param_dim} must be supplied.
 }

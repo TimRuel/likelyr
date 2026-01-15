@@ -25,7 +25,7 @@ walk_profile_side(
 
 \item{init_guess}{θ̂ at ψ̂, used as the initial warm-start.}
 
-\item{eval_psi_fun}{Function(psi, theta_init) → list(theta_hat, branch_val).}
+\item{eval_psi_fun}{Function(psi, param_init) → list(param_hat, branch_val).}
 
 \item{max_retries}{Integer jitter retry budget for monotonicity enforcement.}
 }

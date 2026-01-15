@@ -39,14 +39,14 @@ diagnose.default <- function(cal, ...) {
 
 #' @export
 diagnose.calibrated <- function(cal, verbose = FALSE) {
-  validate_diagnose_input(cal)
+  which <- validate_diagnose_input(cal)
 
-  for (name in names(cal$workspace)) {
+  for (name in which) {
     res <- cal$workspace[[name]]
 
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
     # Run diagnostics engine (type-dispatched)
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
 
     if (is_integrate(res)) {
       diag_raw <- diagnose_integrate(res)
@@ -61,9 +61,9 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
       )
     }
 
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
     # Attach and mark result
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
 
     res$diagnostics <- new_diagnostics_result(diag_raw)
     cal$workspace[[name]] <- mark_diagnosed(res)
@@ -81,6 +81,30 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
 # Validation
 # ================================================================================
 
+#' Validate inputs prior to running diagnostics
+#'
+#' @description
+#' Checks that a calibrated model object is in a valid state for
+#' diagnostics and determines which results should be diagnosed.
+#'
+#' Specifically, this function:
+#' \itemize{
+#'   \item Verifies that the model has been calibrated
+#'   \item Ensures that at least one pseudolikelihood result is present
+#'   \item Silently drops any comparison results from the diagnostic set
+#' }
+#'
+#' Comparison objects are excluded automatically, since diagnostics
+#' are only defined for individual likelihood results (profile or
+#' integrated).
+#'
+#' @param cal A calibrated model object.
+#'
+#' @return A character vector of workspace result names eligible for
+#'   diagnostics (comparison results removed). Returned invisibly.
+#'
+#' @keywords internal
+#' @noRd
 validate_diagnose_input <- function(cal) {
   if (!is_calibrated(cal)) {
     stop("diagnose() requires a calibrated model.", call. = FALSE)
@@ -94,7 +118,21 @@ validate_diagnose_input <- function(cal) {
     )
   }
 
-  invisible(TRUE)
+  available <- names(cal$workspace)
+
+  # --------------------------------------------------
+  # Drop comparison results silently
+  # --------------------------------------------------
+
+  which <- available[
+    !vapply(
+      cal$workspace,
+      is_comparison,
+      logical(1)
+    )
+  ]
+
+  invisible(which)
 }
 
 # ================================================================================

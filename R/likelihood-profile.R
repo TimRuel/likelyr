@@ -72,7 +72,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   estimand <- cal$estimand
   psi_mle <- estimand$psi_mle
   psi_fn <- estimand$psi_fn
-  theta_mle <- cal$parameter$theta_mle
+  param_mle <- cal$parameter$param_mle
   loglik_fn <- cal$likelihood$loglik
 
   # ------------------------------------------------------------------
@@ -85,7 +85,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 3. Compute branch cutoff from confidence levels
   # ------------------------------------------------------------------
-  loglik_at_mle <- loglik_fn(theta_mle)
+  loglik_at_mle <- loglik_fn(param_mle)
 
   alpha_target <- min(1 - estimand$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
@@ -96,7 +96,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   cutoff <- loglik_at_mle - effective_crit
 
   # Build ψ→loglik evaluator at θ̂
-  eval_psi_fun <- build_eval_psi_fun(cal)(theta_mle)
+  eval_psi_fun <- build_eval_psi_fun(cal)(param_mle)
 
   # ------------------------------------------------------------------
   # 4. Construct branch grid and walk it
@@ -109,7 +109,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   psi_ll_df <- tryCatch(
     generate_profile(
       psi_mle = psi_mle,
-      theta_mle = theta_mle,
+      param_mle = param_mle,
       loglik_at_mle = loglik_at_mle,
       increment = increment,
       cutoff = cutoff,
@@ -137,7 +137,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   profile_result <- new_profile_result(list(
     psi_ll_df = psi_ll_df,
     psi_mle = psi_mle,
-    theta_mle = theta_mle,
+    param_mle = param_mle,
     status = if (!is.null(psi_ll_df)) "success" else "failed",
     pseudolikelihood_points = pseudolikelihood_points
   ))
@@ -160,11 +160,30 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 # VALIDATION
 # ======================================================================
 
-# Profile log-likelihood requires:
-#   • likelihood spec
-#   • estimand spec
-#   • nuisance spec
-# but NOT optimizer or execution specs.
+#' Validate inputs prior to profile likelihood computation
+#'
+#' @description
+#' Checks that a model object contains all required structural
+#' components needed to compute a profile log-likelihood.
+#'
+#' Profile likelihood requires:
+#' \itemize{
+#'   \item \code{parameter_spec()}
+#'   \item \code{likelihood_spec()}
+#'   \item \code{estimand_spec()}
+#'   \item \code{nuisance_spec()}
+#' }
+#'
+#' Optimizer and execution specifications are *not* required for
+#' profile likelihood and are therefore not validated here.
+#'
+#' @param cal A model object intended for profile likelihood
+#'   computation.
+#'
+#' @return Invisibly returns \code{cal} if validation succeeds.
+#'
+#' @keywords internal
+#' @noRd
 validate_profile_input <- function(cal) {
   if (!inherits(cal$parameter, "parameter_spec")) {
     stop("model$parameter must be a 'parameter_spec' object.")
@@ -226,10 +245,10 @@ print.profile <- function(x, ...) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
   }
 
-  if (!is.null(x$theta_mle)) {
+  if (!is.null(x$param_mle)) {
     cat(
-      "theta_MLE: (",
-      paste(format(x$theta_mle), collapse = ", "),
+      "param_MLE: (",
+      paste(format(x$param_mle), collapse = ", "),
       ")\n",
       sep = ""
     )

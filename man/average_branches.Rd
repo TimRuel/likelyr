@@ -27,3 +27,4 @@ log L̂(ψ_k) = log( (1/R) Σ exp(ℓ_{k,r}) )
 Diagnostics (ESS, MC variance, outlier rate, etc.) are computed in a
 separate function and attached as an attribute: \code{attr(out, "diagnostics")}.
 }
+\keyword{internal}

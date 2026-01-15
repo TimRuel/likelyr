@@ -32,7 +32,6 @@ calibrate.default <- function(model, data, verbose = FALSE) {
 
 #' @export
 calibrate.model_spec <- function(model, data, verbose = FALSE) {
-
   # -------------------------------------------------------------------
   # 1. Validate structural model specification before calibration
   # -------------------------------------------------------------------
@@ -46,26 +45,26 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # -------------------------------------------------------------------
 
   model$parameter <- calibrate_parameter(
-    parameter  = model$parameter,
+    parameter = model$parameter,
     likelihood = model$likelihood,
-    data       = data
+    data = data
   )
 
   model$likelihood <- calibrate_likelihood(
     likelihood = model$likelihood,
-    data       = data
+    data = data
   )
 
   model$estimand <- calibrate_estimand(
-    estimand   = model$estimand,
-    data       = data,
-    theta_mle  = model$parameter$theta_mle,
-    theta_0    = model$parameter$theta_0
+    estimand = model$estimand,
+    data = data,
+    param_mle = model$parameter$param_mle,
+    param_0 = model$parameter$param_0
   )
 
   model$nuisance <- calibrate_nuisance(
     nuisance = model$nuisance,
-    data     = data
+    data = data
   )
 
   if (!is.null(model$execution)) {
@@ -85,7 +84,9 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # -------------------------------------------------------------------
   # 5. Optional console output
   # -------------------------------------------------------------------
-  if (verbose) print(cal)
+  if (verbose) {
+    print(cal)
+  }
 
   cal
 }
@@ -94,31 +95,57 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 # INTERNAL VALIDATION
 # ======================================================================
 
-# Structural components that must be present before calibration:
-#   • parameter_spec()
-#   • likelihood_spec()
-#   • estimand_spec()
-#   • nuisance_spec()
-#
-# optimizer_spec() and execution_spec() are NOT required here,
-# and will be validated later by integrate() or profile().
+#' Validate structural components prior to calibration
+#'
+#' @description
+#' Ensures that a model object contains all required structural
+#' components before calibration is attempted. Specifically, this
+#' checks for:
+#' \itemize{
+#'   \item \code{parameter_spec()}
+#'   \item \code{likelihood_spec()}
+#'   \item \code{estimand_spec()}
+#'   \item \code{nuisance_spec()}
+#' }
+#'
+#' Optimizer and execution specifications are *not* required at this
+#' stage and are validated later by \code{integrate()} or
+#' \code{profile()}.
+#'
+#' @param model A model specification object to validate.
+#'
+#' @return Invisibly returns the validated \code{model} object.
+#'
+#' @keywords internal
+#' @noRd
 validate_calibrate_input <- function(model) {
+  if (!inherits(model$parameter, "parameter_spec")) {
+    stop(
+      "model$parameter must be a parameter_spec() before calibration.",
+      call. = FALSE
+    )
+  }
 
-  if (!inherits(model$parameter, "parameter_spec"))
-    stop("model$parameter must be a parameter_spec() before calibration.",
-         call. = FALSE)
+  if (!inherits(model$likelihood, "likelihood_spec")) {
+    stop(
+      "model$likelihood must be a likelihood_spec() before calibration.",
+      call. = FALSE
+    )
+  }
 
-  if (!inherits(model$likelihood, "likelihood_spec"))
-    stop("model$likelihood must be a likelihood_spec() before calibration.",
-         call. = FALSE)
+  if (!inherits(model$estimand, "estimand_spec")) {
+    stop(
+      "model$estimand must be an estimand_spec() before calibration.",
+      call. = FALSE
+    )
+  }
 
-  if (!inherits(model$estimand, "estimand_spec"))
-    stop("model$estimand must be an estimand_spec() before calibration.",
-         call. = FALSE)
-
-  if (!inherits(model$nuisance, "nuisance_spec"))
-    stop("model$nuisance must be a nuisance_spec() before calibration.",
-         call. = FALSE)
+  if (!inherits(model$nuisance, "nuisance_spec")) {
+    stop(
+      "model$nuisance must be a nuisance_spec() before calibration.",
+      call. = FALSE
+    )
+  }
 
   invisible(model)
 }
@@ -129,24 +156,59 @@ validate_calibrate_input <- function(model) {
 
 #' @export
 print.calibrated <- function(x, ...) {
+  param_mle <- x$parameter$param_mle
+  psi_mle <- x$estimand$psi_mle
 
-  theta_mle <- x$parameter$theta_mle
-  psi_mle   <- x$estimand$psi_mle
+  cat("# Calibrated Model (likelyr)\n\n")
 
-  cat("# Calibrated Model (likelyr)\n")
+  # --------------------------------------------------
+  # Full parameter MLE
+  # --------------------------------------------------
+  if (!is.null(param_mle)) {
+    if (is.matrix(param_mle)) {
+      cat("- Full Model Parameter MLE:\n")
 
-  # core calibrated quantities
-  if (!is.null(theta_mle)) {
-    cat("- θ̂:           (", paste(format(theta_mle), collapse = ", "), ")\n", sep = "")
+      mat <- param_mle
+      if (is.null(rownames(mat))) {
+        rownames(mat) <- seq_len(nrow(mat))
+      }
+      if (is.null(colnames(mat))) {
+        colnames(mat) <- seq_len(ncol(mat))
+      }
+
+      pretty <- capture.output(
+        print(format(mat), quote = FALSE)
+      )
+
+      cat(paste0("    ", pretty), sep = "\n")
+      cat("\n")
+    } else {
+      cat(
+        "- Full Model Parameter MLE:   (",
+        paste(format(param_mle), collapse = ", "),
+        ")\n",
+        sep = ""
+      )
+    }
   } else {
-    cat("- θ̂:           <not available>\n")
+    cat("- Full Model Parameter MLE:   <not available>\n")
   }
 
-  cat("- ψ̂:            ", format(psi_mle), "\n", sep = "")
+  # --------------------------------------------------
+  # Psi MLE
+  # --------------------------------------------------
+  cat(
+    "- Parameter of Interest MLE: ",
+    format(psi_mle),
+    "\n",
+    sep = ""
+  )
 
-  # state markers
+  # --------------------------------------------------
+  # State markers
+  # --------------------------------------------------
   cat("- integrated:   ", if (is_integrated(x)) "✓" else "×", "\n", sep = "")
-  cat("- profiled:     ", if (is_profiled(x))   "✓" else "×", "\n", sep = "")
+  cat("- profiled:     ", if (is_profiled(x)) "✓" else "×", "\n", sep = "")
 
   invisible(x)
 }

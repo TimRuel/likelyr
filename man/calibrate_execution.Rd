@@ -18,3 +18,4 @@ Execution specifications (serial or parallel) do not depend on data.
 Calibration simply computes the number of Monte Carlo branches implied
 by the execution mode and stores it as \verb{$total_branches}.
 }
+\keyword{internal}

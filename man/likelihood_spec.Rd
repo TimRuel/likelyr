@@ -4,12 +4,12 @@
 \alias{likelihood_spec}
 \title{Specify a Parametric Likelihood Model}
 \usage{
-likelihood_spec(loglik, theta_mle_fn, name = NULL, ...)
+likelihood_spec(loglik, param_mle_fn, name = NULL, ...)
 }
 \arguments{
-\item{loglik}{Function(theta, data) → log-likelihood.}
+\item{loglik}{Function(param, data) → log-likelihood.}
 
-\item{theta_mle_fn}{Function(data) → initial θ̂.}
+\item{param_mle_fn}{Function(data) → initial mle.}
 
 \item{name}{Optional descriptive name.}
 
@@ -21,8 +21,8 @@ A \code{likelihood_spec} object.
 \description{
 Defines the \emph{likelihood component} of the model:
 
-• loglik(theta, data)  — the log-likelihood function
-• theta_mle_fn(data)   — analytic initializer for θ̂
+• loglik(param, data)  — the log-likelihood function
+• param_mle_fn(data)   — analytic initializer for mle of model parameter
 
 All parameter–space structure (dimension, bounds, true value,
 inequality constraints) must now be supplied via \code{parameter_spec()}.

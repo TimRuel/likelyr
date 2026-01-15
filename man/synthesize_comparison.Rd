@@ -74,3 +74,4 @@ Other inference-renderers:
 \code{\link{render_point_estimates_comparison_table}()}
 }
 \concept{inference-renderers}
+\keyword{internal}

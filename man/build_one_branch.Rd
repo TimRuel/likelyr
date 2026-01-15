@@ -6,7 +6,7 @@
 \usage{
 build_one_branch(
   psi_hat_branch,
-  theta_hat_branch,
+  param_hat_branch,
   branch_cutoff,
   grid,
   eval_psi_fun,
@@ -16,7 +16,7 @@ build_one_branch(
 \arguments{
 \item{psi_hat_branch}{Numeric scalar. Branch mode ψ̂ for this ω̂ draw.}
 
-\item{theta_hat_branch}{Numeric vector. θ̂ at ψ̂_branch.}
+\item{param_hat_branch}{Numeric vector. θ̂ at ψ̂_branch.}
 
 \item{branch_cutoff}{Numeric scalar. Log-likelihood cutoff for stopping.}
 
@@ -28,7 +28,7 @@ Must contain components:
 }}
 
 \item{eval_psi_fun}{Function of the form
-\code{eval_psi_fun(psi_value, theta_init) -> list(theta_hat, branch_val)}
+\code{eval_psi_fun(psi_value, param_init) -> list(param_hat, branch_val)}
 used to locally maximize the log-likelihood at fixed ψ.}
 
 \item{max_retries}{Integer. Maximum number of jitter retries for

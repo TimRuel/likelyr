@@ -4,26 +4,27 @@
 \alias{calibrate_estimand}
 \title{Calibrate Estimand Component}
 \usage{
-calibrate_estimand(estimand, data, theta_mle, theta_0 = NULL)
+calibrate_estimand(estimand, data, param_mle, param_0 = NULL)
 }
 \arguments{
 \item{estimand}{An estimand_spec object.}
 
 \item{data}{User data.}
 
-\item{theta_mle}{Numeric vector; MLE of theta.}
+\item{param_mle}{Numeric vector; MLE of param.}
 
-\item{theta_0}{Optional numeric vector; true parameter value.}
+\item{param_0}{Optional numeric vector; true parameter value.}
 }
 \value{
 The same estimand_spec object, enriched with:
 • psi_fn (data-bound)
 • psi_jac (data-bound if present)
 • psi_mle
-• psi_0 (if theta_0 supplied)
+• psi_0 (if param_0 supplied)
 • search_interval
 }
 \description{
 Binds data into psi_fn(), computes psi_MLE and (optionally) psi_0,
 and evaluates the search interval.
 }
+\keyword{internal}

@@ -19,3 +19,4 @@ The SAME nuisance_spec object, with:
 \description{
 Calibrate Nuisance Component
 }
+\keyword{internal}

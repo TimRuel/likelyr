@@ -2,14 +2,35 @@
 # Internal type predicates
 # ----------------------------------------------------------------------
 
+#' Check if object is a data.frame
+#'
+#' @param x Object to test.
+#' @return Logical scalar.
+#' @keywords internal
+#' @noRd
 .is_df <- function(x) {
   is.data.frame(x)
 }
 
+#' Check if object is a ggplot
+#'
+#' @param x Object to test.
+#' @return Logical scalar.
+#' @keywords internal
+#' @noRd
 .is_plot <- function(x) {
   inherits(x, "ggplot")
 }
 
+#' Check if object is an HTML table
+#'
+#' @description
+#' Supports both \code{knitr_kable} and \code{gt_tbl} objects.
+#'
+#' @param x Object to test.
+#' @return Logical scalar.
+#' @keywords internal
+#' @noRd
 .is_table <- function(x) {
   inherits(x, "knitr_kable") || inherits(x, "gt_tbl")
 }
@@ -18,6 +39,17 @@
 # Validator: integrate
 # ======================================================================
 
+#' Validate integrated likelihood result
+#'
+#' @description
+#' Performs structural and type validation on an integrated
+#' log-likelihood result object.
+#'
+#' @param x Result object to validate.
+#' @return Invisibly returns \code{TRUE} on success.
+#'
+#' @keywords internal
+#' @noRd
 validate_integrate_result <- function(x) {
   if (!is.list(x)) {
     stop("Integrated log-likelihood result must be a list.", call. = FALSE)
@@ -60,12 +92,23 @@ validate_integrate_result <- function(x) {
 # Validator: profile
 # ======================================================================
 
+#' Validate profile likelihood result
+#'
+#' @description
+#' Performs structural and type validation on a profile
+#' log-likelihood result object.
+#'
+#' @param x Result object to validate.
+#' @return Invisibly returns \code{TRUE} on success.
+#'
+#' @keywords internal
+#' @noRd
 validate_profile_result <- function(x) {
   if (!is.list(x)) {
     stop("Profile log-likelihood result must be a list.", call. = FALSE)
   }
 
-  required <- c("psi_ll_df", "psi_mle", "theta_mle", "status")
+  required <- c("psi_ll_df", "psi_mle", "param_mle", "status")
 
   missing <- setdiff(required, names(x))
   if (length(missing)) {
@@ -84,8 +127,8 @@ validate_profile_result <- function(x) {
     stop("psi_mle must be numeric.", call. = FALSE)
   }
 
-  if (!is.numeric(x$theta_mle)) {
-    stop("theta_mle must be numeric.", call. = FALSE)
+  if (!is.numeric(x$param_mle)) {
+    stop("param_mle must be numeric.", call. = FALSE)
   }
 
   if (!x$status %in% c("success", "failed")) {
@@ -96,7 +139,7 @@ validate_profile_result <- function(x) {
     !is.null(x$profile_plot) &&
       !inherits(x$profile_plot, "ggplot")
   ) {
-    stop("pseudolikelihood_points must be a ggplot if present.", call. = FALSE)
+    stop("profile_plot must be a ggplot if present.", call. = FALSE)
   }
 
   invisible(TRUE)
@@ -106,6 +149,13 @@ validate_profile_result <- function(x) {
 # Validator: diagnostics
 # ----------------------------------------------------------------------
 
+#' Validate diagnostics result
+#'
+#' @param x Result object to validate.
+#' @return Invisibly returns \code{TRUE} on success.
+#'
+#' @keywords internal
+#' @noRd
 validate_diagnostics_result <- function(x) {
   if (!is.list(x)) {
     stop("Diagnostics result must be a list.", call. = FALSE)
@@ -141,6 +191,13 @@ validate_diagnostics_result <- function(x) {
 # Validator: inference
 # ======================================================================
 
+#' Validate inference result
+#'
+#' @param x Result object to validate.
+#' @return Invisibly returns \code{TRUE} on success.
+#'
+#' @keywords internal
+#' @noRd
 validate_inference_result <- function(x) {
   if (!is.list(x)) {
     stop("Inference result must be a list.", call. = FALSE)
@@ -191,6 +248,13 @@ validate_inference_result <- function(x) {
 # Validator: comparison
 # ======================================================================
 
+#' Validate comparison result
+#'
+#' @param x Result object to validate.
+#' @return Invisibly returns \code{TRUE} on success.
+#'
+#' @keywords internal
+#' @noRd
 validate_comparison_result <- function(x) {
   if (!is.list(x)) {
     stop("Comparison result must be a list.", call. = FALSE)
@@ -228,7 +292,8 @@ validate_comparison_result <- function(x) {
   # Plot validation
   # --------------------------------------------------
   if (
-    !is.null(x$pseudolikelihood_curves) && !.is_plot(x$pseudolikelihood_curves)
+    !is.null(x$pseudolikelihood_curves) &&
+      !.is_plot(x$pseudolikelihood_curves)
   ) {
     stop(
       "pseudolikelihood_curves must be a ggplot object if present.",

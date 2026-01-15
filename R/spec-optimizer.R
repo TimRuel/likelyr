@@ -42,21 +42,20 @@
 #'
 #' @export
 optimizer_spec <- function(
-    localsolver = "SLSQP",
-    control     = list(),
-    localtol    = 1e-6,
-    max_retries = 10,
-    name        = NULL,
-    ...
+  localsolver = "SLSQP",
+  control = list(),
+  localtol = 1e-6,
+  max_retries = 10,
+  name = NULL,
+  ...
 ) {
-
   x <- list(
-    name        = name %||% "<optimizer>",
+    name = name %||% "<optimizer>",
     localsolver = localsolver,
-    control     = control,
-    localtol    = localtol,
+    control = control,
+    localtol = localtol,
     max_retries = max_retries,
-    extra       = list(...)
+    extra = list(...)
   )
 
   x <- new_optimizer_spec(x)
@@ -68,34 +67,71 @@ optimizer_spec <- function(
 # INTERNAL VALIDATOR
 # ======================================================================
 
+#' Validate optimizer specification
+#'
+#' @description
+#' Internal validator for \code{optimizer_spec} objects. Ensures that all
+#' required optimizer configuration fields are present and correctly
+#' typed before numerical optimization routines are invoked.
+#'
+#' @details
+#' The following checks are performed:
+#'
+#' \itemize{
+#'   \item \code{localsolver} must be a non-empty character scalar giving
+#'         the local optimizer name.
+#'   \item \code{control} must be a named list of optimizer control
+#'         options (e.g., for \code{nloptr} or \code{auglag}).
+#'   \item \code{localtol} must be a positive numeric scalar specifying
+#'         the local convergence tolerance.
+#'   \item \code{max_retries} must be a non-negative integer giving the
+#'         number of allowed retry attempts.
+#' }
+#'
+#' These checks enforce the contract required for robust and reproducible
+#' numerical optimization within the likelihood workflow.
+#'
+#' @param x A list representing an \code{optimizer_spec} object.
+#'
+#' @return Invisibly returns \code{x} if validation succeeds.
+#'
+#' @keywords internal
+#' @noRd
 .validate_optimizer_spec <- function(x) {
-
   # Local solver ---------------------------------------------------------
-  if (!is.character(x$localsolver) ||
+  if (
+    !is.character(x$localsolver) ||
       length(x$localsolver) != 1 ||
-      !nzchar(x$localsolver)) {
+      !nzchar(x$localsolver)
+  ) {
     stop("localsolver must be a non-empty character scalar.", call. = FALSE)
   }
 
   # Control list ---------------------------------------------------------
   if (!is.list(x$control)) {
-    stop("control must be a named list of nloptr / auglag options.",
-         call. = FALSE)
+    stop(
+      "control must be a named list of nloptr / auglag options.",
+      call. = FALSE
+    )
   }
 
   # Local tolerance ------------------------------------------------------
-  if (!is.numeric(x$localtol) ||
+  if (
+    !is.numeric(x$localtol) ||
       length(x$localtol) != 1 ||
       !is.finite(x$localtol) ||
-      x$localtol <= 0) {
+      x$localtol <= 0
+  ) {
     stop("localtol must be a positive numeric scalar.", call. = FALSE)
   }
 
   # Retry count ----------------------------------------------------------
-  if (!is.numeric(x$max_retries) ||
+  if (
+    !is.numeric(x$max_retries) ||
       length(x$max_retries) != 1 ||
       x$max_retries < 0 ||
-      x$max_retries != as.integer(x$max_retries)) {
+      x$max_retries != as.integer(x$max_retries)
+  ) {
     stop("max_retries must be a non-negative integer.", call. = FALSE)
   }
 
@@ -113,8 +149,15 @@ print.optimizer_spec <- function(x, ...) {
   cat("- Local solver:  ", x$localsolver, "\n", sep = "")
   cat("- Tolerance:     ", x$localtol, "\n", sep = "")
   cat("- Max retries:   ", x$max_retries, "\n", sep = "")
-  cat("- Control list:  ",
-      if (length(x$control) == 0) "<empty>" else paste(names(x$control), collapse = ", "),
-      "\n", sep = "")
+  cat(
+    "- Control list:  ",
+    if (length(x$control) == 0) {
+      "<empty>"
+    } else {
+      paste(names(x$control), collapse = ", ")
+    },
+    "\n",
+    sep = ""
+  )
   invisible(x)
 }

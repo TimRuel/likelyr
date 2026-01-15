@@ -47,6 +47,7 @@
   )
 }
 
+
 #' Apply standard header styling to a kable
 #'
 #' @description
@@ -68,6 +69,7 @@
       bold = TRUE
     )
 }
+
 
 #' Apply row-wise striping using a background vector
 #'
@@ -92,6 +94,7 @@
   )
 }
 
+
 #' Compute background colors by confidence level blocks
 #'
 #' @description
@@ -113,6 +116,7 @@
   )
 }
 
+
 #' Compute background colors by pseudolikelihood
 #'
 #' @description
@@ -127,6 +131,7 @@
 .pe_row_bg <- function(pseudolikelihood) {
   table_pe_row_bg(pseudolikelihood)
 }
+
 
 #' Vertically center table cell contents
 #'
@@ -148,9 +153,28 @@
   )
 }
 
+
 # ------------------------------------------------------------------
 # Internal: render base point-estimate table
 # ------------------------------------------------------------------
+
+#' Render base point-estimate table
+#'
+#' @description
+#' Constructs the core kable object used for point-estimate tables,
+#' applying consistent headers, column styling, and optional row striping.
+#'
+#' @param df Data frame of point estimates.
+#' @param col_names Character vector of column names.
+#' @param header_groups Named vector for grouped headers.
+#' @param caption HTML caption string.
+#' @param stripe_bg Optional background vector for row striping.
+#' @param collapse_truth Logical; collapse truth rows?
+#'
+#' @return A styled `kableExtra` table.
+#'
+#' @keywords internal
+#' @noRd
 .render_point_estimate_base <- function(
   df,
   col_names,
@@ -221,9 +245,33 @@
   tbl
 }
 
+
 # ------------------------------------------------------------------
 # Internal: render base interval-estimate table
 # ------------------------------------------------------------------
+
+#' Render base interval-estimate table
+#'
+#' @description
+#' Constructs the core kable object used for confidence interval tables,
+#' including diagram columns and optional pseudolikelihood grouping.
+#'
+#' @param df Data frame of interval estimates.
+#' @param col_names Character vector of column names.
+#' @param header_groups Named vector for grouped headers.
+#' @param caption HTML caption string.
+#' @param stripe_bg Background vector for row striping.
+#' @param diagram_x Numeric x positions.
+#' @param diagram_lower Numeric lower bounds.
+#' @param diagram_upper Numeric upper bounds.
+#' @param vline Vertical reference line.
+#' @param include_pl Logical; include pseudolikelihood column?
+#' @param collapse_cols Integer vector of columns to collapse.
+#'
+#' @return A styled `kableExtra` table.
+#'
+#' @keywords internal
+#' @noRd
 .render_interval_estimate_base <- function(
   df,
   col_names,
@@ -314,9 +362,32 @@
   tbl
 }
 
+
 # ------------------------------------------------------------------
 # Internal: render combined estimates base table
 # ------------------------------------------------------------------
+
+#' Render combined estimates base table
+#'
+#' @description
+#' Builds the core kable for combined point and interval estimates,
+#' handling grouped headers, row collapsing, and semantic coloring.
+#'
+#' @param df_render Render-ready data frame.
+#' @param caption HTML caption.
+#' @param header_groups Named vector for grouped headers.
+#' @param header_bg Header background color.
+#' @param header_cols List of column index groups.
+#' @param body_spec_fun Function applying body column specs.
+#' @param stripe_bg Background vector for rows.
+#' @param collapse_cols Columns to collapse.
+#' @param include_pl Logical; include pseudolikelihood?
+#' @param pe_bg Optional PE background vector.
+#'
+#' @return A styled `kableExtra` table.
+#'
+#' @keywords internal
+#' @noRd
 .render_estimates_base <- function(
   df_render,
   caption,

@@ -24,3 +24,4 @@ This generator provides \strong{geometrically diverse} initial guesses by:
 The result is far more uniform exploration of the manifold
 ψ(ω̂) = ψ_MLE before projecting with auglag().
 }
+\keyword{internal}

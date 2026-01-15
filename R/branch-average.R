@@ -21,16 +21,15 @@
 #'
 #' @return tibble(psi, value) with attribute `"diagnostics"`
 #'
-#' @export
+#' @keywords internal
 average_branches <- function(branches) {
-
   # -------------------------------------------------------------
   # 1. Rename "loglik" columns: loglik1, loglik2, ...
   # -------------------------------------------------------------
   renamed <- Map(
     f = function(br, i) dplyr::rename(br, !!paste0("loglik", i) := loglik),
     br = branches,
-    i  = seq_along(branches)
+    i = seq_along(branches)
   )
 
   # -------------------------------------------------------------
@@ -58,12 +57,11 @@ average_branches <- function(branches) {
   log_mean <- matrixStats::rowLogSumExps(branch_mat) - log(R)
 
   psi_ll_df <- tibble::tibble(
-    psi   = psi,
+    psi = psi,
     loglik = as.numeric(log_mean)
   )
 
   attr(psi_ll_df, "type") <- "integrate"
 
-  list(psi_ll_df = psi_ll_df,
-       branch_mat = branch_mat)
+  list(psi_ll_df = psi_ll_df, branch_mat = branch_mat)
 }

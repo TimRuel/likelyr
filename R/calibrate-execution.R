@@ -14,9 +14,8 @@
 #' @return The SAME execution_spec object, enriched with:
 #'         • $total_branches — integer number of MC branches
 #'
-#' @export
+#' @keywords internal
 calibrate_execution <- function(exec) {
-
   stopifnot(inherits(exec, "execution_spec"))
 
   # Compute number of branches implied by execution mode

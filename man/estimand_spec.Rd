@@ -17,9 +17,9 @@ estimand_spec(
 )
 }
 \arguments{
-\item{psi_fn}{Function(theta) → scalar ψ(θ). Required.}
+\item{psi_fn}{Function(param) → scalar ψ(θ). Required.}
 
-\item{psi_jac}{Optional function(theta) → gradient ∇ψ(θ).}
+\item{psi_jac}{Optional function(param) → gradient ∇ψ(θ).}
 
 \item{search_interval_fn}{Function(data) → c(lower, upper). Required.}
 
@@ -45,7 +45,7 @@ An \code{estimand_spec} object.
 Defines the estimand function ψ(θ) and all metadata needed for
 generating profile or integrated log-likelihood curves:
 
-• \code{psi_fn(theta)} — mapping from θ → ψ
+• \code{psi_fn(param)} — mapping from θ → ψ
 • optional analytic Jacobian ∂ψ/∂θ
 • \code{search_interval_fn(data)} — allowable ψ-range
 • grid \code{increment} for ψ exploration

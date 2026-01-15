@@ -25,7 +25,7 @@ walk_branch_side(
 
 \item{init_guess}{Initial θ̂ used at ψ_MLE}
 
-\item{eval_psi_fun}{Function(psi_value, theta_init) → list(theta_hat, branch_val)}
+\item{eval_psi_fun}{Function(psi_value, param_init) → list(param_hat, branch_val)}
 
 \item{max_retries}{Integer number of jitter retries for monotonicity}
 }
@@ -37,6 +37,6 @@ Performs a one-sided sweep of the branch log-likelihood by stepping
 through integer grid indices k, computing ψ_k from the supplied ψ-grid,
 and calling:
 
-eval_psi_fun(psi_k, theta_init)
+eval_psi_fun(psi_k, param_init)
 }
 \keyword{internal}

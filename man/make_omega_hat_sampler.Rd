@@ -22,3 +22,4 @@ using \code{nloptr::auglag()} and incorporating:
 • Jacobians for constraints (if supplied)
 • optimizer_spec settings only for SLSQP/local solver
 }
+\keyword{internal}

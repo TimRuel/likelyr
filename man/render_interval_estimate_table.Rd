@@ -16,3 +16,4 @@ A kableExtra object.
 \description{
 Render confidence interval table
 }
+\keyword{internal}

@@ -30,3 +30,4 @@ Other inference-renderers:
 \code{\link{synthesize_comparison}()}
 }
 \concept{inference-renderers}
+\keyword{internal}

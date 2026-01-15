@@ -9,24 +9,24 @@
 #' used in Monte Carlo Integrated Log-Likelihood:
 #'
 #' \deqn{
-#'   E_{\omegâ}[ \log p(Y \mid \theta) ].
+#'   E_{\omegâ}[ \log p(Y \mid \param) ].
 #' }
 #'
 #' The nuisance specification provides:
 #'
-#' • `E_loglik(theta, omega_hat, data)` — expected log-likelihood
-#' • `E_loglik_grad(theta, omega_hat, data)` — optional gradient wrt θ
+#' • `E_loglik(param, omega_hat, data)` — expected log-likelihood
+#' • `E_loglik_grad(param, omega_hat, data)` — optional gradient wrt θ
 #'
 #' These functions are used *only* for integrated log-likelihood calculations.
 #' They play no role in profile log-likelihood.
 #'
 #' @param E_loglik
-#'   Required. Function `(theta, omega_hat, data) -> numeric`
+#'   Required. Function `(param, omega_hat, data) -> numeric`
 #'   giving the expected log-likelihood.
 #'
 #' @param E_loglik_grad
-#'   Optional gradient function `(theta, omega_hat, data) -> numeric vector`.
-#'   If supplied, must return a vector of length `theta_dim`.
+#'   Optional gradient function `(param, omega_hat, data) -> numeric vector`.
+#'   If supplied, must return a vector of length `param_dim`.
 #'
 #' @param name Optional descriptive name for the nuisance component.
 #' @param ... Additional fields stored but unused.
@@ -36,16 +36,12 @@
 #' `c("nuisance_spec", "likelyr")`.
 #'
 #' @export
-nuisance_spec <- function(E_loglik,
-                          E_loglik_grad = NULL,
-                          name = NULL,
-                          ...) {
-
+nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
   x <- list(
-    name          = name %||% "<nuisance>",
-    E_loglik      = E_loglik,
+    name = name %||% "<nuisance>",
+    E_loglik = E_loglik,
     E_loglik_grad = E_loglik_grad,
-    extra         = list(...)
+    extra = list(...)
   )
 
   x <- new_nuisance_spec(x)
@@ -57,12 +53,37 @@ nuisance_spec <- function(E_loglik,
 # INTERNAL VALIDATOR
 # ======================================================================
 
+#' Validate nuisance specification
+#'
+#' @description
+#' Internal validator for \code{nuisance_spec} objects. Ensures that all
+#' required nuisance-related functions are present and correctly typed
+#' before downstream likelihood procedures are run.
+#'
+#' @details
+#' The following checks are performed:
+#'
+#' \itemize{
+#'   \item \code{E_loglik} must be a function with signature
+#'         \code{(param, omega_hat, data)}.
+#'   \item \code{E_loglik_grad}, if supplied, must also be a function with
+#'         the same signature. It may be \code{NULL}.
+#' }
+#'
+#' These validations enforce the contract required for integrated
+#' likelihood calculations involving nuisance parameters.
+#'
+#' @param x A list representing a \code{nuisance_spec} object.
+#'
+#' @return Invisibly returns \code{x} if validation succeeds.
+#'
+#' @keywords internal
+#' @noRd
 .validate_nuisance_spec <- function(x) {
-
   # ---- Expected loglik must be supplied ----
   if (!is.function(x$E_loglik)) {
     stop(
-      "E_loglik must be a function(theta, omega_hat, data).",
+      "E_loglik must be a function(param, omega_hat, data).",
       call. = FALSE
     )
   }
@@ -70,7 +91,7 @@ nuisance_spec <- function(E_loglik,
   # ---- Gradient must be a function if present ----
   if (!is.null(x$E_loglik_grad) && !is.function(x$E_loglik_grad)) {
     stop(
-      "E_loglik_grad must be NULL or a function(theta, omega_hat, data).",
+      "E_loglik_grad must be NULL or a function(param, omega_hat, data).",
       call. = FALSE
     )
   }
@@ -86,7 +107,17 @@ nuisance_spec <- function(E_loglik,
 print.nuisance_spec <- function(x, ...) {
   cat("# Nuisance Specification\n")
   cat("- Name: ", x$name, "\n", sep = "")
-  cat("- Expected log-likelihood:   ", if (!is.null(x$E_loglik))      "present" else "missing", "\n", sep = "")
-  cat("- Expected loglik gradient:  ", if (!is.null(x$E_loglik_grad)) "present" else "absent", "\n", sep = "")
+  cat(
+    "- Expected log-likelihood:   ",
+    if (!is.null(x$E_loglik)) "present" else "missing",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "- Expected loglik gradient:  ",
+    if (!is.null(x$E_loglik_grad)) "present" else "absent",
+    "\n",
+    sep = ""
+  )
   invisible(x)
 }

@@ -11,11 +11,10 @@
 #' @param data User data.
 #'
 #' @return The SAME likelihood_spec object, enriched with:
-#'   • $loglik — a closure(theta) that captures `data`
+#'   • $loglik — a closure(param) that captures `data`
 #'
-#' @export
+#' @keywords internal
 calibrate_likelihood <- function(likelihood, data) {
-
   stopifnot(inherits(likelihood, "likelihood_spec"))
 
   # -------------------------------------------------------------
@@ -23,8 +22,8 @@ calibrate_likelihood <- function(likelihood, data) {
   # -------------------------------------------------------------
   orig_loglik <- likelihood$loglik
 
-  likelihood$loglik <- function(theta) {
-    orig_loglik(theta, data)
+  likelihood$loglik <- function(param) {
+    orig_loglik(param, data)
   }
 
   likelihood

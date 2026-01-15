@@ -6,7 +6,7 @@
 \usage{
 generate_profile(
   psi_mle,
-  theta_mle,
+  param_mle,
   loglik_at_mle,
   increment,
   cutoff,
@@ -17,7 +17,7 @@ generate_profile(
 \arguments{
 \item{psi_mle}{Numeric scalar. The ψ-value at θ̂.}
 
-\item{theta_mle}{Numeric vector. MLE θ̂.}
+\item{param_mle}{Numeric vector. MLE θ̂.}
 
 \item{loglik_at_mle}{Numeric scalar. log-likelihood at θ̂.}
 
@@ -26,7 +26,7 @@ generate_profile(
 \item{cutoff}{Numeric scalar. loglik cutoff (loglik_at_mle − χ²/2).}
 
 \item{eval_psi_fun}{Function ψ → loglik(ψ) constructed by
-\code{build_eval_psi_fun(cal)(theta_mle)}.}
+\code{build_eval_psi_fun(cal)(param_mle)}.}
 
 \item{max_retries}{Integer. Max retries for monotonicity enforcement
 inside \code{walk_profile_side()}.}

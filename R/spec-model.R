@@ -11,7 +11,7 @@
 # INTERNAL: Calibration Lock Helpers
 # ======================================================================
 
-# Structural specs cannot be modified post-calibration
+#' @keywords internal
 .slot_is_structural <- function(slot) {
   slot %in% c("parameter", "likelihood", "estimand", "nuisance")
 }
@@ -39,25 +39,26 @@
 #' Structural components cannot be modified *after* calibration.
 #'
 #' @export
-model_spec <- function(parameter  = NULL,
-                       likelihood = NULL,
-                       estimand   = NULL,
-                       nuisance   = NULL,
-                       optimizer  = NULL,
-                       execution  = NULL,
-                       name       = NULL,
-                       ...) {
-
+model_spec <- function(
+  parameter = NULL,
+  likelihood = NULL,
+  estimand = NULL,
+  nuisance = NULL,
+  optimizer = NULL,
+  execution = NULL,
+  name = NULL,
+  ...
+) {
   x <- list(
-    name       = name %||% "<model>",
-    parameter  = parameter,
+    name = name %||% "<model>",
+    parameter = parameter,
     likelihood = likelihood,
-    estimand   = estimand,
-    nuisance   = nuisance,
-    optimizer  = optimizer,
-    execution  = execution,
-    extra      = list(...)
-    ) |>
+    estimand = estimand,
+    nuisance = nuisance,
+    optimizer = optimizer,
+    execution = execution,
+    extra = list(...)
+  ) |>
     new_model_spec()
 
   .validate_structural_specs(x)
@@ -76,13 +77,14 @@ add <- function(model, spec, ...) {
 
 #' @export
 add.model_spec <- function(model, spec, ...) {
-
   slot <- .identify_model_slot(spec)
 
   # Structural specs cannot change after calibration
   if (is_calibrated(model) && .slot_is_structural(slot)) {
-    stop(sprintf("Cannot modify structural slot '%s' after calibration.", slot),
-         call. = FALSE)
+    stop(
+      sprintf("Cannot modify structural slot '%s' after calibration.", slot),
+      call. = FALSE
+    )
   }
 
   # Overwrite allowed
@@ -103,14 +105,26 @@ add.default <- function(model, spec, ...) {
 # INTERNAL: Identify Component Slot by Class
 # ======================================================================
 
+#' @keywords internal
 .identify_model_slot <- function(x) {
-
-  if (inherits(x, "parameter_spec"))  return("parameter")
-  if (inherits(x, "likelihood_spec")) return("likelihood")
-  if (inherits(x, "estimand_spec"))   return("estimand")
-  if (inherits(x, "nuisance_spec"))   return("nuisance")
-  if (inherits(x, "optimizer_spec"))  return("optimizer")
-  if (inherits(x, "execution_spec"))  return("execution")
+  if (inherits(x, "parameter_spec")) {
+    return("parameter")
+  }
+  if (inherits(x, "likelihood_spec")) {
+    return("likelihood")
+  }
+  if (inherits(x, "estimand_spec")) {
+    return("estimand")
+  }
+  if (inherits(x, "nuisance_spec")) {
+    return("nuisance")
+  }
+  if (inherits(x, "optimizer_spec")) {
+    return("optimizer")
+  }
+  if (inherits(x, "execution_spec")) {
+    return("execution")
+  }
 
   stop("Unrecognized specification type passed to add().", call. = FALSE)
 }
@@ -119,23 +133,62 @@ add.default <- function(model, spec, ...) {
 # INTERNAL: Validation of STRUCTURAL SPECS ONLY
 # ======================================================================
 
+#' Validate structural specification components
+#'
+#' @description
+#' Internal validator that checks whether the structural components
+#' attached to a model object (if present) inherit from the correct
+#' specification classes.
+#'
+#' This function is intentionally permissive: each component is only
+#' validated *if it exists*. Missing components are allowed here and
+#' are validated later by stage-specific validators (e.g.,
+#' \code{validate_profile_input()}, \code{validate_integrate_input()}).
+#'
+#' @param x A list representing a model specification object.
+#'
+#' @details
+#' The following fields are checked when non-NULL:
+#'
+#' \itemize{
+#'   \item \code{parameter} must inherit from \code{"parameter_spec"}
+#'   \item \code{likelihood} must inherit from \code{"likelihood_spec"}
+#'   \item \code{estimand} must inherit from \code{"estimand_spec"}
+#'   \item \code{nuisance} must inherit from \code{"nuisance_spec"}
+#' }
+#'
+#' @return Invisibly returns \code{x} if validation succeeds.
+#'
+#' @keywords internal
+#' @noRd
 .validate_structural_specs <- function(x) {
-
-  if (!is.null(x$parameter) &&
-      !inherits(x$parameter, "parameter_spec"))
+  if (
+    !is.null(x$parameter) &&
+      !inherits(x$parameter, "parameter_spec")
+  ) {
     stop("parameter must be a parameter_spec().", call. = FALSE)
+  }
 
-  if (!is.null(x$likelihood) &&
-      !inherits(x$likelihood, "likelihood_spec"))
+  if (
+    !is.null(x$likelihood) &&
+      !inherits(x$likelihood, "likelihood_spec")
+  ) {
     stop("likelihood must be a likelihood_spec().", call. = FALSE)
+  }
 
-  if (!is.null(x$estimand) &&
-      !inherits(x$estimand, "estimand_spec"))
+  if (
+    !is.null(x$estimand) &&
+      !inherits(x$estimand, "estimand_spec")
+  ) {
     stop("estimand must be an estimand_spec().", call. = FALSE)
+  }
 
-  if (!is.null(x$nuisance) &&
-      !inherits(x$nuisance, "nuisance_spec"))
+  if (
+    !is.null(x$nuisance) &&
+      !inherits(x$nuisance, "nuisance_spec")
+  ) {
     stop("nuisance must be a nuisance_spec().", call. = FALSE)
+  }
 
   invisible(x)
 }
@@ -144,10 +197,16 @@ add.default <- function(model, spec, ...) {
 # INTERNAL: Complete Check for integrate() / profile()
 # ======================================================================
 
+#' @keywords internal
 .is_model_spec_complete <- function(model) {
-
-  required <- c("parameter", "likelihood", "estimand", "nuisance",
-                "optimizer", "execution")
+  required <- c(
+    "parameter",
+    "likelihood",
+    "estimand",
+    "nuisance",
+    "optimizer",
+    "execution"
+  )
 
   all(vapply(required, function(s) !is.null(model[[s]]), logical(1)))
 }
@@ -159,14 +218,45 @@ add.default <- function(model, spec, ...) {
 #' @export
 print.model_spec <- function(x, ...) {
   cat("<model_spec>\n")
-  if (!is.null(x$name))
+  if (!is.null(x$name)) {
     cat("Model:          ", x$name, "\n", sep = "")
-  cat("Full Parameter: ", if (!is.null(x$parameter))  x$parameter$name  else "(missing)", "\n", sep = "")
-  cat("Likelihood:     ", if (!is.null(x$likelihood)) x$likelihood$name else "(missing)", "\n", sep = "")
-  cat("Estimand:       ", if (!is.null(x$estimand))   x$estimand$name   else "(missing)", "\n", sep = "")
-  cat("Nuisance:       ", if (!is.null(x$nuisance))   x$nuisance$name   else "(missing)", "\n", sep = "")
-  cat("Optimizer:      ", if (!is.null(x$optimizer))  x$optimizer$name  else "(missing)", "\n", sep = "")
-  cat("Execution:      ", if (!is.null(x$execution))  x$execution$name  else "(missing)", "\n", sep = "")
+  }
+  cat(
+    "Full Parameter: ",
+    if (!is.null(x$parameter)) x$parameter$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Likelihood:     ",
+    if (!is.null(x$likelihood)) x$likelihood$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Estimand:       ",
+    if (!is.null(x$estimand)) x$estimand$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Nuisance:       ",
+    if (!is.null(x$nuisance)) x$nuisance$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Optimizer:      ",
+    if (!is.null(x$optimizer)) x$optimizer$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Execution:      ",
+    if (!is.null(x$execution)) x$execution$name else "(missing)",
+    "\n",
+    sep = ""
+  )
 
   invisible(x)
 }

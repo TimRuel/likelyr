@@ -30,14 +30,15 @@
 #' @return A `kableExtra` HTML table object.
 #'
 #' @family inference-renderers
-#' @export
+#' @keywords internal
 render_point_estimate_table <- function(point_estimate_df) {
-
   required <- c("psi_0", "psi_hat", "error", "se_psi_hat")
   stopifnot(all(required %in% names(point_estimate_df)))
 
   type <- attr(point_estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) type <- NULL
+  if (length(type) == 0) {
+    type <- NULL
+  }
 
   .render_point_estimate_base(
     df = point_estimate_df,
@@ -46,12 +47,12 @@ render_point_estimate_table <- function(point_estimate_df) {
       "$\\hat{\\psi}$",
       "$\\mathrm{e}(\\hat{\\psi}; \\psi_0)$",
       "$\\widehat{\\mathrm{SE}}(\\hat{\\psi})$"
-      ),
+    ),
     header_groups = c("Truth" = 1, "Estimate" = 3),
     caption = .table_caption(
       "Point Estimate and Uncertainty Measures",
       type
-      )
+    )
   )
 }
 
@@ -65,20 +66,26 @@ render_point_estimate_table <- function(point_estimate_df) {
 #'   `get_interval_estimate_df()`.
 #'
 #' @return A kableExtra object.
+#' @keywords internal
 render_interval_estimate_table <- function(interval_estimate_df) {
-
   required <- c(
-    "Interval", "Length", "Lower Deviation",
-    "Upper Deviation", "Status", "Level"
+    "Interval",
+    "Length",
+    "Lower Deviation",
+    "Upper Deviation",
+    "Status",
+    "Level"
   )
   stopifnot(all(required %in% names(interval_estimate_df)))
 
   type <- attr(interval_estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) type <- NULL
+  if (length(type) == 0) {
+    type <- NULL
+  }
 
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
-  point_estimate        <- attr(interval_estimate_df, "point_estimate")
-  psi_0                 <- attr(interval_estimate_df, "psi_0")
+  point_estimate <- attr(interval_estimate_df, "point_estimate")
+  psi_0 <- attr(interval_estimate_df, "psi_0")
 
   stopifnot(
     !is.null(interval_estimate_raw),
@@ -115,13 +122,13 @@ render_interval_estimate_table <- function(interval_estimate_df) {
       "Interval Estimates and Uncertainty Measures",
       type
     ),
-    stripe_bg      = stripe_bg,
-    diagram_x      = rep(point_estimate, nrow(interval_estimate_raw)),
-    diagram_lower  = interval_estimate_raw$lower,
-    diagram_upper  = interval_estimate_raw$upper,
-    vline          = psi_0,
-    include_pl     = FALSE,
-    collapse_cols  = 1
+    stripe_bg = stripe_bg,
+    diagram_x = rep(point_estimate, nrow(interval_estimate_raw)),
+    diagram_lower = interval_estimate_raw$lower,
+    diagram_upper = interval_estimate_raw$upper,
+    vline = psi_0,
+    include_pl = FALSE,
+    collapse_cols = 1
   )
 }
 
@@ -133,15 +140,22 @@ render_interval_estimate_table <- function(interval_estimate_df) {
 #'
 #' @param estimate_df Data frame combining point and interval estimates.
 #' @return A kableExtra object.
+#' @keywords internal
 render_estimate_table <- function(estimate_df) {
-
   # --------------------------------------------------
   # Validate required columns
   # --------------------------------------------------
   required <- c(
-    "se_psi_hat", "error", "psi_hat", "psi_0",
-    "Interval", "Length", "Lower Deviation",
-    "Upper Deviation", "Status", "Level"
+    "se_psi_hat",
+    "error",
+    "psi_hat",
+    "psi_0",
+    "Interval",
+    "Length",
+    "Lower Deviation",
+    "Upper Deviation",
+    "Status",
+    "Level"
   )
   stopifnot(all(required %in% names(estimate_df)))
 
@@ -149,7 +163,9 @@ render_estimate_table <- function(estimate_df) {
   # Extract rendering metadata
   # --------------------------------------------------
   type <- attr(estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) type <- NULL
+  if (length(type) == 0) {
+    type <- NULL
+  }
 
   interval_estimate_raw <- attr(estimate_df, "interval_estimate_raw")
   stopifnot(!is.null(interval_estimate_raw))
@@ -163,18 +179,25 @@ render_estimate_table <- function(estimate_df) {
   df_render <- estimate_df |>
     dplyr::mutate(
       dplyr::across(
-        c(se_psi_hat, error, psi_hat, psi_0,
-          Length, `Lower Deviation`, `Upper Deviation`),
+        c(
+          se_psi_hat,
+          error,
+          psi_hat,
+          psi_0,
+          Length,
+          `Lower Deviation`,
+          `Upper Deviation`
+        ),
         ~ round(.x, 2)
-        )
-      ) |>
+      )
+    ) |>
     dplyr::mutate(
       Diagram = "",
       .after = "Interval"
     )
 
   bg_interval <- .interval_level_bg(df_render$Level)
-  bg_pe       <- table_pe_row_bg(type)
+  bg_pe <- table_pe_row_bg(type)
 
   body_spec_fun <- function(tbl) {
     tbl |>
@@ -186,18 +209,18 @@ render_estimate_table <- function(estimate_df) {
       kableExtra::column_spec(
         6,
         image = kableExtra::spec_pointrange(
-          x     = estimate_df$psi_hat,
-          xmin  = interval_estimate_raw$lower,
-          xmax  = interval_estimate_raw$upper,
+          x = estimate_df$psi_hat,
+          xmin = interval_estimate_raw$lower,
+          xmax = interval_estimate_raw$upper,
           vline = psi_0,
           line_col = table_text_body("diagram"),
-          width  = 300,
+          width = 300,
           height = 150,
-          cex    = 0.6
-          )
-        ) |>
-      kableExtra::column_spec(7,  color = table_text_body("length")) |>
-      kableExtra::column_spec(8,  color = table_text_body("lower_dev")) |>
+          cex = 0.6
+        )
+      ) |>
+      kableExtra::column_spec(7, color = table_text_body("length")) |>
+      kableExtra::column_spec(8, color = table_text_body("lower_dev")) |>
       kableExtra::column_spec(9, color = table_text_body("upper_dev")) |>
       kableExtra::column_spec(11, color = table_text_body("level"))
   }
@@ -207,29 +230,29 @@ render_estimate_table <- function(estimate_df) {
   # --------------------------------------------------
   .render_estimates_base(
     df_render = df_render,
-    caption   = .table_caption(
+    caption = .table_caption(
       "Estimates and Uncertainty Measures",
       type
-      ),
+    ),
     header_groups = c(
-      "Point Estimates"    = 3,
-      "Truth"              = 1,
+      "Point Estimates" = 3,
+      "Truth" = 1,
       "Interval Estimates" = 7
-      ),
+    ),
     header_bg = c(
       table_group_header_bg("point_estimate"),
       table_group_header_bg("truth"),
       table_group_header_bg("interval_estimate")
-      ),
+    ),
     header_cols = list(
-      point    = 1:3,
-      truth    = 4,
+      point = 1:3,
+      truth = 4,
       interval = 5:11
-      ),
+    ),
     body_spec_fun = body_spec_fun,
-    stripe_bg     = bg_interval,
+    stripe_bg = bg_interval,
     collapse_cols = 1:4,
-    include_pl    = FALSE,
-    pe_bg         = bg_pe
+    include_pl = FALSE,
+    pe_bg = bg_pe
   )
 }

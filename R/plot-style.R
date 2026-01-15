@@ -3,22 +3,14 @@
 #
 # Semantic accessors for plot colors and styles defined in
 # inst/styles/plots.yml
-#
-# Plots should NEVER hard-code hex values or style constants.
-# They should ask for colors and styles by meaning.
 # ======================================================================
 
 # ----------------------------------------------------------------------
 # Internal: load style spec
 # ----------------------------------------------------------------------
 
-#' Load plot style YAML
-#'
-#' @description
-#' Reads inst/styles/plots.yml from the installed package.
-#'
-#' @return Named list of style configuration
 #' @keywords internal
+#' @noRd
 .load_plot_style <- function() {
   path <- system.file("styles", "plots.yml", package = "likelyr")
   if (path == "") {
@@ -27,16 +19,12 @@
   yaml::read_yaml(path)
 }
 
-
 # ----------------------------------------------------------------------
 # Internal helpers
 # ----------------------------------------------------------------------
 
-#' Navigate nested style node
-#'
-#' @param path Character vector of node names
-#' @return Node value or NULL
 #' @keywords internal
+#' @noRd
 .get_style_node <- function(path) {
   style <- .load_plot_style()
   node <- style
@@ -51,13 +39,8 @@
   node
 }
 
-#' Lookup style value with validation
-#'
-#' @param path Base path
-#' @param key Value name
-#' @param label Human-readable label for errors
-#' @return Requested style value
 #' @keywords internal
+#' @noRd
 .get_style_value <- function(path, key, label) {
   node <- .get_style_node(path)
 
@@ -68,175 +51,230 @@
   node[[key]]
 }
 
-#' Comparison-aware style lookup
-#'
-#' @param base_path Base node
-#' @param key Field name
-#' @param comparison Logical
-#' @return Style value
-#' @keywords internal
-.get_comparison_value <- function(base_path, key, comparison) {
-  node <- .get_style_node(base_path)
-
-  if (isTRUE(comparison) && !is.null(node$comparison)) {
-    comp <- node$comparison[[key]]
-    if (!is.null(comp)) return(comp)
-  }
-
-  node[[key]]
-}
-
-#' Resolve scalar vs named list values
-#'
-#' @keywords internal
-.resolve_pseudolikelihood_value <- function(val, pseudolikelihood) {
-  if (is.list(val)) {
-    return(val[[pseudolikelihood]])
-  }
-
-  val
-}
-
-
 # ----------------------------------------------------------------------
 # Curve styling
 # ----------------------------------------------------------------------
 
-#' Curve color
+#' Resolve curve color
 #'
 #' @param pseudolikelihood "integrate" or "profile"
-#' @param comparison Logical
-#' @return Hex color
-#' @export
+#' @param comparison Logical; use comparison styling?
+#' @return Hex color string
+#' @keywords internal
+#' @noRd
 plot_curve_color <- function(pseudolikelihood, comparison = FALSE) {
-  val <- .get_comparison_value(c("curve"), "colors", comparison)
-  .resolve_pseudolikelihood_value(val, pseudolikelihood)
+  pseudolikelihood <- tolower(pseudolikelihood)
+
+  if (isTRUE(comparison)) {
+    node <- .get_style_node(c("curve", "comparison"))
+  } else {
+    node <- .get_style_node(c("curve", "by_method"))
+  }
+
+  if (is.null(node) || !pseudolikelihood %in% names(node)) {
+    stop(
+      "Unknown curve styling for method '",
+      pseudolikelihood,
+      "'.",
+      call. = FALSE
+    )
+  }
+
+  node[[pseudolikelihood]]$color
 }
 
-#' Curve linetype
+#' Resolve curve linetype
 #'
 #' @param pseudolikelihood "integrate" or "profile"
-#' @param comparison Logical
+#' @param comparison Logical; use comparison styling?
 #' @return Character linetype
-#' @export
+#' @keywords internal
+#' @noRd
 plot_curve_linetype <- function(pseudolikelihood, comparison = FALSE) {
-  val <- .get_comparison_value(c("curve"), "linetype", comparison)
-  .resolve_pseudolikelihood_value(val, pseudolikelihood)
+  pseudolikelihood <- tolower(pseudolikelihood)
+
+  if (isTRUE(comparison)) {
+    node <- .get_style_node(c("curve", "comparison"))
+  } else {
+    node <- .get_style_node(c("curve", "by_method"))
+  }
+
+  if (is.null(node) || !pseudolikelihood %in% names(node)) {
+    stop(
+      "Unknown curve styling for method '",
+      pseudolikelihood,
+      "'.",
+      call. = FALSE
+    )
+  }
+
+  node[[pseudolikelihood]]$linetype
 }
 
-#' Curve linewidth
+#' Resolve curve linewidth
 #'
+#' @param pseudolikelihood Optional likelihood type
+#' @param comparison Logical; use comparison styling?
 #' @return Numeric linewidth
-#' @export
-plot_curve_linewidth <- function() {
-  .get_style_node(c("curve", "linewidth"))
-}
+#' @keywords internal
+#' @noRd
+plot_curve_linewidth <- function(pseudolikelihood = NULL, comparison = FALSE) {
+  base <- .get_style_node(c("curve", "linewidth"))
+  pseudolikelihood <- tolower(pseudolikelihood %||% "")
 
+  if (isTRUE(comparison) && nzchar(pseudolikelihood)) {
+    node <- .get_style_node(c("curve", "comparison"))
+    if (!is.null(node[[pseudolikelihood]]$linewidth)) {
+      return(node[[pseudolikelihood]]$linewidth)
+    }
+  }
+
+  if (!isTRUE(comparison) && nzchar(pseudolikelihood)) {
+    node <- .get_style_node(c("curve", "by_method"))
+    if (!is.null(node[[pseudolikelihood]]$linewidth)) {
+      return(node[[pseudolikelihood]]$linewidth)
+    }
+  }
+
+  base
+}
 
 # ----------------------------------------------------------------------
 # Point cloud styling
 # ----------------------------------------------------------------------
 
-#' Point cloud size
-#'
-#' @return Numeric size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_point_cloud_size <- function() {
   .get_style_node(c("points", "cloud", "size"))
 }
 
-#' Point cloud alpha
-#'
-#' @return Numeric alpha
-#' @export
+#' @keywords internal
+#' @noRd
 plot_point_cloud_alpha <- function() {
   .get_style_node(c("points", "cloud", "alpha"))
 }
-
 
 # ----------------------------------------------------------------------
 # Point estimate styling
 # ----------------------------------------------------------------------
 
-#' Point estimate color
+#' Resolve point estimate color
 #'
 #' @param pseudolikelihood "integrate" or "profile"
 #' @param comparison Logical
-#' @return Hex color
-#' @export
+#' @return Hex color string
+#' @keywords internal
+#' @noRd
 plot_point_estimate_color <- function(pseudolikelihood, comparison = FALSE) {
-  val <- .get_comparison_value(c("point_estimate"), "colors", comparison)
-  .resolve_pseudolikelihood_value(val, pseudolikelihood)
+  pseudolikelihood <- tolower(pseudolikelihood)
+
+  if (isTRUE(comparison)) {
+    node <- .get_style_node(c("point_estimate", "comparison"))
+    node[[pseudolikelihood]]$color
+  } else {
+    .get_style_node(c("point_estimate", "color"))
+  }
 }
 
-#' Point estimate size
+#' Resolve point estimate size
 #'
 #' @return Numeric size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_point_estimate_size <- function() {
-  .get_style_node(c("point_estimate", "size"))
+  .get_style_node(c("point_estimate", "linewidth"))
 }
 
-#' Point estimate linetype
+#' Resolve point estimate linetype
 #'
 #' @param pseudolikelihood "integrate" or "profile"
 #' @param comparison Logical
 #' @return Character linetype
-#' @export
+#' @keywords internal
+#' @noRd
 plot_point_estimate_linetype <- function(pseudolikelihood, comparison = FALSE) {
-  val <- .get_comparison_value(c("point_estimate"), "linetype", comparison)
-  .resolve_pseudolikelihood_value(val, pseudolikelihood)
+  pseudolikelihood <- tolower(pseudolikelihood)
+
+  if (isTRUE(comparison)) {
+    node <- .get_style_node(c("point_estimate", "comparison"))
+    node[[pseudolikelihood]]$linetype
+  } else {
+    .get_style_node(c("point_estimate", "linetype"))
+  }
 }
 
+#' Resolve point estimate linewidth
+#'
+#' @param pseudolikelihood "integrate" or "profile"
+#' @param comparison Logical
+#' @return Numeric linewidth
+#' @keywords internal
+#' @noRd
+plot_point_estimate_linewidth <- function(
+  pseudolikelihood,
+  comparison = FALSE
+) {
+  pseudolikelihood <- tolower(pseudolikelihood)
+
+  if (isTRUE(comparison)) {
+    node <- .get_style_node(c("point_estimate", "comparison"))
+    node[[pseudolikelihood]]$linewidth
+  } else {
+    .get_style_node(c("point_estimate", "linewidth"))
+  }
+}
 
 # ----------------------------------------------------------------------
-# Truth marker styling
+# Truth marker styling (simple accessors)
 # ----------------------------------------------------------------------
 
-#' Truth marker color
-#' @export
+#' @keywords internal
+#' @noRd
 plot_truth_color <- function() .get_style_node(c("truth", "color"))
-
-#' Truth marker shape
-#' @export
+#' @keywords internal
+#' @noRd
+plot_truth_linetype <- function() .get_style_node(c("truth", "linetype"))
+#' @keywords internal
+#' @noRd
+plot_truth_linewidth <- function() .get_style_node(c("truth", "linewidth"))
+#' @keywords internal
+#' @noRd
 plot_truth_shape <- function() .get_style_node(c("truth", "shape"))
-
-#' Truth marker size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_truth_size <- function() .get_style_node(c("truth", "size"))
-
-#' Truth marker stroke
-#' @export
+#' @keywords internal
+#' @noRd
 plot_truth_stroke <- function() .get_style_node(c("truth", "stroke"))
-
 
 # ----------------------------------------------------------------------
 # Confidence interval styling
 # ----------------------------------------------------------------------
 
-#' CI linetype
-#' @export
+#' @keywords internal
+#' @noRd
 plot_ci_linetype <- function() {
   .get_style_node(c("interval_estimate", "line", "linetype"))
 }
 
-#' CI linewidth
-#' @export
+#' @keywords internal
+#' @noRd
 plot_ci_linewidth <- function() {
   .get_style_node(c("interval_estimate", "line", "linewidth"))
 }
 
-#' CI color palette
+#' Generate confidence interval color palette
 #'
-#' @param interval_estimate_df Data frame
-#' @return Named character vector
-#' @export
+#' @param interval_estimate_df Data frame of interval estimates
+#' @return Named character vector of colors
+#' @keywords internal
+#' @noRd
 plot_ci_palette <- function(interval_estimate_df) {
   style <- .load_plot_style()
   cfg <- style$interval_estimate
 
   name_from <- cfg$name_from %||% "Level"
-
   n <- nrow(interval_estimate_df)
   p <- cfg$params
 
@@ -252,166 +290,59 @@ plot_ci_palette <- function(interval_estimate_df) {
   cols
 }
 
-
 # ----------------------------------------------------------------------
 # Reference lines
 # ----------------------------------------------------------------------
 
-#' Reference line style
+#' Resolve reference line style
 #'
 #' @param name Style key
-#' @return Named list
-#' @export
+#' @return Named list of style values
+#' @keywords internal
+#' @noRd
 plot_reference_line_style <- function(name) {
   .get_style_value(c("reference_lines"), name, "reference line")
 }
-
-
-# ----------------------------------------------------------------------
-# Theme accessors
-# ----------------------------------------------------------------------
-
-#' Full theme configuration
-#'
-#' @return Named list
-#' @export
-plot_theme_cfg <- function() {
-  .get_style_node(c("theme"))
-}
-
-
-# ----------------------------------------------------------------------
-# Public accessors required by plot-utils.R
-# ----------------------------------------------------------------------
-
-#' Panel background fill
-#' @export
-plot_bg_panel_fill <- function() {
-  .get_style_node(c("theme", "background", "panel", "fill"))
-}
-
-#' Panel background border color
-#' @export
-plot_bg_panel_color <- function() {
-  .get_style_node(c("theme", "background", "panel", "color"))
-}
-
-#' Plot background fill
-#' @export
-plot_bg_plot_fill <- function() {
-  .get_style_node(c("theme", "background", "plot", "fill"))
-}
-
-#' Plot background border color
-#' @export
-plot_bg_plot_color <- function() {
-  .get_style_node(c("theme", "background", "plot", "color"))
-}
-
-#' Legend background fill
-#' @export
-plot_bg_legend_fill <- function() {
-  .get_style_node(c("theme", "background", "legend", "fill"))
-}
-
-
-#' Major grid color
-#' @export
-plot_grid_major_color <- function() {
-  .get_style_node(c("theme", "grid", "major", "color"))
-}
-
-#' Minor grid color
-#' @export
-plot_grid_minor_color <- function() {
-  .get_style_node(c("theme", "grid", "minor", "color"))
-}
-
-
-#' Axis tick color
-#' @export
-plot_axis_tick_color <- function() {
-  .get_style_node(c("theme", "axis", "ticks", "color"))
-}
-
-#' Axis text color
-#' @export
-plot_axis_text_color <- function() {
-  .get_style_node(c("theme", "axis", "text", "color"))
-}
-
-#' Axis title color
-#' @export
-plot_axis_title_color <- function() {
-  .get_style_node(c("theme", "axis", "title", "color"))
-}
-
-
-#' Strip label color
-#' @export
-plot_strip_text_color <- function() {
-  .get_style_node(c("theme", "strip", "text", "color"))
-}
-
-
-#' Plot title color
-#' @export
-plot_title_color <- function() {
-  .get_style_node(c("theme", "plot", "title", "color"))
-}
-
-#' Plot title face
-#' @export
-plot_title_face <- function() {
-  .get_style_node(c("theme", "plot", "title", "face"))
-}
-
-
-#' Legend text color
-#' @export
-plot_legend_text_color <- function() {
-  .get_style_node(c("theme", "legend", "text", "color"))
-}
-
-#' Legend title color
-#' @export
-plot_legend_title_color <- function() {
-  .get_style_node(c("theme", "legend", "title", "color"))
-}
-
 
 # ----------------------------------------------------------------------
 # Diagnostics styling
 # ----------------------------------------------------------------------
 
-#' Diagnostics defaults
-#' @export
+#' Diagnostics default styles
+#' @return Named list
+#' @keywords internal
+#' @noRd
 plot_diagnostics_defaults <- function() {
   .get_style_node(c("diagnostics", "defaults"))
 }
 
-#' Diagnostics method override
+#' Diagnostics method overrides
 #'
 #' @param method "integrate" or "profile"
-#' @export
+#' @return Named list
+#' @keywords internal
+#' @noRd
 plot_diagnostics_method_cfg <- function(method) {
   .get_style_node(c("diagnostics", "by_method"))[[method]]
 }
 
-#' Diagnostics plot override
+#' Diagnostics plot overrides
 #'
 #' @param plot_name Plot key
-#' @export
+#' @return Named list
+#' @keywords internal
+#' @noRd
 plot_diagnostics_plot_cfg <- function(plot_name) {
   .get_style_node(c("diagnostics", "plots"))[[plot_name]]
 }
 
 #' Resolve diagnostics style
 #'
-#' @param method Method
-#' @param plot Plot name
-#' @return Named list
-#' @export
+#' @param method Likelihood type
+#' @param plot Plot key
+#' @return Named list of merged styles
+#' @keywords internal
+#' @noRd
 plot_diagnostics_style <- function(method, plot) {
   defaults <- plot_diagnostics_defaults()
   by_meth <- plot_diagnostics_method_cfg(method) %||% list()
@@ -423,13 +354,12 @@ plot_diagnostics_style <- function(method, plot) {
   style
 }
 
-
 # ----------------------------------------------------------------------
-# Text sizing
+# Text sizing API
 # ----------------------------------------------------------------------
 
-#' Base text size
 #' @keywords internal
+#' @noRd
 .get_base_text_size <- function(path, default = 11) {
   cfg <- plot_theme_cfg()
 
@@ -441,8 +371,8 @@ plot_diagnostics_style <- function(method, plot) {
   val %||% default
 }
 
-#' Plot-specific override
 #' @keywords internal
+#' @noRd
 .get_plot_text_override <- function(plot, path) {
   if (is.null(plot)) {
     return(NULL)
@@ -461,71 +391,77 @@ plot_diagnostics_style <- function(method, plot) {
   )
 }
 
-#' Resolve text size
 #' @keywords internal
+#' @noRd
 .resolve_text_size <- function(plot, base_path, default = 11) {
   override <- .get_plot_text_override(plot, base_path)
+
   if (!is.null(override)) {
     return(override)
   }
+
   .get_base_text_size(base_path, default)
 }
 
-
-# ----------------------------------------------------------------------
-# Public text accessors
-# ----------------------------------------------------------------------
-
 #' Axis text size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_axis_text_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("axis", "text", "size"), 11)
 }
 
 #' Axis title size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_axis_title_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("axis", "title", "size"), 12)
 }
 
 #' Plot title size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_title_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("plot", "title", "size"), 14)
 }
 
 #' Plot subtitle size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_subtitle_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("plot", "subtitle", "size"), 12)
 }
 
 #' Plot caption size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_caption_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("plot", "caption", "size"), 10)
 }
 
 #' Label text size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_label_text_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("labels", "text", "size"), 11)
 }
 
 #' Legend text size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_legend_text_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("legend", "text", "size"), 10)
 }
 
 #' Legend title size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_legend_title_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("legend", "title", "size"), 11)
 }
 
 #' Strip label size
-#' @export
+#' @keywords internal
+#' @noRd
 plot_strip_text_size <- function(plot = NULL) {
   .resolve_text_size(plot, c("strip", "text", "size"), 11)
 }

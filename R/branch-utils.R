@@ -3,7 +3,6 @@
 # File: R/branch-utils.R
 # ======================================================================
 
-
 # ======================================================================
 # 1. Compute Number of Monte Carlo Branches
 # ======================================================================
@@ -25,26 +24,23 @@
 #' @return Integer number of branches `R`.
 #' @keywords internal
 compute_num_branches <- function(execution) {
-
   if (inherits(execution, "serial_spec")) {
-
     R <- execution$R
-
   } else if (inherits(execution, "parallel_spec")) {
-
     R <- execution$num_workers * execution$chunk_size
-
   } else {
-
     stop(
       "`execution` must be created via serial_spec() or parallel_spec().",
       call. = FALSE
     )
   }
 
-  if (!is.numeric(R) || R < 1)
-    stop("Computed number of branches R must be a positive integer.",
-         call. = FALSE)
+  if (!is.numeric(R) || R < 1) {
+    stop(
+      "Computed number of branches R must be a positive integer.",
+      call. = FALSE
+    )
+  }
 
   as.integer(R)
 }
@@ -76,12 +72,13 @@ compute_num_branches <- function(execution) {
 #' @return Numeric scalar `alpha_branch`.
 #' @keywords internal
 compute_required_branch_alpha <- function(R, alpha) {
-
-  if (!is.numeric(R) || R < 1)
+  if (!is.numeric(R) || R < 1) {
     stop("`R` must be a positive integer.", call. = FALSE)
+  }
 
-  if (!is.numeric(alpha) || alpha <= 0 || alpha >= 1)
+  if (!is.numeric(alpha) || alpha <= 0 || alpha >= 1) {
     stop("`alpha` must be strictly between 0 and 1.", call. = FALSE)
+  }
 
   # global cutoff at desired CI depth
   c_global <- 0.5 * stats::qchisq(1 - alpha, df = 1)
@@ -94,7 +91,6 @@ compute_required_branch_alpha <- function(R, alpha) {
 
   alpha_branch
 }
-
 
 
 # ======================================================================
@@ -117,19 +113,18 @@ compute_required_branch_alpha <- function(R, alpha) {
 #' @return An object of class `"psi_grid"`.
 #' @keywords internal
 psi_grid_anchor <- function(psi_mle, increment) {
-
-  if (!is.numeric(increment) || increment <= 0)
+  if (!is.numeric(increment) || increment <= 0) {
     stop("`increment` must be a strictly positive scalar.", call. = FALSE)
+  }
 
   structure(
     list(
-      psi_mle   = psi_mle,
+      psi_mle = psi_mle,
       increment = increment
     ),
     class = "psi_grid"
   )
 }
-
 
 
 # ======================================================================
@@ -148,7 +143,6 @@ psi_grid_anchor <- function(psi_mle, increment) {
 #' @return Numeric: nearest ψ-grid point.
 #' @keywords internal
 snap_to_grid <- function(psi, grid) {
-
   k_float <- (psi - grid$psi_mle) / grid$increment
 
   # guard against floating point drift

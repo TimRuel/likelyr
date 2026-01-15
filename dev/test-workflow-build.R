@@ -13,36 +13,36 @@ library(foreach)
 seed <- 7835
 set.seed(seed)
 J <- 6
-theta_0 <- rgamma(J, shape = 3, rate = 1)
-theta_lower <- 1e-12
+param_0 <- rgamma(J, shape = 3, rate = 1)
+param_lower <- 1e-12
 
 parameter <- parameter_spec(
   name = "Model parameter spec",
-  theta_0 = theta_0,
-  theta_lower = theta_lower
+  param_0 = param_0,
+  param_lower = param_lower
 )
 
 # ============================================================
 # Specify likelihood
 # ============================================================
-loglik <- function(theta, data) sum(dpois(data$Y, data$t * theta, log = TRUE))
-theta_mle_fn <- function(data) data$Y / data$t
+loglik <- function(param, data) sum(dpois(data$Y, data$t * param, log = TRUE))
+param_mle_fn <- function(data) data$Y / data$t
 
 likelihood <- likelihood_spec(
   loglik = loglik,
-  theta_mle_fn = theta_mle_fn,
+  param_mle_fn = param_mle_fn,
   name = "Likelihood Spec"
 )
 
 # ============================================================
 # Specify estimand
 # ============================================================
-psi_fn <- function(theta, data) sum(theta * data$weights)
-psi_jac <- function(theta, data) data$weights
+psi_fn <- function(param, data) sum(param * data$weights)
+psi_jac <- function(param, data) data$weights
 search_interval_fn <- function(data) {
-  theta_mle <- theta_mle_fn(data)
-  psi_mle <- psi_fn(theta_mle, data)
-  psi_mle_se <- sqrt(sum(data$weights^2 * theta_mle / data$t))
+  param_mle <- param_mle_fn(data)
+  psi_mle <- psi_fn(param_mle, data)
+  psi_mle_se <- sqrt(sum(data$weights^2 * param_mle / data$t))
   psi_mle + c(-1, 1) * 6 * psi_mle_se
 }
 increment <- 0.1
@@ -64,11 +64,11 @@ estimand <- estimand_spec(
 # ============================================================
 # Specify nuisance parameter
 # ============================================================
-E_loglik <- function(theta, omega_hat, data) {
-  sum(data$t * (omega_hat * log(theta) - theta))
+E_loglik <- function(param, omega_hat, data) {
+  sum(data$t * (omega_hat * log(param) - param))
 }
-E_loglik_grad <- function(theta, omega_hat, data) {
-  data$t * (omega_hat / theta - 1)
+E_loglik_grad <- function(param, omega_hat, data) {
+  data$t * (omega_hat / param - 1)
 }
 
 nuisance <- nuisance_spec(
@@ -120,7 +120,7 @@ model <- model_spec(name = "Poisson - Naive Rates") |>
 process_labels <- LETTERS[1:J]
 weights <- runif(J, 1, 3)
 t <- do.call(runif, list(n = J, min = J * 1, max = J * 5))
-mu_0 <- theta_0 * t
+mu_0 <- param_0 * t
 Y <- rpois(J, mu_0)
 data <- dplyr::tibble(
   process = factor(process_labels),

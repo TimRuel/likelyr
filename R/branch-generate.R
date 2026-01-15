@@ -11,7 +11,6 @@
 # given and does not know about the buffer.
 # ======================================================================
 
-
 # ======================================================================
 # INTERNAL: Build a full branch (left + right sweep) on the ψ-grid
 # ======================================================================
@@ -28,7 +27,7 @@
 #' in [generate_branches()].
 #'
 #' @param psi_hat_branch Numeric scalar. Branch mode ψ̂ for this ω̂ draw.
-#' @param theta_hat_branch Numeric vector. θ̂ at ψ̂_branch.
+#' @param param_hat_branch Numeric vector. θ̂ at ψ̂_branch.
 #' @param branch_cutoff Numeric scalar. Log-likelihood cutoff for stopping.
 #' @param grid A ψ-grid object created by [psi_grid_anchor()].
 #'   Must contain components:
@@ -37,7 +36,7 @@
 #'     \item increment — step size between ψ-grid points
 #'   }
 #' @param eval_psi_fun Function of the form
-#'   \code{eval_psi_fun(psi_value, theta_init) -> list(theta_hat, branch_val)}
+#'   \code{eval_psi_fun(psi_value, param_init) -> list(param_hat, branch_val)}
 #'   used to locally maximize the log-likelihood at fixed ψ.
 #' @param max_retries Integer. Maximum number of jitter retries for
 #'   enforcing monotonic branch behavior.
@@ -55,16 +54,15 @@
 #'
 #' @keywords internal
 build_one_branch <- function(
-    psi_hat_branch,
-    theta_hat_branch,
-    branch_cutoff,
-    grid,
-    eval_psi_fun,
-    max_retries
+  psi_hat_branch,
+  param_hat_branch,
+  branch_cutoff,
+  grid,
+  eval_psi_fun,
+  max_retries
 ) {
-
   # Extract grid metadata
-  psi_mle   <- grid$psi_mle
+  psi_mle <- grid$psi_mle
   increment <- grid$increment
 
   # Determine adjacent left/right k-indices around psi_hat_branch
@@ -75,24 +73,24 @@ build_one_branch <- function(
 
   # Left sweep
   left <- walk_branch_side(
-    grid          = grid,
-    k_direction   = -1L,
-    k_start       = adj$k_left,
+    grid = grid,
+    k_direction = -1L,
+    k_start = adj$k_left,
     branch_cutoff = branch_cutoff,
-    init_guess    = theta_hat_branch,
-    eval_psi_fun  = eval_psi_fun,
-    max_retries   = max_retries
+    init_guess = param_hat_branch,
+    eval_psi_fun = eval_psi_fun,
+    max_retries = max_retries
   )
 
   # Right sweep
   right <- walk_branch_side(
-    grid          = grid,
-    k_direction   = +1L,
-    k_start       = adj$k_right,
+    grid = grid,
+    k_direction = +1L,
+    k_start = adj$k_right,
     branch_cutoff = branch_cutoff,
-    init_guess    = theta_hat_branch,
-    eval_psi_fun  = eval_psi_fun,
-    max_retries   = max_retries
+    init_guess = param_hat_branch,
+    eval_psi_fun = eval_psi_fun,
+    max_retries = max_retries
   )
 
   # Merge & assign ψ values
@@ -110,12 +108,11 @@ build_one_branch <- function(
 
   # Metadata
   attr(branch, "mode_index") <- which.max(branch$loglik)
-  attr(branch, "n_points")   <- nrow(branch)
-  attr(branch, "psi_MLE")    <- psi_mle
+  attr(branch, "n_points") <- nrow(branch)
+  attr(branch, "psi_MLE") <- psi_mle
 
   branch
 }
-
 
 # =========================================================================
 # INTERNAL: Generate Monte Carlo Branches (integrated log-likelihood only)
@@ -148,13 +145,16 @@ build_one_branch <- function(
 #'
 #' @keywords internal
 generate_branches <- function(cal, verbose = TRUE) {
+  if (!inherits(cal, "calibrated")) {
+    stop(
+      "generate_branches() requires a 'calibrated' model object.",
+      call. = FALSE
+    )
+  }
 
-  if (!inherits(cal, "calibrated"))
-    stop("generate_branches() requires a 'calibrated' model object.", call. = FALSE)
-
-  param     <- cal$parameter
-  lik       <- cal$likelihood
-  estimand  <- cal$estimand
+  param <- cal$parameter
+  lik <- cal$likelihood
+  estimand <- cal$estimand
   optimizer <- cal$optimizer
   execution <- cal$execution
 
@@ -162,9 +162,11 @@ generate_branches <- function(cal, verbose = TRUE) {
   # Integrated log-likelihood components now live in cal$workspace$integrate
   # -------------------------------------------------------------------------
   integrate_result <- cal$workspace$integrate
-  if (is.null(integrate_result) ||
+  if (
+    is.null(integrate_result) ||
       is.null(integrate_result$generate_init) ||
-      is.null(integrate_result$sample_omega_hat)) {
+      is.null(integrate_result$sample_omega_hat)
+  ) {
     stop(
       "integrate() must set cal$workspace$integrate_result$generate_init and $sample_omega_hat.",
       call. = FALSE
@@ -183,39 +185,41 @@ generate_branches <- function(cal, verbose = TRUE) {
     )
   }
 
-  `%op%` <- if (is_parallel) `%dofuture%` else `%do%`
+  `%op%` <- if (is_parallel) doFuture::`%dofuture%` else `%do%`
 
   # -------------------------------------------------------------------
   # Core calibrated quantities
   # -------------------------------------------------------------------
-  psi_mle   <- estimand$psi_mle
-  theta_mle <- param$theta_mle
+  psi_mle <- estimand$psi_mle
+  param_mle <- param$param_mle
   increment <- estimand$increment
-  interval  <- estimand$search_interval
+  interval <- estimand$search_interval
+
+  max_retries <- optimizer$max_retries
 
   # ψ-grid anchor
   grid <- psi_grid_anchor(
-    psi_mle   = psi_mle,
+    psi_mle = psi_mle,
     increment = increment
   )
-
-  # -------------------------------------------------------------------
-  # LR cutoff and buffer
-  # -------------------------------------------------------------------
-  alpha_target <- min(1 - estimand$confidence_levels)
-  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
-
-  cutoff_buffer  <- estimand$cutoff_buffer %||% 0
-  effective_crit <- crit * (1 + cutoff_buffer)
 
   # -------------------------------------------------------------------
   # Monte Carlo configuration
   # -------------------------------------------------------------------
   R <- execution$total_branches
-
-  seed_opt   <- if (is_parallel) execution$seed else NULL
+  seed_opt <- if (is_parallel) execution$seed else NULL
   chunk_size <- if (is_parallel) execution$chunk_size else 1L
-  pkg_list   <- execution$packages %||% character()
+  pkg_list <- execution$packages %||% character()
+
+  # -------------------------------------------------------------------
+  # LR cutoff and buffer
+  # -------------------------------------------------------------------
+  alpha_target <- min(1 - estimand$confidence_levels)
+  alpha_branch <- compute_required_branch_alpha(R, alpha_target)
+  crit <- 0.5 * stats::qchisq(1 - alpha_branch, df = 1)
+
+  cutoff_buffer <- estimand$cutoff_buffer %||% 0
+  effective_crit <- crit * (1 + cutoff_buffer)
 
   # ψ-conditional optimizer factory
   eval_psi_builder <- build_eval_psi_fun(cal)
@@ -230,62 +234,82 @@ generate_branches <- function(cal, verbose = TRUE) {
   # -------------------------------------------------------------------
   result <- foreach::foreach(
     r = seq_len(R),
-    .packages       = pkg_list,
     .options.future = list(
-      seed       = seed_opt,
+      packages = pkg_list,
+      seed = seed_opt,
       chunk.size = chunk_size
+      # globals = structure(
+      #   TRUE,
+      #   add = c(
+      #     "branch_mode_solve",
+      #     "build_one_branch",
+      #     "build_eval_psi_fun",
+      #     "psi_grid_anchor",
+      #     "walk_branch_side",
+      #     "get_adjacent_psi_points",
+      #     "integrate_result",
+      #     "eval_psi_builder",
+      #     "effective_crit",
+      #     "psi_mle",
+      #     "param_mle",
+      #     "interval",
+      #     "optimizer",
+      #     "grid"
+      #   )
+      # )
     )
-  ) %op% {
+  ) %op%
+    {
+      # 1. Draw ω̂
+      init <- integrate_result$generate_init()
+      omega_hat <- integrate_result$sample_omega_hat(init)
 
-    # 1. Draw ω̂
-    init      <- integrate_result$generate_init()
-    omega_hat <- integrate_result$sample_omega_hat(init)
+      # 2. Build ψ evaluator for this ω̂
+      eval_psi_fun <- eval_psi_builder(omega_hat)
 
-    # 2. Build ψ evaluator for this ω̂
-    eval_psi_fun <- eval_psi_builder(omega_hat)
+      # 3. Solve branch mode
+      mode_obj <- branch_mode_solve(
+        psi_mle = psi_mle,
+        eval_psi_fun = eval_psi_fun,
+        param_init = param_mle,
+        search_interval = interval
+      )
 
-    # 3. Solve branch mode
-    mode_obj <- branch_mode_solve(
-      psi_mle         = psi_mle,
-      eval_psi_fun    = eval_psi_fun,
-      theta_init      = theta_mle,
-      search_interval = interval
-    )
+      psi_hat_branch <- mode_obj$psi_hat
+      loglik_at_mode <- mode_obj$loglik_at_mode
+      param_hat_branch <- mode_obj$param_hat
 
-    psi_hat_branch   <- mode_obj$psi_hat
-    loglik_at_mode   <- mode_obj$loglik_at_mode
-    theta_hat_branch <- mode_obj$theta_hat
+      # 4. Critical cutoff with buffer
+      branch_cutoff <- loglik_at_mode - effective_crit
 
-    # 4. Critical cutoff with buffer
-    branch_cutoff <- loglik_at_mode - effective_crit
+      # 5. Build full branch
+      branch <- build_one_branch(
+        psi_hat_branch = psi_hat_branch,
+        param_hat_branch = param_hat_branch,
+        branch_cutoff = branch_cutoff,
+        grid = grid,
+        eval_psi_fun = eval_psi_fun,
+        max_retries = max_retries
+      )
 
-    # 5. Build full branch
-    branch <- build_one_branch(
-      psi_hat_branch   = psi_hat_branch,
-      theta_hat_branch = theta_hat_branch,
-      branch_cutoff    = branch_cutoff,
-      grid             = grid,
-      eval_psi_fun     = eval_psi_fun,
-      max_retries      = optimizer$max_retries
-    )
-
-    list(
-      branch    = branch,
-      omega_hat = omega_hat
-    )
-  }
+      list(
+        branch = branch,
+        omega_hat = omega_hat
+      )
+    }
 
   # -------------------------------------------------------------------
   # Collect results
   # -------------------------------------------------------------------
-  branches   <- lapply(result, `[[`, "branch")
+  branches <- lapply(result, `[[`, "branch")
   omega_hats <- lapply(result, `[[`, "omega_hat")
 
-  if (verbose)
+  if (verbose) {
     cat("[integrate] Branch generation complete.\n")
+  }
 
   list(
-    branches    = branches,
+    branches = branches,
     omega_draws = omega_hats
   )
 }

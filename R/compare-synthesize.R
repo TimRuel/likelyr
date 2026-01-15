@@ -64,16 +64,19 @@
 #' \code{\link{render_estimates_comparison_table}}
 #'
 #' @family inference-renderers
-#' @export
+#' @keywords internal
 synthesize_comparison <- function(res_list) {
-
   point_estimates_df <- get_point_estimates_df(res_list)
 
-  point_estimates_comparison_table <- render_point_estimates_comparison_table(point_estimates_df)
+  point_estimates_comparison_table <- render_point_estimates_comparison_table(
+    point_estimates_df
+  )
 
   interval_estimates_df <- get_interval_estimates_df(res_list)
 
-  interval_estimates_comparison_table <- render_interval_estimates_comparison_table(interval_estimates_df)
+  interval_estimates_comparison_table <- render_interval_estimates_comparison_table(
+    interval_estimates_df
+  )
 
   n_levels <- interval_estimates_df |>
     dplyr::select(Level) |>
@@ -102,11 +105,11 @@ synthesize_comparison <- function(res_list) {
   pseudolikelihood_curves <- plot_pseudolikelihood_curves(res_list)
 
   list(
-    point_estimates_df                  = point_estimates_df,
-    interval_estimates_df               = interval_estimates_df,
-    estimates_df                        = estimates_df,
-    point_estimates_comparison_table    = point_estimates_comparison_table,
+    point_estimates_df = point_estimates_df,
+    interval_estimates_df = interval_estimates_df,
+    estimates_df = estimates_df,
+    point_estimates_comparison_table = point_estimates_comparison_table,
     interval_estimates_comparison_table = interval_estimates_comparison_table,
-    estimates_comparison_table          = estimates_comparison_table
+    estimates_comparison_table = estimates_comparison_table
   )
 }

@@ -7,11 +7,11 @@
 nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 }
 \arguments{
-\item{E_loglik}{Required. Function \verb{(theta, omega_hat, data) -> numeric}
+\item{E_loglik}{Required. Function \verb{(param, omega_hat, data) -> numeric}
 giving the expected log-likelihood.}
 
-\item{E_loglik_grad}{Optional gradient function \verb{(theta, omega_hat, data) -> numeric vector}.
-If supplied, must return a vector of length \code{theta_dim}.}
+\item{E_loglik_grad}{Optional gradient function \verb{(param, omega_hat, data) -> numeric vector}.
+If supplied, must return a vector of length \code{param_dim}.}
 
 \item{name}{Optional descriptive name for the nuisance component.}
 
@@ -26,13 +26,13 @@ Defines the nuisance contribution to the \emph{expected} log-likelihood
 used in Monte Carlo Integrated Log-Likelihood:
 
 \deqn{
-  E_{\omegâ}[ \log p(Y \mid \theta) ].
+  E_{\omegâ}[ \log p(Y \mid \param) ].
 }
 
 The nuisance specification provides:
 
-• \code{E_loglik(theta, omega_hat, data)} — expected log-likelihood
-• \code{E_loglik_grad(theta, omega_hat, data)} — optional gradient wrt θ
+• \code{E_loglik(param, omega_hat, data)} — expected log-likelihood
+• \code{E_loglik_grad(param, omega_hat, data)} — optional gradient wrt θ
 
 These functions are used \emph{only} for integrated log-likelihood calculations.
 They play no role in profile log-likelihood.

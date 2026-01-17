@@ -1,5 +1,5 @@
 # ======================================================================
-# Profile Log-Likelihood Builder (Improved)
+# Profile Log-Likelihood Builder
 # ======================================================================
 
 #' Generate a Profile Log-Likelihood Curve
@@ -40,7 +40,8 @@ generate_profile <- function(
   increment,
   cutoff,
   eval_psi_fun,
-  max_retries
+  max_retries,
+  drop_mult
 ) {
   # ------------------------------------------------------------
   # 1. Left sweep
@@ -52,7 +53,8 @@ generate_profile <- function(
     cutoff = cutoff,
     init_guess = param_mle,
     eval_psi_fun = eval_psi_fun,
-    max_retries = max_retries
+    max_retries = max_retries,
+    drop_mult = drop_mult
   )
 
   # ------------------------------------------------------------
@@ -65,7 +67,8 @@ generate_profile <- function(
     cutoff = cutoff,
     init_guess = param_mle,
     eval_psi_fun = eval_psi_fun,
-    max_retries = max_retries
+    max_retries = max_retries,
+    drop_mult = drop_mult
   )
 
   # ------------------------------------------------------------

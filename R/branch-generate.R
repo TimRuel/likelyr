@@ -185,7 +185,7 @@ generate_branches <- function(cal, verbose = TRUE) {
     )
   }
 
-  `%op%` <- if (is_parallel) doFuture::`%dofuture%` else `%do%`
+  `%op%` <- if (is_parallel) doFuture::`%dofuture%` else foreach::`%do%`
 
   # -------------------------------------------------------------------
   # Core calibrated quantities

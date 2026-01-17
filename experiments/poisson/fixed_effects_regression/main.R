@@ -1,7 +1,6 @@
 devtools::load_all()
 devtools::document()
 library(likelyr)
-library(foreach)
 ctx <- rstudioapi::getActiveDocumentContext()
 if (!is.null(ctx$path) && nzchar(ctx$path)) {
   script_dir <- dirname(ctx$path)
@@ -36,7 +35,7 @@ likelihood <- likelihood_spec(
 # Specify estimand
 # ============================================================
 source("estimand.R")
-increment <- 0.1
+increment <- 0.05
 confidence_levels <- c(0.90, 0.95, 0.99)
 cutoff_buffer <- 0.01
 uniroot_expand_factor <- 0.02
@@ -70,12 +69,14 @@ localsolver <- "SLSQP"
 control <- list(xtol_rel = 1e-8, maxeval = 1000)
 localtol <- 1e-6
 max_retries <- 10
+drop_mult <- 2
 
 optimizer <- optimizer_spec(
   localsolver = localsolver,
   control = control,
   localtol = localtol,
   max_retries = max_retries,
+  drop_mult = drop_mult,
   name = "Optimizer spec"
 )
 
@@ -109,10 +110,11 @@ model <- model_spec(name = "Poisson - Fixed Effects Regression") |>
 # Calibrate model to data and integrate
 # ============================================================
 source("data.R")
+set.seed(2026)
 data <- generate_data(config, beta_0)
 
-doFuture::registerDoFuture()
-future::plan(future::multisession, workers = num_workers)
+# doFuture::registerDoFuture()
+# future::plan(future::multisession, workers = num_workers)
 
 fit <- model |>
   calibrate(data)
@@ -129,3 +131,6 @@ fit <- fit |>
   diagnose() |>
   infer() |>
   compare()
+
+
+fit <- fit |> infer()

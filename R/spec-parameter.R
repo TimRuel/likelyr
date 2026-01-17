@@ -1,5 +1,5 @@
 # ======================================================================
-# Parameter Specification (v3.1)
+# Parameter Specification (v3.2) — list support for param_0
 # ======================================================================
 
 #' Specify the Parameter Space for a Likelihood Model
@@ -8,13 +8,14 @@
 #' Defines the parameter space, including:
 #'
 #'   • dimension
-#'   • optional true value
+#'   • optional true value(s)
 #'   • box constraints (lower, upper)
 #'   • inequality constraints h(param) ≤ 0 and Jacobian
 #'
 #' Exactly one of `param_0` or `param_dim` must be supplied.
 #'
-#' @param param_0 Optional numeric vector OR 1-column matrix giving true parameters.
+#' @param param_0 Optional numeric vector, 1-column matrix,
+#'   OR list of such objects giving true / initial parameters.
 #' @param param_dim Optional integer giving the parameter dimension.
 #' @param param_lower Optional numeric scalar or vector of lower bounds.
 #' @param param_upper Optional numeric scalar or vector of upper bounds.
@@ -55,51 +56,6 @@ parameter_spec <- function(
 # INTERNAL VALIDATOR
 # ======================================================================
 
-#' Validate parameter specification
-#'
-#' @description
-#' Internal validator for \code{parameter_spec} objects. This function
-#' enforces the structural and numerical constraints required for
-#' parameter definitions used in likelihood optimization.
-#'
-#' @details
-#' The following checks and transformations are performed:
-#'
-#' \itemize{
-#'   \item Exactly one of \code{param_0} (initial value) or
-#'         \code{param_dim} (dimension) must be supplied.
-#'
-#'   \item If \code{param_0} is supplied, it must be a finite numeric
-#'         vector or a one-column numeric matrix. Its length defines
-#'         the parameter dimension.
-#'
-#'   \item If \code{param_dim} is supplied, it must be a positive integer.
-#'
-#'   \item Box constraints \code{param_lower} and \code{param_upper}, if
-#'         provided, must be numeric scalars or vectors of length
-#'         \code{param_dim}. Scalars are recycled.
-#'
-#'   \item Lower bounds must not exceed upper bounds.
-#'
-#'   \item If \code{param_0} is supplied, it must respect all box
-#'         constraints.
-#'
-#'   \item Inequality constraint functions \code{ineq} and
-#'         \code{ineq_jac}, if supplied, must be functions. If both are
-#'         provided, their dimensions are validated for consistency.
-#' }
-#'
-#' After validation, the normalized fields \code{param_dim},
-#' \code{param_0}, \code{param_lower}, and \code{param_upper} are written
-#' back into the object.
-#'
-#' @param x A list representing a \code{parameter_spec} object.
-#'
-#' @return Returns the validated and normalized \code{parameter_spec}
-#' object.
-#'
-#' @keywords internal
-#' @noRd
 .validate_parameter_spec <- function(x) {
   param_0 <- x$param_0
   param_dim <- x$param_dim
@@ -132,8 +88,41 @@ parameter_spec <- function(
   # 2. Determine dimension
   # --------------------------------------------------------------
   if (has_param0) {
-    # Allow 1-column matrix
-    if (is.matrix(param_0)) {
+    if (is.list(param_0)) {
+      if (length(param_0) == 0) {
+        stop("param_0 list cannot be empty.", call. = FALSE)
+      }
+
+      lens <- vapply(
+        param_0,
+        function(p) {
+          if (is.matrix(p)) {
+            if (ncol(p) != 1) {
+              stop(
+                "Each param_0 matrix must have exactly one column.",
+                call. = FALSE
+              )
+            }
+            if (!is.numeric(p) || any(!is.finite(p))) {
+              stop("param_0 matrices must be finite numeric.", call. = FALSE)
+            }
+            nrow(p)
+          } else {
+            if (!is.numeric(p) || any(!is.finite(p))) {
+              stop(
+                "param_0 list elements must be finite numeric vectors.",
+                call. = FALSE
+              )
+            }
+            length(p)
+          }
+        },
+        integer(1)
+      )
+
+      # 🔹 NEW: total dimension = sum of sub-dimensions
+      J <- sum(lens)
+    } else if (is.matrix(param_0)) {
       if (ncol(param_0) != 1) {
         stop("param_0 matrix must have exactly one column.", call. = FALSE)
       }
@@ -167,7 +156,6 @@ parameter_spec <- function(
   # --------------------------------------------------------------
   # 3. Normalize box constraints
   # --------------------------------------------------------------
-
   if (!is.null(param_lower)) {
     if (!is.numeric(param_lower)) {
       stop("param_lower must be numeric.", call. = FALSE)
@@ -206,25 +194,24 @@ parameter_spec <- function(
   # 4. Validate param_0 vs constraints
   # --------------------------------------------------------------
   if (!is.null(param_0)) {
-    param_vec <- if (is.matrix(param_0)) {
-      as.numeric(param_0)
-    } else {
-      param_0
-    }
+    param_list <- if (is.list(param_0)) param_0 else list(param_0)
 
-    if (!is.null(param_lower) && any(param_vec < param_lower)) {
-      stop("param_0 violates param_lower constraints.", call. = FALSE)
-    }
+    for (p in param_list) {
+      param_vec <- if (is.matrix(p)) as.numeric(p) else p
 
-    if (!is.null(param_upper) && any(param_vec > param_upper)) {
-      stop("param_0 violates param_upper constraints.", call. = FALSE)
+      if (!is.null(param_lower) && any(param_vec < param_lower)) {
+        stop("param_0 violates param_lower constraints.", call. = FALSE)
+      }
+
+      if (!is.null(param_upper) && any(param_vec > param_upper)) {
+        stop("param_0 violates param_upper constraints.", call. = FALSE)
+      }
     }
   }
 
   # --------------------------------------------------------------
   # 5. Validate inequality constraints
   # --------------------------------------------------------------
-
   if (!is.null(ineq) && !is.function(ineq)) {
     stop("ineq must be NULL or a function(param).", call. = FALSE)
   }
@@ -236,7 +223,8 @@ parameter_spec <- function(
   if (!is.null(ineq) && !is.null(ineq_jac)) {
     test_param <-
       if (!is.null(param_0)) {
-        if (is.matrix(param_0)) as.numeric(param_0) else param_0
+        p0 <- if (is.list(param_0)) param_0[[1]] else param_0
+        if (is.matrix(p0)) as.numeric(p0) else p0
       } else if (!is.null(param_lower) && !is.null(param_upper)) {
         (param_lower + param_upper) / 2
       } else {
@@ -283,12 +271,57 @@ print.parameter_spec <- function(x, ...) {
   cat("- Dimension:   ", x$param_dim, "\n", sep = "")
 
   if (!is.null(x$param_0)) {
-    cat("- True value:\n")
+    cat("- True value(s):\n")
 
-    if (is.matrix(x$param_0)) {
-      print(x$param_0)
+    # ---------------------------
+    # Helper to format one vector
+    # ---------------------------
+    fmt_vec <- function(v) {
+      nms <- names(v)
+      vals <- format(v)
+
+      if (!is.null(nms)) {
+        paste0(nms, " = ", vals, collapse = ", ")
+      } else {
+        paste(vals, collapse = ", ")
+      }
+    }
+
+    # ---------------------------
+    # Case: list of starts
+    # ---------------------------
+    if (is.list(x$param_0)) {
+      list_names <- names(x$param_0)
+
+      for (i in seq_along(x$param_0)) {
+        label <- if (!is.null(list_names) && nzchar(list_names[i])) {
+          paste0(list_names[i])
+        } else {
+          i
+        }
+
+        cat("  [", label, "]: ", sep = "")
+
+        p <- x$param_0[[i]]
+        v <- if (is.matrix(p)) as.numeric(p) else p
+        names(v) <- if (!is.null(names(p))) names(p) else names(v)
+
+        cat("(", fmt_vec(v), ")\n", sep = "")
+      }
+
+      # ---------------------------
+      # Case: single matrix
+      # ---------------------------
+    } else if (is.matrix(x$param_0)) {
+      v <- as.numeric(x$param_0)
+      names(v) <- rownames(x$param_0)
+      cat("  (", fmt_vec(v), ")\n", sep = "")
+
+      # ---------------------------
+      # Case: single vector
+      # ---------------------------
     } else {
-      cat("  (", paste(format(x$param_0), collapse = ", "), ")\n", sep = "")
+      cat("  (", fmt_vec(x$param_0), ")\n", sep = "")
     }
   }
 

@@ -102,9 +102,9 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # 4. Construct branch grid and walk it
   # ------------------------------------------------------------------
 
-  # increment & max_retries must come from execution or default settings
-  increment <- cal$execution$increment %||% 0.05
-  max_retries <- cal$execution$max_retries %||% 4
+  increment <- cal$estimand$increment %||% 0.05
+  max_retries <- cal$optimizer$max_retries %||% 4
+  drop_mult <- cal$optimizer$drop_mult %||% 5
 
   psi_ll_df <- tryCatch(
     generate_profile(
@@ -115,7 +115,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
       cutoff = cutoff,
       eval_psi_fun = eval_psi_fun,
       max_retries = max_retries,
-      ...
+      drop_mult = drop_mult
     ),
 
     error = function(e) {

@@ -73,24 +73,39 @@ walk_branch_side <- function(
       eval <- eval_psi_fun(psi_k, current_par)
     }
 
-    # --------------------------------------------------------------
-    # Stop if branch value too small or non-finite
-    # --------------------------------------------------------------
+    # ------------------------------
+    # Update first
+    # ------------------------------
     current_val <- eval$branch_val
 
-    if (!is.finite(current_val) || current_val < branch_cutoff) {
+    # Record
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
+
+    # ------------------------------
+    # Terminate
+    # ------------------------------
+    if (!is.finite(current_val)) {
+      stop(
+        "walk_branch_side(): Non-finite log-likelihood at k = ",
+        k_curr,
+        " (value = ",
+        current_val,
+        ").",
+        call. = FALSE
+      )
+    }
+
+    if (current_val < branch_cutoff) {
       break
     }
 
     # Update θ̂
     current_par <- eval$param_hat
 
-    # Record this step
-    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
-
     # Next grid index
     k_curr <- k_curr + k_direction
   }
 
-  dplyr::distinct(df) |> dplyr::arrange(.data$k)
+  dplyr::distinct(df) |>
+    dplyr::arrange(.data$k)
 }

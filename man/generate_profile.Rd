@@ -11,7 +11,8 @@ generate_profile(
   increment,
   cutoff,
   eval_psi_fun,
-  max_retries
+  max_retries,
+  drop_mult
 )
 }
 \arguments{

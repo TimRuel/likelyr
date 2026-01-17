@@ -9,6 +9,7 @@ optimizer_spec(
   control = list(),
   localtol = 1e-06,
   max_retries = 10,
+  drop_mult = 5,
   name = NULL,
   ...
 )
@@ -23,6 +24,10 @@ Default: \code{"SLSQP"}.}
 
 \item{max_retries}{Numeric scalar giving number of restart attempts allowed when
 optimization fails to converge.}
+
+\item{drop_mult}{Numeric scalar controlling how large a log-likelihood drop
+is allowed relative to the previous drop during continuation.
+Values > 1 are required. Typical range: 3–10.}
 
 \item{name}{Optional descriptive name.}
 
@@ -40,6 +45,7 @@ Defines optimization behavior for estimating θ using
 • nloptr control parameters
 • Local solver tolerance
 • Restart policy (max_retries)
+• Drop consistency tolerance (drop_mult)
 
 These settings are used by both profile and integrated likelihood
 routines when solving constrained optimization problems.

@@ -12,6 +12,7 @@
 #' • nloptr control parameters
 #' • Local solver tolerance
 #' • Restart policy (max_retries)
+#' • Drop consistency tolerance (drop_mult)
 #'
 #' These settings are used by both profile and integrated likelihood
 #' routines when solving constrained optimization problems.
@@ -30,6 +31,11 @@
 #'   Numeric scalar giving number of restart attempts allowed when
 #'   optimization fails to converge.
 #'
+#' @param drop_mult
+#'   Numeric scalar controlling how large a log-likelihood drop
+#'   is allowed relative to the previous drop during continuation.
+#'   Values > 1 are required. Typical range: 3–10.
+#'
 #' @param name
 #'   Optional descriptive name.
 #'
@@ -46,6 +52,7 @@ optimizer_spec <- function(
   control = list(),
   localtol = 1e-6,
   max_retries = 10,
+  drop_mult = 5,
   name = NULL,
   ...
 ) {
@@ -55,6 +62,7 @@ optimizer_spec <- function(
     control = control,
     localtol = localtol,
     max_retries = max_retries,
+    drop_mult = drop_mult,
     extra = list(...)
   )
 
@@ -86,6 +94,9 @@ optimizer_spec <- function(
 #'         the local convergence tolerance.
 #'   \item \code{max_retries} must be a non-negative integer giving the
 #'         number of allowed retry attempts.
+#'   \item \code{drop_mult} must be a numeric scalar greater than 1,
+#'         controlling how large a log-likelihood drop is allowed
+#'         relative to the previous drop during continuation.
 #' }
 #'
 #' These checks enforce the contract required for robust and reproducible
@@ -135,6 +146,19 @@ optimizer_spec <- function(
     stop("max_retries must be a non-negative integer.", call. = FALSE)
   }
 
+  # Drop multiplier -----------------------------------------------------
+  if (
+    !is.numeric(x$drop_mult) ||
+      length(x$drop_mult) != 1 ||
+      !is.finite(x$drop_mult) ||
+      x$drop_mult <= 1
+  ) {
+    stop(
+      "drop_mult must be a numeric scalar > 1.",
+      call. = FALSE
+    )
+  }
+
   invisible(x)
 }
 
@@ -149,6 +173,7 @@ print.optimizer_spec <- function(x, ...) {
   cat("- Local solver:  ", x$localsolver, "\n", sep = "")
   cat("- Tolerance:     ", x$localtol, "\n", sep = "")
   cat("- Max retries:   ", x$max_retries, "\n", sep = "")
+  cat("- Drop mult:     ", x$drop_mult, "\n", sep = "")
   cat(
     "- Control list:  ",
     if (length(x$control) == 0) {

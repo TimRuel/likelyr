@@ -305,6 +305,122 @@ plot_reference_line_style <- function(name) {
 }
 
 # ----------------------------------------------------------------------
+# Theme accessors
+# ----------------------------------------------------------------------
+
+#' Theme configuration
+#' @keywords internal
+#' @noRd
+plot_theme_cfg <- function() {
+  .get_style_node(c("theme"))
+}
+
+#' Panel background fill
+#' @keywords internal
+#' @noRd
+plot_bg_panel_fill <- function() {
+  .get_style_node(c("theme", "background", "panel", "fill"))
+}
+
+#' Panel background border
+#' @keywords internal
+#' @noRd
+plot_bg_panel_color <- function() {
+  .get_style_node(c("theme", "background", "panel", "color"))
+}
+
+#' Plot background fill
+#' @keywords internal
+#' @noRd
+plot_bg_plot_fill <- function() {
+  .get_style_node(c("theme", "background", "plot", "fill"))
+}
+
+#' Plot background border
+#' @keywords internal
+#' @noRd
+plot_bg_plot_color <- function() {
+  .get_style_node(c("theme", "background", "plot", "color"))
+}
+
+#' Legend background fill
+#' @keywords internal
+#' @noRd
+plot_bg_legend_fill <- function() {
+  .get_style_node(c("theme", "background", "legend", "fill"))
+}
+
+#' Major grid color
+#' @keywords internal
+#' @noRd
+plot_grid_major_color <- function() {
+  .get_style_node(c("theme", "grid", "major", "color"))
+}
+
+#' Minor grid color
+#' @keywords internal
+#' @noRd
+plot_grid_minor_color <- function() {
+  .get_style_node(c("theme", "grid", "minor", "color"))
+}
+
+#' Axis tick color
+#' @keywords internal
+#' @noRd
+plot_axis_tick_color <- function() {
+  .get_style_node(c("theme", "axis", "ticks", "color"))
+}
+
+#' Axis text color
+#' @keywords internal
+#' @noRd
+plot_axis_text_color <- function() {
+  .get_style_node(c("theme", "axis", "text", "color"))
+}
+
+#' Axis title color
+#' @keywords internal
+#' @noRd
+plot_axis_title_color <- function() {
+  .get_style_node(c("theme", "axis", "title", "color"))
+}
+
+#' Strip label color
+#' @keywords internal
+#' @noRd
+plot_strip_text_color <- function() {
+  .get_style_node(c("theme", "strip", "text", "color"))
+}
+
+#' Plot title color
+#' @keywords internal
+#' @noRd
+plot_title_color <- function() {
+  .get_style_node(c("theme", "plot", "title", "color"))
+}
+
+#' Plot title face
+#' @keywords internal
+#' @noRd
+plot_title_face <- function() {
+  .get_style_node(c("theme", "plot", "title", "face"))
+}
+
+#' Legend text color
+#' @keywords internal
+#' @noRd
+plot_legend_text_color <- function() {
+  .get_style_node(c("theme", "legend", "text", "color"))
+}
+
+#' Legend title color
+#' @keywords internal
+#' @noRd
+plot_legend_title_color <- function() {
+  .get_style_node(c("theme", "legend", "title", "color"))
+}
+
+# ----------------------------------------------------------------------
 # Diagnostics styling
 # ----------------------------------------------------------------------
 

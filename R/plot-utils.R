@@ -255,9 +255,11 @@ extract_ci_long <- function(interval_estimate_df) {
 #' @keywords internal
 #' @noRd
 compute_y_limits <- function(psi_ll_df) {
-  y_range <- range(psi_ll_df$loglik - max(psi_ll_df$loglik))
-  y_range + c(-1, 1) * 0.5
+  y <- psi_ll_df$loglik - max(psi_ll_df$loglik)
+  pad <- 0.1
+  range(y) + c(-pad, pad)
 }
+
 
 #' Vertical CI endpoint lines
 #'

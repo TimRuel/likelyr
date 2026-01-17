@@ -9,18 +9,6 @@
 
 #' Plot pseudolikelihood evaluation points
 #'
-#' @description
-#' Builds a scatter plot of pseudolikelihood evaluation points
-#' over the ψ-grid. This is primarily used for visual inspection
-#' of the raw evaluated log-likelihood surface.
-#'
-#' @param psi_ll_df Data frame with columns \code{psi} and
-#'   \code{loglik}, and an attribute \code{"type"} indicating
-#'   \code{"profile"} or \code{"integrate"}.
-#'
-#' @return A ggplot object visualizing the pseudolikelihood
-#'   evaluation points.
-#'
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_points <- function(psi_ll_df) {
@@ -49,28 +37,6 @@ plot_pseudolikelihood_points <- function(psi_ll_df) {
 
 #' Plot single pseudolikelihood curve with inference overlays
 #'
-#' @description
-#' Constructs a complete visualization for a single pseudolikelihood
-#' result, including:
-#' \itemize{
-#'   \item Zero-shifted likelihood curve
-#'   \item Confidence interval endpoints
-#'   \item Point estimate marker
-#'   \item Truth reference marker
-#' }
-#'
-#' This plot is used for both profile and integrated likelihood
-#' inference visualization.
-#'
-#' @param psi_ll_df Data frame of evaluated pseudolikelihood values.
-#' @param zero_max_psi_ll_fn Zero-shifted log-likelihood function.
-#' @param point_estimate_df Data frame containing point estimate
-#'   information (ψ̂ and ψ₀).
-#' @param interval_estimate_df Data frame of interval estimates.
-#'
-#' @return A ggplot object showing the likelihood curve and
-#'   inference annotations.
-#'
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_curve <- function(
@@ -82,7 +48,14 @@ plot_pseudolikelihood_curve <- function(
   type <- attr(psi_ll_df, "type")
   pseudolikelihood <- tolower(type)
 
-  psi_limits <- range(psi_ll_df$psi)
+  # --------------------------------------------------
+  # Axis limits
+  # --------------------------------------------------
+
+  psi_limits <- range(psi_ll_df$psi) +
+    c(-1, 1) * 3 * head(diff(psi_ll_df$psi), 1)
+
+  y_limits <- compute_y_limits(psi_ll_df)
 
   # --------------------------------------------------
   # Curve layer
@@ -100,7 +73,6 @@ plot_pseudolikelihood_curve <- function(
   # --------------------------------------------------
 
   ci_long <- extract_ci_long(interval_estimate_df)
-  y_limits <- compute_y_limits(psi_ll_df)
 
   # --------------------------------------------------
   # Labels
@@ -108,7 +80,10 @@ plot_pseudolikelihood_curve <- function(
 
   label_data <- data.frame(
     source = c(pseudolikelihood, "Truth"),
-    value = c(point_estimate_df$psi_hat, point_estimate_df$psi_0),
+    value = c(
+      point_estimate_df$psi_hat,
+      point_estimate_df$psi_0
+    ),
     label = c(
       paste0(
         "hat(psi)[",
@@ -161,15 +136,14 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::labs(title = likelihood_title(type)) +
     likelihood_axes() +
 
+    # ---- X domain restriction (real limits) ----
     ggplot2::scale_x_continuous(
       expand = c(0, 0),
       limits = psi_limits
     ) +
 
-    ggplot2::scale_y_continuous(
-      expand = c(0, 0),
-      limits = y_limits
-    ) +
+    # ---- Y zoom ONLY (no data dropping) ----
+    ggplot2::coord_cartesian(ylim = y_limits) +
 
     ggplot2::theme(
       legend.position = "inside",
@@ -185,24 +159,6 @@ plot_pseudolikelihood_curve <- function(
 # ---------------------------------------------------------------------
 
 #' Plot pseudolikelihood comparison curves
-#'
-#' @description
-#' Builds a multi-curve comparison plot overlaying profile and
-#' integrated pseudolikelihood curves, along with:
-#' \itemize{
-#'   \item Shared confidence cutoffs
-#'   \item Point estimate markers
-#'   \item Truth reference markers
-#' }
-#'
-#' This plot is used for visual comparison of profile vs integrated
-#' likelihood inference results.
-#'
-#' @param res_list Named list of likelihood result objects, each
-#'   containing inference outputs.
-#'
-#' @return A ggplot object showing overlaid likelihood curves
-#'   and inference annotations.
 #'
 #' @keywords internal
 #' @noRd
@@ -278,7 +234,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   )
 
   # --------------------------------------------------
-  # Axes limits
+  # Axis limits
   # --------------------------------------------------
 
   psi_limits <- range(
@@ -329,15 +285,14 @@ plot_pseudolikelihood_curves <- function(res_list) {
     ) +
     likelihood_axes() +
 
+    # ---- X domain restriction ----
     ggplot2::scale_x_continuous(
       expand = c(0, 0),
       limits = psi_limits
     ) +
 
-    ggplot2::scale_y_continuous(
-      expand = c(0, 0),
-      limits = y_limits
-    ) +
+    # ---- Y zoom ONLY ----
+    ggplot2::coord_cartesian(ylim = y_limits) +
 
     ggplot2::theme(
       legend.position = "inside",

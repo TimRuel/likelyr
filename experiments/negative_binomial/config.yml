@@ -1,0 +1,72 @@
+experiment:
+  app: negative_binomial
+  estimand: process_rates_weighted_sum
+  model: naive_rates
+  description: >
+    Estimate a separate rate (θ_j) for each negative binomial process using observed counts
+    and known exposure times. No covariates or regression structure; each process is treated
+    independently. Process-level weights influence the weighted-sum estimand ψ.
+
+seed: 4972
+
+processes:
+  n_processes: 5
+  n_per_process: 10
+  labels: auto_upper          # auto_upper | auto_lower | auto_num | explicit list
+  
+omega:
+  distribution: rgamma
+  args: [5.0, 1.0]
+
+theta:
+  distribution: rgamma
+  args: [8.0, 2.0]
+  per_process: true
+
+phi:
+  distribution: rgamma
+  args: [10.0, 3.0]
+  per_process: true
+
+exposure:
+  name: t
+  distribution: runif
+  args: [1, 3]               # t_i ~ U(1,3)
+
+weights:
+  distribution: runif
+  args: [1, 10]
+  normalize_mean_to: 1.0
+
+optimization_specs:
+
+  IL:  # Integrated Likelihood settings
+    # --- ψ-grid sizing ---
+    num_std_errors: 6          # width of ψ-grid in SE units
+    increment: 0.05            # coarse ψ step
+    alpha_levels: [0.01, 0.05, 0.10]
+
+    # --- parallel branch generation ---
+    chunk_size: 1              # branches per worker
+    num_workers: 8             # total branches = chunk_size * num_workers
+
+    # --- inner solver controls ---
+    p_cutoff: 1e-12
+    max_y_cap: 1e6
+    max_retries: 5
+    localsolver: SLSQP
+    xtol_rel: 1e-8
+    maxeval: 1000
+
+  PL:  # Profile Likelihood settings
+    # --- ψ-grid sizing ---
+    increment: 0.05
+    alpha_levels: [0.01, 0.05, 0.10]
+    
+    # --- inner solver controls ---
+    p_cutoff: 1e-12
+    max_y_cap: 1e6
+    max_retries: 5
+    localsolver: SLSQP
+    xtol_rel: 1e-8
+    maxeval: 1000

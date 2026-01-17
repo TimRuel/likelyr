@@ -16,7 +16,8 @@ parameter_spec(
 )
 }
 \arguments{
-\item{param_0}{Optional numeric vector OR 1-column matrix giving true parameters.}
+\item{param_0}{Optional numeric vector, 1-column matrix,
+OR list of such objects giving true / initial parameters.}
 
 \item{param_dim}{Optional integer giving the parameter dimension.}
 
@@ -39,7 +40,7 @@ A \code{parameter_spec} object.
 Defines the parameter space, including:
 
 • dimension
-• optional true value
+• optional true value(s)
 • box constraints (lower, upper)
 • inequality constraints h(param) ≤ 0 and Jacobian
 

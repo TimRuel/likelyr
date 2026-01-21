@@ -248,6 +248,7 @@ diagnostics:
       color: "#88C0D0"
       linewidth: 1.2
       linetype: solid
+      alpha: 1
 
     point:
       color: "#E5C07B"

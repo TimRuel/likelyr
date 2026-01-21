@@ -155,6 +155,7 @@ generate_branches <- function(cal, verbose = TRUE) {
   param <- cal$parameter
   lik <- cal$likelihood
   estimand <- cal$estimand
+  nuisance <- cal$nuisance
   optimizer <- cal$optimizer
   execution <- cal$execution
 
@@ -238,25 +239,6 @@ generate_branches <- function(cal, verbose = TRUE) {
       packages = pkg_list,
       seed = seed_opt,
       chunk.size = chunk_size
-      # globals = structure(
-      #   TRUE,
-      #   add = c(
-      #     "branch_mode_solve",
-      #     "build_one_branch",
-      #     "build_eval_psi_fun",
-      #     "psi_grid_anchor",
-      #     "walk_branch_side",
-      #     "get_adjacent_psi_points",
-      #     "integrate_result",
-      #     "eval_psi_builder",
-      #     "effective_crit",
-      #     "psi_mle",
-      #     "param_mle",
-      #     "interval",
-      #     "optimizer",
-      #     "grid"
-      #   )
-      # )
     )
   ) %op%
     {

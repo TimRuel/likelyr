@@ -103,7 +103,7 @@ build_eval_psi_fun <- function(cal) {
       psi_target = NULL,
       x0 = NULL
     ),
-    parent = emptyenv()
+    parent = baseenv()
   )
 
   # ---------------------------------------------------------------

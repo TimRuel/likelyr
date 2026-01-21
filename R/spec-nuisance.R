@@ -1,5 +1,5 @@
 # ======================================================================
-# Nuisance Specification (v3.1)
+# Nuisance Specification (v5.1)
 # ======================================================================
 
 #' Specify Nuisance Components for Integrated Log-Likelihood
@@ -18,7 +18,6 @@
 #' • `E_loglik_grad(param, omega_hat, data)` — optional gradient wrt θ
 #'
 #' These functions are used *only* for integrated log-likelihood calculations.
-#' They play no role in profile log-likelihood.
 #'
 #' @param E_loglik
 #'   Required. Function `(param, omega_hat, data) -> numeric`
@@ -26,7 +25,6 @@
 #'
 #' @param E_loglik_grad
 #'   Optional gradient function `(param, omega_hat, data) -> numeric vector`.
-#'   If supplied, must return a vector of length `param_dim`.
 #'
 #' @param name Optional descriptive name for the nuisance component.
 #' @param ... Additional fields stored but unused.
@@ -53,10 +51,10 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
 # INTERNAL VALIDATOR
 # ======================================================================
 
-#' Validate nuisance specification
+#' Validate Nuisance Specification
 #'
 #' @description
-#' Internal validator for \code{nuisance_spec} objects. Ensures that all
+#' Internal validator for `nuisance_spec` objects. Ensures that all
 #' required nuisance-related functions are present and correctly typed
 #' before downstream likelihood procedures are run.
 #'
@@ -64,23 +62,20 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
 #' The following checks are performed:
 #'
 #' \itemize{
-#'   \item \code{E_loglik} must be a function with signature
-#'         \code{(param, omega_hat, data)}.
-#'   \item \code{E_loglik_grad}, if supplied, must also be a function with
-#'         the same signature. It may be \code{NULL}.
+#'   \item `E_loglik` must be a function with signature
+#'         `(param, omega_hat, data)`.
+#'   \item `E_loglik_grad`, if supplied, must also be a function with
+#'         the same signature.
 #' }
 #'
-#' These validations enforce the contract required for integrated
-#' likelihood calculations involving nuisance parameters.
+#' @param x A list representing a `nuisance_spec` object.
 #'
-#' @param x A list representing a \code{nuisance_spec} object.
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
+#' @return Invisibly returns `x` if validation succeeds.
 #'
 #' @keywords internal
 #' @noRd
 .validate_nuisance_spec <- function(x) {
-  # ---- Expected loglik must be supplied ----
+  # ---- E_loglik ----
   if (!is.function(x$E_loglik)) {
     stop(
       "E_loglik must be a function(param, omega_hat, data).",
@@ -88,12 +83,33 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
     )
   }
 
-  # ---- Gradient must be a function if present ----
-  if (!is.null(x$E_loglik_grad) && !is.function(x$E_loglik_grad)) {
+  fmls <- names(formals(x$E_loglik))
+
+  if (!"data" %in% fmls) {
     stop(
-      "E_loglik_grad must be NULL or a function(param, omega_hat, data).",
+      "E_loglik must include a `data` argument. ",
+      "Signature must be: (param, omega_hat, data).",
       call. = FALSE
     )
+  }
+
+  # ---- Gradient ----
+  if (!is.null(x$E_loglik_grad)) {
+    if (!is.function(x$E_loglik_grad)) {
+      stop(
+        "E_loglik_grad must be NULL or a function(param, omega_hat, data).",
+        call. = FALSE
+      )
+    }
+
+    fmls_g <- names(formals(x$E_loglik_grad))
+
+    if (!"data" %in% fmls_g) {
+      stop(
+        "E_loglik_grad must include a `data` argument.",
+        call. = FALSE
+      )
+    }
   }
 
   invisible(x)
@@ -103,16 +119,21 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
 # PRINT METHOD
 # ======================================================================
 
+#' Print Method for `nuisance_spec`
+#'
+#' @description
+#' Displays a concise summary of the nuisance specification.
+#'
+#' @param x A `nuisance_spec` object.
+#' @param ... Unused.
+#'
+#' @return Invisibly returns `x`.
+#'
 #' @export
 print.nuisance_spec <- function(x, ...) {
   cat("# Nuisance Specification\n")
   cat("- Name: ", x$name, "\n", sep = "")
-  cat(
-    "- Expected log-likelihood:   ",
-    if (!is.null(x$E_loglik)) "present" else "missing",
-    "\n",
-    sep = ""
-  )
+  cat("- Expected log-likelihood:  present\n")
   cat(
     "- Expected loglik gradient:  ",
     if (!is.null(x$E_loglik_grad)) "present" else "absent",

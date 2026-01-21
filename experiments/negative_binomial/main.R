@@ -1,6 +1,6 @@
 # devtools::document()
 # devtools::install(upgrade = "never")
-# library(likelyr)
+library(likelyr)
 devtools::load_all()
 ctx <- rstudioapi::getActiveDocumentContext()
 if (!is.null(ctx$path) && nzchar(ctx$path)) {
@@ -45,7 +45,7 @@ likelihood <- likelihood_spec(
 # # Specify estimand
 # # ============================================================
 source("estimand.R")
-increment <- 0.1
+increment <- 0.5
 confidence_levels <- c(0.90, 0.95, 0.99)
 cutoff_buffer <- 0.01
 uniroot_expand_factor <- 0.02
@@ -94,7 +94,7 @@ optimizer <- optimizer_spec(
 # # Specify execution plan (serial or parallel)
 # # ============================================================
 seed <- 7835
-num_workers <- 12
+num_workers <- 10
 chunk_size <- 1
 packages <- c("likelyr")
 execution <- parallel_spec(
@@ -122,23 +122,41 @@ model <- model_spec(name = "Poisson - Fixed Effects Regression") |>
 source("data.R")
 data <- generate_data(config, parameter)
 
-# # doFuture::registerDoFuture()
-# # future::plan(future::multisession, workers = num_workers)
-
 fit <- model |>
   calibrate(data)
 
-# fit <- fit |>
-#   integrate()
+f <- fit$nuisance$E_loglik
+inner <- get("f", envir = environment(f))
 
-# future::plan(future::sequential)
+# E_loglik sees helper
+exists("E_log_gamma", environment(inner), inherits = TRUE)
+
+# E_log_gamma sees E_gamma
+g <- get("E_log_gamma", environment(inner))
+exists("E_gamma", environment(g), inherits = TRUE)
+
+# E_digamma sees E_gamma
+dg <- get("E_digamma", environment(inner), inherits = TRUE)
+exists("E_gamma", environment(dg), inherits = TRUE)
+
+
+future::plan(future::multisession, workers = num_workers)
+
+fit <- fit |>
+  integrate()
+
+future::plan(future::sequential)
+
+print("Integrate done!")
 
 fit <- fit |>
   profile()
 
-# fit <- fit |>
-#   diagnose() |>
-#   infer() |>
-#   compare()
+print("Profile done!")
 
-fit <- fit |> infer()
+fit <- fit |>
+  diagnose() |>
+  infer() |>
+  compare()
+
+# fit <- fit |> infer()

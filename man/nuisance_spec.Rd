@@ -10,8 +10,7 @@ nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
 \item{E_loglik}{Required. Function \verb{(param, omega_hat, data) -> numeric}
 giving the expected log-likelihood.}
 
-\item{E_loglik_grad}{Optional gradient function \verb{(param, omega_hat, data) -> numeric vector}.
-If supplied, must return a vector of length \code{param_dim}.}
+\item{E_loglik_grad}{Optional gradient function \verb{(param, omega_hat, data) -> numeric vector}.}
 
 \item{name}{Optional descriptive name for the nuisance component.}
 
@@ -35,5 +34,4 @@ The nuisance specification provides:
 • \code{E_loglik_grad(param, omega_hat, data)} — optional gradient wrt θ
 
 These functions are used \emph{only} for integrated log-likelihood calculations.
-They play no role in profile log-likelihood.
 }

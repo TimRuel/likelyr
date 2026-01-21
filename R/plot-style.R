@@ -460,9 +460,9 @@ plot_diagnostics_plot_cfg <- function(plot_name) {
 #' @keywords internal
 #' @noRd
 plot_diagnostics_style <- function(method, plot) {
-  defaults <- plot_diagnostics_defaults()
-  by_meth <- plot_diagnostics_method_cfg(method) %||% list()
-  by_plot <- plot_diagnostics_plot_cfg(plot) %||% list()
+  defaults <- likelyr:::plot_diagnostics_defaults()
+  by_meth <- likelyr:::plot_diagnostics_method_cfg(method) %||% list()
+  by_plot <- likelyr:::plot_diagnostics_plot_cfg(plot) %||% list()
 
   style <- modifyList(defaults, by_meth)
   style <- modifyList(style, by_plot)

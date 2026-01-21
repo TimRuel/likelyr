@@ -1,0 +1,317 @@
+# ==================================================
+# PLOT STYLE CONFIGURATION (DARK THEME)
+# ==================================================
+
+# --------------------------------------------------
+# Likelihood curve styling
+# --------------------------------------------------
+curve:
+  linetype: solid
+  linewidth: 1.5
+
+  by_method:
+    integrate:
+      color: "#052880"
+      linetype: solid
+    profile:
+      color: "#052880"
+      linetype: solid
+
+  comparison:
+    integrate:
+      color: "#052880"
+      linetype: solid
+    profile:
+      color: "#941703"
+      linetype: "22"
+
+# --------------------------------------------------
+# Point cloud styling
+# --------------------------------------------------
+points:
+  cloud:
+    size:  3
+    alpha: 0.7
+
+# --------------------------------------------------
+# Point estimate marker styling
+# --------------------------------------------------
+point_estimate:
+  color: "#941703"
+  linewidth: 1.5
+  linetype: solid
+
+  comparison:
+    integrate:
+      color: "#052880"
+      linetype: solid
+      linewidth: 1.5
+    profile:
+      color: "#941703"
+      linetype: solid
+      linewidth: 1.5
+
+# --------------------------------------------------
+# Truth marker styling (KOKIRI FOREST GREEN)
+# --------------------------------------------------
+truth:
+  color:     "#3A8F4E"   # deep forest green
+  linetype:  solid
+  linewidth: 1.5
+
+# --------------------------------------------------
+# Interval estimate styling (TRIFORCE GOLD)
+# --------------------------------------------------
+interval_estimate:
+  description: >
+    Triforce-inspired golden HCL palette for likelihood-ratio
+    confidence interval endpoints. Warm, luminous yellow tones.
+
+  generator: sequential_hcl
+  params:
+    h: 85          # golden yellow hue
+    c: [30, 75]    # soft -> vivid gold
+    l: [96, 45]    # glow -> deep gold
+    power: 1.05
+  name_from: Level
+
+  line:
+    linetype: dashed
+    linewidth: 1
+
+# --------------------------------------------------
+# Reference lines
+# --------------------------------------------------
+reference_lines:
+  loglik_zero:
+    linetype: dashed
+    linewidth: 0.8
+    color: "black"
+
+# --------------------------------------------------
+# Base ggplot theme (global defaults)
+# --------------------------------------------------
+theme:
+  base: minimal
+
+  background:
+    panel:
+      fill: "#444444"
+      color: null
+    plot:
+      fill: "#2A2A2A"
+      color: null
+    legend:
+      fill: "#444444"
+
+  grid:
+    major:
+      color: "#4C4C4C"
+    minor:
+      color: "#333333"
+
+  axis:
+    ticks:
+      color: "white"
+
+    text:
+      color: "white"
+      size: 11
+
+    title:
+      color: "white"
+      size: 13
+
+  strip:
+    text:
+      color: "white"
+      size: 12
+
+  plot:
+    title:
+      color: "white"
+      face: "bold"
+      size: 16
+
+    subtitle:
+      size: 13
+
+    caption:
+      size: 10
+
+  legend:
+    text:
+      color: "white"
+      size: 11
+
+    title:
+      color: "white"
+      size: 12
+
+  labels:
+    text:
+      size: 7
+
+  # --------------------------------------------------
+  # Plot-specific text overrides
+  # --------------------------------------------------
+  plots:
+
+    omega_branches:
+      plot:
+        title:
+          size: 16
+      axis:
+        text:
+          size: 9
+
+    ess:
+      plot:
+        title:
+          size: 18
+      axis:
+        text:
+          size: 12
+
+    rel_se:
+      plot:
+        title:
+          size: 17
+
+    outliers:
+      plot:
+        title:
+          size: 17
+
+    omega_eigen:
+      axis:
+        text:
+          size: 10
+
+    omega_pca:
+      axis:
+        text:
+          size: 9
+
+    points:
+      plot:
+        title:
+          size: 15
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+    single_curve:
+      plot:
+        title:
+          size: 16
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+    comparison:
+      plot:
+        title:
+          size: 17
+      axis:
+        title:
+          size: 16
+        text:
+          size: 14
+      legend:
+        text:
+          size: 18
+        title:
+          size: 20
+
+# --------------------------------------------------
+# Diagnostics plot styling
+# --------------------------------------------------
+diagnostics:
+
+  defaults:
+    line:
+      color: "#88C0D0"
+      linewidth: 1.2
+      linetype: solid
+      alpha: 1
+
+    point:
+      color: "#E5C07B"
+      size: 2.5
+      alpha: 0.8
+      shape: 16
+
+  by_method:
+
+    integrate:
+      line:
+        color: "#6FA3D9"
+        linewidth: 1.4
+      point:
+        color: "#6FA3D9"
+        size: 3
+
+    profile:
+      line:
+        color: "#A7B0C0"
+        linewidth: 1.2
+        linetype: "22"
+      point:
+        color: "#A7B0C0"
+        size: 2.5
+
+  plots:
+
+    omega_branches:
+
+      color_by_curve: true
+
+      line:
+        color: "#6FA3D9"
+        linewidth: 1
+        alpha: 0.8
+
+      palette:
+        type: discrete
+        name: "viridis"
+        direction: 1
+
+    ess:
+      line:
+        linewidth: 1.6
+      point:
+        size: 3
+
+    rel_se:
+      line:
+        linetype: dashed
+
+    outliers:
+      point:
+        color: "#E06C75"
+
+    omega_eigen:
+      line:
+        linewidth: 1.1
+      point:
+        shape: 17
+
+    omega_pca:
+      point:
+        size: 2.5
+        alpha: 0.7

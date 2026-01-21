@@ -1,0 +1,93 @@
+# ======================================================================
+# Profile Log-Likelihood Builder
+# ======================================================================
+
+#' Generate a Profile Log-Likelihood Curve
+#'
+#' @description
+#' Internal helper used by [profile()] to construct the *profile
+#' log-likelihood branch* by sweeping left and right from ψ̂ using a fixed
+#' increment. Nuisance parameters remain fixed at θ̂ throughout.
+#'
+#' The function performs:
+#'   • Left sweep:  ψ = ψ̂ - k·increment
+#'   • Right sweep: ψ = ψ̂ + k·increment
+#'   • Termination when loglik < cutoff
+#'
+#' @param psi_mle Numeric scalar. The ψ-value at θ̂.
+#' @param param_mle Numeric vector. MLE θ̂.
+#' @param loglik_at_mle Numeric scalar. log-likelihood at θ̂.
+#' @param increment Numeric scalar. ψ-grid spacing.
+#' @param cutoff Numeric scalar. loglik cutoff (loglik_at_mle − χ²/2).
+#' @param eval_psi_fun Function ψ → loglik(ψ) constructed by
+#'   `build_eval_psi_fun(cal)(param_mle)`.
+#' @param max_retries Integer. Max retries for monotonicity enforcement
+#'   inside `walk_profile_side()`.
+#'
+#' @return A tibble with:
+#'   * k               – integer grid index
+#'   * psi             – ψ-values
+#'   * loglik           – log-likelihood at ψ
+#'   * loglik_centered  – loglik − max(loglik)
+#'
+#' The tibble is sorted in increasing order of ψ.
+#'
+#' @keywords internal
+generate_profile <- function(
+  psi_mle,
+  param_mle,
+  loglik_at_mle,
+  increment,
+  cutoff,
+  eval_psi_fun,
+  max_retries,
+  drop_mult
+) {
+  # ------------------------------------------------------------
+  # 1. Left sweep
+  # ------------------------------------------------------------
+  left <- walk_profile_side(
+    psi_mle = psi_mle,
+    increment = increment,
+    k_direction = -1L,
+    cutoff = cutoff,
+    init_guess = param_mle,
+    eval_psi_fun = eval_psi_fun,
+    max_retries = max_retries,
+    drop_mult = drop_mult
+  )
+
+  # ------------------------------------------------------------
+  # 2. Right sweep
+  # ------------------------------------------------------------
+  right <- walk_profile_side(
+    psi_mle = psi_mle,
+    increment = increment,
+    k_direction = +1L,
+    cutoff = cutoff,
+    init_guess = param_mle,
+    eval_psi_fun = eval_psi_fun,
+    max_retries = max_retries,
+    drop_mult = drop_mult
+  )
+
+  # ------------------------------------------------------------
+  # 3. Combine all points including center
+  # ------------------------------------------------------------
+  psi_ll_df <- dplyr::bind_rows(
+    left,
+    tibble::tibble(k = 0L, loglik = loglik_at_mle),
+    right
+  ) |>
+    dplyr::mutate(
+      psi = psi_mle + k * increment,
+      loglik_centered = loglik - max(loglik, na.rm = TRUE)
+    ) |>
+    dplyr::arrange(psi)
+
+  # Metadata
+  attr(psi_ll_df, "n_points") <- nrow(psi_ll_df)
+  attr(psi_ll_df, "type") <- "Profile"
+
+  return(psi_ll_df)
+}

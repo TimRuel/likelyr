@@ -1,0 +1,188 @@
+# ======================================================================
+# Optimizer Specification (v3.1, unified class system)
+# ======================================================================
+
+#' Specify Optimization Settings for nloptr::auglag
+#'
+#' @description
+#' Defines optimization behavior for estimating θ using
+#' `nloptr::auglag()`. This specification controls:
+#'
+#' • Local solver (e.g., "SLSQP")
+#' • nloptr control parameters
+#' • Local solver tolerance
+#' • Restart policy (max_retries)
+#' • Drop consistency tolerance (drop_mult)
+#'
+#' These settings are used by both profile and integrated likelihood
+#' routines when solving constrained optimization problems.
+#'
+#' @param localsolver
+#'   Character scalar. Inner solver used inside `nloptr::auglag`.
+#'   Default: `"SLSQP"`.
+#'
+#' @param control
+#'   Named list of nloptr/auglag control options.
+#'
+#' @param localtol
+#'   Numeric scalar specifying local solver tolerance.
+#'
+#' @param max_retries
+#'   Numeric scalar giving number of restart attempts allowed when
+#'   optimization fails to converge.
+#'
+#' @param drop_mult
+#'   Numeric scalar controlling how large a log-likelihood drop
+#'   is allowed relative to the previous drop during continuation.
+#'   Values > 1 are required. Typical range: 3–10.
+#'
+#' @param name
+#'   Optional descriptive name.
+#'
+#' @param ...
+#'   Additional stored but unused user metadata.
+#'
+#' @return
+#' An `optimizer_spec` object with classes:
+#' `c("optimizer_spec", "likelyr")`.
+#'
+#' @export
+optimizer_spec <- function(
+  localsolver = "SLSQP",
+  control = list(),
+  localtol = 1e-6,
+  max_retries = 10,
+  drop_mult = 5,
+  name = NULL,
+  ...
+) {
+  x <- list(
+    name = name %||% "<optimizer>",
+    localsolver = localsolver,
+    control = control,
+    localtol = localtol,
+    max_retries = max_retries,
+    drop_mult = drop_mult,
+    extra = list(...)
+  )
+
+  x <- new_optimizer_spec(x)
+  .validate_optimizer_spec(x)
+  x
+}
+
+# ======================================================================
+# INTERNAL VALIDATOR
+# ======================================================================
+
+#' Validate optimizer specification
+#'
+#' @description
+#' Internal validator for \code{optimizer_spec} objects. Ensures that all
+#' required optimizer configuration fields are present and correctly
+#' typed before numerical optimization routines are invoked.
+#'
+#' @details
+#' The following checks are performed:
+#'
+#' \itemize{
+#'   \item \code{localsolver} must be a non-empty character scalar giving
+#'         the local optimizer name.
+#'   \item \code{control} must be a named list of optimizer control
+#'         options (e.g., for \code{nloptr} or \code{auglag}).
+#'   \item \code{localtol} must be a positive numeric scalar specifying
+#'         the local convergence tolerance.
+#'   \item \code{max_retries} must be a non-negative integer giving the
+#'         number of allowed retry attempts.
+#'   \item \code{drop_mult} must be a numeric scalar greater than 1,
+#'         controlling how large a log-likelihood drop is allowed
+#'         relative to the previous drop during continuation.
+#' }
+#'
+#' These checks enforce the contract required for robust and reproducible
+#' numerical optimization within the likelihood workflow.
+#'
+#' @param x A list representing an \code{optimizer_spec} object.
+#'
+#' @return Invisibly returns \code{x} if validation succeeds.
+#'
+#' @keywords internal
+#' @noRd
+.validate_optimizer_spec <- function(x) {
+  # Local solver ---------------------------------------------------------
+  if (
+    !is.character(x$localsolver) ||
+      length(x$localsolver) != 1 ||
+      !nzchar(x$localsolver)
+  ) {
+    stop("localsolver must be a non-empty character scalar.", call. = FALSE)
+  }
+
+  # Control list ---------------------------------------------------------
+  if (!is.list(x$control)) {
+    stop(
+      "control must be a named list of nloptr / auglag options.",
+      call. = FALSE
+    )
+  }
+
+  # Local tolerance ------------------------------------------------------
+  if (
+    !is.numeric(x$localtol) ||
+      length(x$localtol) != 1 ||
+      !is.finite(x$localtol) ||
+      x$localtol <= 0
+  ) {
+    stop("localtol must be a positive numeric scalar.", call. = FALSE)
+  }
+
+  # Retry count ----------------------------------------------------------
+  if (
+    !is.numeric(x$max_retries) ||
+      length(x$max_retries) != 1 ||
+      x$max_retries < 0 ||
+      x$max_retries != as.integer(x$max_retries)
+  ) {
+    stop("max_retries must be a non-negative integer.", call. = FALSE)
+  }
+
+  # Drop multiplier -----------------------------------------------------
+  if (
+    !is.numeric(x$drop_mult) ||
+      length(x$drop_mult) != 1 ||
+      !is.finite(x$drop_mult) ||
+      x$drop_mult <= 1
+  ) {
+    stop(
+      "drop_mult must be a numeric scalar > 1.",
+      call. = FALSE
+    )
+  }
+
+  invisible(x)
+}
+
+# ======================================================================
+# PRINT METHOD
+# ======================================================================
+
+#' @export
+print.optimizer_spec <- function(x, ...) {
+  cat("# Optimizer Specification\n")
+  cat("- Name:          ", x$name, "\n", sep = "")
+  cat("- Local solver:  ", x$localsolver, "\n", sep = "")
+  cat("- Tolerance:     ", x$localtol, "\n", sep = "")
+  cat("- Max retries:   ", x$max_retries, "\n", sep = "")
+  cat("- Drop mult:     ", x$drop_mult, "\n", sep = "")
+  cat(
+    "- Control list:  ",
+    if (length(x$control) == 0) {
+      "<empty>"
+    } else {
+      paste(names(x$control), collapse = ", ")
+    },
+    "\n",
+    sep = ""
+  )
+  invisible(x)
+}

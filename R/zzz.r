@@ -1,0 +1,20 @@
+utils::globalVariables(c(
+  ".data",
+  "psi",
+  "loglik",
+  "alpha",
+  "level",
+  "value",
+  "label",
+  "Interval",
+  "Length",
+  "Lower Deviation",
+  "Upper Deviation",
+  "Status",
+  "Pseudolikelihood",
+  "CurveID",
+  "psi_hat",
+  "se_psi_hat",
+  "error",
+  "psi_0"
+))

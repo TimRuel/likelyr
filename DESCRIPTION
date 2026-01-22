@@ -35,14 +35,21 @@ Imports:
     foreach,
     future,
     matrixStats,
-    methods
+    methods,
+    colorspace,
+    digest,
+    doFuture,
+    ggnewscale,
+    ggrepel,
+    kableExtra,
+    scales,
+    tidyr,
+    yaml
 Suggests:
-    knitr,
     rmarkdown,
     testthat (>= 3.0.0),
     pkgdown,
     parallel
-VignetteBuilder: knitr
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

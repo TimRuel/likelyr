@@ -208,6 +208,7 @@ validate_profile_input <- function(cal) {
 # RESULT CLASS SUPPORT
 # ======================================================================
 
+#' @method print profile
 #' @export
 print.profile <- function(x, ...) {
   cat("<Profile Log-Likelihood Result>\n")
@@ -269,6 +270,7 @@ print.profile <- function(x, ...) {
 # S3 Plot Method
 # =====================================================================
 
+#' @method plot profile
 #' @export
 plot.profile <- function(x, ...) {
   if (is.null(x$pseudolikelihood_points)) {

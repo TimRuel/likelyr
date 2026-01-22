@@ -16,5 +16,13 @@ utils::globalVariables(c(
   "psi_hat",
   "se_psi_hat",
   "error",
-  "psi_0"
+  "psi_0",
+  "k",
+  "lower",
+  "upper",
+  "crit",
+  "endpoint",
+  "matches",
+  "where",
+  ":="
 ))

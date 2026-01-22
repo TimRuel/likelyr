@@ -223,6 +223,7 @@ validate_integrate_input <- function(cal) {
 # PRINT AND SUMMARY METHODS
 # ======================================================================
 
+#' @method print integrate
 #' @export
 print.integrate <- function(x, ...) {
   cat("<Integrated Log-Likelihood Result>\n")
@@ -285,6 +286,7 @@ print.integrate <- function(x, ...) {
 # S3 Plot Method
 # =====================================================================
 
+#' @method plot integrate
 #' @export
 plot.integrate <- function(x, ...) {
   if (is.null(x$pseudolikelihood_points)) {

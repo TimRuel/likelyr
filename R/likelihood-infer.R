@@ -1,8 +1,16 @@
 # =====================================================================
-# likelihood-infer.R — Likelihood-based inference for likelyr
+# likelihood-infer.R — Likelihood-based inference for likelyr (HPC-safe)
 # =====================================================================
 
 #' Likelihood-Based Inference for a Calibrated Model
+#'
+#' @description
+#' Computes likelihood-based inference **data only** (point estimates and
+#' confidence interval diagnostics) for each pseudolikelihood result.
+#'
+#' This function performs **no table rendering and no plotting**.
+#' Presentation is deferred to `view()` and `plot()` (local-only).
+#'
 #' @export
 infer <- function(cal, which = NULL, alpha_levels = NULL) {
   which <- validate_infer_input(cal, which)
@@ -24,46 +32,18 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
       expand_factor = expand_factor
     )
 
+    # Attach inference data only
     res$inference <- new_inference_result(synthesis)
-
     cal$workspace[[name]] <- mark_inferred(res)
   }
 
   cal
 }
 
-
 # ---------------------------------------------------------------------
-# Validation (preconditions for infer())
+# Validation
 # ---------------------------------------------------------------------
 
-#' Validate inputs prior to likelihood-based inference
-#'
-#' @description
-#' Checks that a calibrated model object is in a valid state for
-#' inference and determines which likelihood results should be
-#' processed.
-#'
-#' Specifically, this function:
-#' \itemize{
-#'   \item Verifies that the model has been calibrated
-#'   \item Ensures pseudolikelihood results are present
-#'   \item Resolves the target result set (\code{which})
-#'   \item Silently drops any comparison results
-#'   \item Confirms required fields (\code{psi_ll_df}) exist
-#' }
-#'
-#' Comparison objects are excluded automatically, since inference
-#' is only defined for individual likelihood results (profile or
-#' integrated).
-#'
-#' @param cal A calibrated model object.
-#' @param which Optional character vector of result names to infer on.
-#'   If \code{NULL}, all available results are used.
-#'
-#' @return A character vector of workspace result names eligible for
-#'   inference (comparison results removed). Returned invisibly.
-#'
 #' @keywords internal
 #' @noRd
 validate_infer_input <- function(cal, which) {
@@ -81,10 +61,6 @@ validate_infer_input <- function(cal, which) {
 
   available <- names(cal$workspace)
 
-  # --------------------------------------------------
-  # Resolve target set
-  # --------------------------------------------------
-
   if (is.null(which)) {
     which <- available
   } else {
@@ -98,22 +74,12 @@ validate_infer_input <- function(cal, which) {
     }
   }
 
-  # --------------------------------------------------
-  # Drop comparison results silently
-  # --------------------------------------------------
-
+  # Drop comparison results
   which <- which[
-    !vapply(
-      cal$workspace[which],
-      is_comparison,
-      logical(1)
-    )
+    !vapply(cal$workspace[which], is_comparison, logical(1))
   ]
 
-  # --------------------------------------------------
-  # Validate required fields
-  # --------------------------------------------------
-
+  # Require psi_ll_df
   for (nm in which) {
     if (is.null(cal$workspace[[nm]]$psi_ll_df)) {
       stop(
@@ -144,13 +110,7 @@ print.inference <- function(x, ...) {
     cat("Estimates available: use summary()\n")
   }
 
-  if (!is.null(x$estimate_table)) {
-    cat("HTML table available: use view()\n")
-  }
-
-  if (!is.null(x$pseudolikelihood_curve)) {
-    cat("Plot available: use plot()\n")
-  }
+  cat("Use view() to render tables and plot() to visualize curves.\n")
 
   invisible(x)
 }
@@ -164,12 +124,9 @@ summary.inference <- function(object, ...) {
   out <- list(
     type = attr(object$psi_ll_df, "type"),
     data_frames = list(
-      estimate = object$estimate_df
-    ),
-    tables = list(
-      estimate = object$estimate_table
-    ),
-    plot = object$pseudolikelihood_curve
+      estimate = object$estimate_df,
+      interval = object$interval_estimate_df
+    )
   )
 
   class(out) <- "summary_inference"
@@ -182,51 +139,53 @@ print.summary_inference <- function(x, ...) {
   cat("Type: ", x$type, "\n\n", sep = "")
 
   if (!is.null(x$data_frames$estimate)) {
-    cat("Estimates:\n")
+    cat("Point + interval estimates:\n")
     print(x$data_frames$estimate)
   } else {
     cat("Estimates: <none>\n")
   }
 
-  if (!is.null(x$tables$estimate)) {
-    cat("\nHTML table available: use view()\n")
-  }
-
-  if (!is.null(x$plot)) {
-    cat("Plot available: use plot()\n")
-  }
+  cat("\nUse view() / plot() locally for presentation.\n")
 
   invisible(x)
 }
 
 # ---------------------------------------------------------------------
-# View
+# View (local-only)
 # ---------------------------------------------------------------------
 
 #' @export
 view.inference <- function(x, ...) {
-  tbl <- x$estimate_table
-
-  if (is.null(tbl)) {
-    stop("No HTML estimate table to render.", call. = FALSE)
+  if (is.null(x$estimate_df)) {
+    stop("No inference data available to render.", call. = FALSE)
   }
 
-  print(tbl)
-  invisible(x)
+  list(
+    point = render_point_estimate_table(x$point_estimate_df),
+    interval = render_interval_estimate_table(x$interval_estimate_df),
+    combined = render_estimate_table(x$estimate_df)
+  )
 }
 
 # ---------------------------------------------------------------------
-# Plot
+# Plot (local-only)
 # ---------------------------------------------------------------------
 
 #' @export
 plot.inference <- function(x, ...) {
-  if (is.null(x$pseudolikelihood_curve)) {
+  .assert_local_plotting()
+
+  if (is.null(x$psi_ll_df)) {
     stop(
-      "No plot available in pseudolikelihood inference result",
+      "No pseudolikelihood data available to plot.",
       call. = FALSE
     )
   }
 
-  x$pseudolikelihood_curve
+  plot_pseudolikelihood_curve(
+    psi_ll_df = x$psi_ll_df,
+    zero_max_psi_ll_fn = x$zero_max_psi_ll_fn,
+    point_estimate_df = x$point_estimate_df,
+    interval_estimate_df = x$interval_estimate_df
+  )
 }

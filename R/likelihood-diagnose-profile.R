@@ -28,7 +28,7 @@ diagnose_profile <- function(res) {
     message = "Diagnostics for profile log-likelihood are not yet implemented.",
     warnings = character(),
     metrics = list(),
-    plots = list(),
+    plot_data = list(),
     summary = NULL
   )
   out

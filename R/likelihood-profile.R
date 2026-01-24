@@ -1,5 +1,5 @@
 # ======================================================================
-# likelihood-profile.R — Profile Log-Likelihood API
+# likelihood-profile.R — Profile Log-Likelihood API (HPC-safe)
 # ======================================================================
 
 #' Profile Log-Likelihood
@@ -22,21 +22,18 @@
 #'   cal$workspace$profile
 #' }
 #'
+#' This function performs **no plotting or table rendering**. Visualization
+#' is deferred to `plot()` / `view()` methods, which materialize plots/tables
+#' locally from stored data frames.
+#'
 #' @param cal A `calibrated` model object produced by [calibrate()].
 #' @param verbose Logical; print diagnostic messages (default FALSE).
 #' @param ... Additional arguments forwarded to [generate_profile()].
 #'
 #' @return
-#' The SAME `calibrated` model object object, augmented with:
-#'    * class `profiled`
+#' The SAME `calibrated` model object, augmented with:
+#'   * class `profiled`
 #'   * `workspace$profile` — a `profile` object
-#'
-#' @examples
-#' \dontrun{
-#' cal <- calibrate(model, data)
-#' cal <- profile(cal)
-#' plot(cal$workspace$profile)
-#' }
 #'
 #' @export
 profile <- function(cal, ...) {
@@ -62,7 +59,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 0B. Profile log-likelihood does NOT require optimizer/execution specs
+  # 0B. Validate required components (optimizer/execution not required)
   # ------------------------------------------------------------------
   validate_profile_input(cal)
 
@@ -95,14 +92,13 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 
   cutoff <- loglik_at_mle - effective_crit
 
-  # Build ψ→loglik evaluator at θ̂
+  # Build ψ → loglik evaluator at θ̂
   eval_psi_fun <- build_eval_psi_fun(cal)(param_mle)
 
   # ------------------------------------------------------------------
   # 4. Construct branch grid and walk it
   # ------------------------------------------------------------------
-
-  increment <- cal$estimand$increment %||% 0.05
+  increment <- estimand$increment %||% 0.05
   max_retries <- cal$optimizer$max_retries %||% 4
   drop_mult <- cal$optimizer$drop_mult %||% 5
 
@@ -117,36 +113,37 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
       max_retries = max_retries,
       drop_mult = drop_mult
     ),
-
     error = function(e) {
       if (verbose) {
         cat("[profile] ERROR in generate_profile():\n")
         message(e)
       }
-      return(NULL)
+      NULL
     }
   )
 
-  attr(psi_ll_df, "type") <- "profile"
-
-  pseudolikelihood_points <- plot_pseudolikelihood_points(psi_ll_df)
+  if (!is.null(psi_ll_df)) {
+    attr(psi_ll_df, "type") <- "profile"
+  }
 
   # ------------------------------------------------------------------
-  # 5. Wrap into profile_result
+  # 5. Wrap into profile_result (data only)
   # ------------------------------------------------------------------
   profile_result <- new_profile_result(list(
     psi_ll_df = psi_ll_df,
     psi_mle = psi_mle,
     param_mle = param_mle,
-    status = if (!is.null(psi_ll_df)) "success" else "failed",
-    pseudolikelihood_points = pseudolikelihood_points
+    status = if (!is.null(psi_ll_df)) "success" else "failed"
   ))
 
   # ------------------------------------------------------------------
   # 6. Store and return
   # ------------------------------------------------------------------
-  cal$workspace$profile <- profile_result
+  if (is.null(cal$workspace)) {
+    cal$workspace <- list()
+  }
 
+  cal$workspace$profile <- profile_result
   cal <- mark_profiled(cal)
 
   if (verbose) {
@@ -174,11 +171,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 #'   \item \code{nuisance_spec()}
 #' }
 #'
-#' Optimizer and execution specifications are *not* required for
-#' profile likelihood and are therefore not validated here.
-#'
-#' @param cal A model object intended for profile likelihood
-#'   computation.
+#' @param cal A model object intended for profile likelihood computation.
 #'
 #' @return Invisibly returns \code{cal} if validation succeeds.
 #'
@@ -188,19 +181,15 @@ validate_profile_input <- function(cal) {
   if (!inherits(cal$parameter, "parameter_spec")) {
     stop("model$parameter must be a 'parameter_spec' object.")
   }
-
   if (!inherits(cal$likelihood, "likelihood_spec")) {
     stop("model$likelihood must be a 'likelihood_spec' object.")
   }
-
   if (!inherits(cal$estimand, "estimand_spec")) {
     stop("model$estimand must be an 'estimand_spec' object.")
   }
-
   if (!inherits(cal$nuisance, "nuisance_spec")) {
     stop("model$nuisance must be a 'nuisance_spec' object.")
   }
-
   invisible(cal)
 }
 
@@ -220,32 +209,19 @@ print.profile <- function(x, ...) {
   # -----------------------------------------------------------
   # Lifecycle flags (slot presence)
   # -----------------------------------------------------------
-
   has_inference <- !is.null(x$inference)
   has_diagnostics <- !is.null(x$diagnostics)
 
   cat("Lifecycle:\n")
-  cat(
-    "  inferred:   ",
-    if (has_inference) "✓" else "×",
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  diagnosed:  ",
-    if (has_diagnostics) "✓" else "×",
-    "\n",
-    sep = ""
-  )
+  cat("  inferred:   ", if (has_inference) "✓" else "×", "\n", sep = "")
+  cat("  diagnosed:  ", if (has_diagnostics) "✓" else "×", "\n", sep = "")
 
   # -----------------------------------------------------------
   # Estimates
   # -----------------------------------------------------------
-
   if (!is.null(x$psi_mle)) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
   }
-
   if (!is.null(x$param_mle)) {
     cat(
       "param_MLE: (",
@@ -258,7 +234,6 @@ print.profile <- function(x, ...) {
   # -----------------------------------------------------------
   # Grid information
   # -----------------------------------------------------------
-
   if (!is.null(x$psi_ll_df)) {
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
   }
@@ -267,15 +242,18 @@ print.profile <- function(x, ...) {
 }
 
 # =====================================================================
-# S3 Plot Method
+# S3 Plot Method (local-only materialization)
 # =====================================================================
 
 #' @method plot profile
 #' @export
 plot.profile <- function(x, ...) {
-  if (is.null(x$pseudolikelihood_points)) {
-    stop("No plot available in profile log-likelihood result.", call. = FALSE)
+  .assert_local_plotting()
+
+  if (is.null(x$psi_ll_df)) {
+    stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  x$pseudolikelihood_points
+  # Materialize plot at call time
+  plot_pseudolikelihood_points(x$psi_ll_df)
 }

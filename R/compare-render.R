@@ -1,5 +1,6 @@
 # ============================================================================
 # compare-render.R — Rendering functions for pseudo-log-likelihood comparison
+# (local-only)
 # ============================================================================
 
 # ---------------------------------------------------------------------
@@ -12,18 +13,7 @@
 #' Renders a formatted comparison table of point estimates and associated
 #' uncertainty measures (error and standard error) across pseudolikelihoods.
 #'
-#' @details
-#' The input data frame is expected to contain one row per pseudolikelihood.
-#' Missing values are rendered as em dashes for visual clarity.
-#'
-#' Required columns:
-#' \itemize{
-#'   \item \code{psi_0}
-#'   \item \code{psi_hat}
-#'   \item \code{error}
-#'   \item \code{se_psi_hat}
-#'   \item \code{pseudolikelihood}
-#' }
+#' This function is **local-only** and must not be called on HPC.
 #'
 #' @param point_estimates_df A data frame of point estimates and diagnostics.
 #'
@@ -65,27 +55,7 @@ render_point_estimates_comparison_table <- function(point_estimates_df) {
 #' Renders a comparison table of confidence intervals and associated
 #' diagnostics across pseudolikelihoods and confidence levels.
 #'
-#' @details
-#' The input data frame must include specific attributes used for rendering:
-#'
-#' \describe{
-#'   \item{\code{interval_estimates_raw}}{Data frame containing raw lower and upper bounds.}
-#'   \item{\code{point_estimates}}{Numeric vector of point estimates aligned with rows.}
-#'   \item{\code{psi_0}}{Scalar true parameter value.}
-#' }
-#'
-#' Required columns:
-#' \itemize{
-#'   \item \code{Level}
-#'   \item \code{Pseudolikelihood}
-#'   \item \code{Interval}
-#'   \item \code{Length}
-#'   \item \code{Lower Deviation}
-#'   \item \code{Upper Deviation}
-#'   \item \code{Status}
-#' }
-#'
-#' Interval diagrams are rendered inline using `spec_pointrange()`.
+#' This function is **local-only** and must not be called on HPC.
 #'
 #' @param interval_estimates_df A formatted interval estimates data frame
 #'   with required attributes attached.
@@ -159,7 +129,7 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
 }
 
 # ---------------------------------------------------------------------
-# Combined inference table
+# Combined inference comparison table
 # ---------------------------------------------------------------------
 
 #' Render combined point and interval comparison table
@@ -168,10 +138,7 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
 #' Renders a unified comparison table containing both point estimates and
 #' interval estimates for multiple pseudolikelihood methods.
 #'
-#' @details
-#' This table aligns point estimates with their corresponding confidence
-#' intervals and uses row collapsing and hidden HTML markers to preserve
-#' grouping by pseudolikelihood.
+#' This function is **local-only** and must not be called on HPC.
 #'
 #' @param estimates_df Data frame combining point and interval estimates
 #'   across pseudolikelihoods and confidence levels.
@@ -181,9 +148,6 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
 #' @family inference-renderers
 #' @keywords internal
 render_estimates_comparison_table <- function(estimates_df) {
-  # --------------------------------------------------
-  # Prepare render data (with salting)
-  # --------------------------------------------------
   df_render <- estimates_df |>
     dplyr::mutate(Diagram = "", .after = "Pseudolikelihood") |>
     dplyr::mutate(
@@ -251,3 +215,7 @@ render_estimates_comparison_table <- function(estimates_df) {
     pe_bg = bg_pe
   )
 }
+
+# ============================================================================
+# END compare-render.R
+# ============================================================================

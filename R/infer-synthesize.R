@@ -7,7 +7,10 @@
 #' @description
 #' Orchestrates point estimation and confidence interval construction from
 #' a ψ log-likelihood grid, returning a unified inference object containing
-#' both numeric results and (optionally) rendered summaries.
+#' numeric results and the data required for downstream presentation.
+#'
+#' This function performs **no table rendering or plotting**. Tables/plots
+#' are materialized later by `view()` and `plot()` (local-only).
 #'
 #' This function assumes that likelihood evaluation has already been
 #' performed and that `psi_ll_df` represents a unimodal likelihood curve.
@@ -16,20 +19,15 @@
 #'   representing the evaluated log-likelihood curve.
 #' @param alpha_levels Numeric vector of significance levels.
 #' @param psi_0 Optional numeric scalar giving the true value of ψ.
-#'   (e.g. `"profile"`, `"integrated"`). Used for labeling and rendering.
 #' @param expand_factor Numeric scalar controlling multiplicative expansion
 #'   of the search bounds for confidence interval root finding.
 #'
-#' @return
-#' A named list containing:
+#' @return A named list containing:
 #' \describe{
-#'   \item{psi_ll_fn}{Smoothed log-likelihood function.}
-#'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, and SE(ψ̂).}
-#'   \item{interval_estimate_df}{Formatted confidence interval table.}
-#'   \item{inference_df}{Combined point and interval estimate summary table.}
-#'   \item{point_estimate_table}{Rendered point estimate table}
-#'   \item{interval_estimate_table}{Rendered interval estimate table}
-#'   \item{estimate_table}{Rendered combined estimate table}
+#'   \item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function with max at 0.}
+#'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
+#'   \item{interval_estimate_df}{Confidence interval diagnostics table (numeric).}
+#'   \item{estimate_df}{Combined point + interval summary table (numeric).}
 #' }
 #'
 #' @keywords internal
@@ -47,7 +45,7 @@ synthesize_inference <- function(
   required <- c("psi", "loglik")
   if (!all(required %in% names(psi_ll_df))) {
     stop(
-      "synthesize(): psi_ll_df must contain columns ",
+      "synthesize_inference(): psi_ll_df must contain columns ",
       paste(shQuote(required), collapse = ", "),
       call. = FALSE
     )
@@ -118,29 +116,13 @@ synthesize_inference <- function(
     "interval_estimate_raw"
   )
 
-  point_estimate_table <- render_point_estimate_table(point_estimate_df)
-
-  interval_estimate_table <- render_interval_estimate_table(
-    interval_estimate_df
-  )
-
-  estimate_table <- render_estimate_table(estimate_df)
-
-  pseudolikelihood_curve <- plot_pseudolikelihood_curve(
-    psi_ll_df = psi_ll_df,
-    zero_max_psi_ll_fn = zero_max_psi_ll_fn,
-    point_estimate_df = point_estimate_df,
-    interval_estimate_df = interval_estimate_df
-  )
-
+  # --------------------------------------------------
+  # Return data only (no tables, no plots)
+  # --------------------------------------------------
   list(
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     point_estimate_df = point_estimate_df,
     interval_estimate_df = interval_estimate_df,
-    estimate_df = estimate_df,
-    point_estimate_table = point_estimate_table,
-    interval_estimate_table = interval_estimate_table,
-    estimate_table = estimate_table,
-    pseudolikelihood_curve = pseudolikelihood_curve
+    estimate_df = estimate_df
   )
 }

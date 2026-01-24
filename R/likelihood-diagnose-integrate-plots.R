@@ -1,18 +1,14 @@
 # ================================================================================
 # likelihood-diagnose-integrate-plots.R
-# Plot helpers for integrated likelihood diagnostics
+# Plot helpers for integrated likelihood diagnostics (local-only)
 # ================================================================================
 
+# NOTE:
+#   All functions in this file are **local-only**.
+#   They must never be called on HPC.
+#   Enforcement is via .assert_local_plotting() at entry.
+
 #' Plot effective sample size (ESS) across the ψ-grid
-#'
-#' @description
-#' Constructs a diagnostic line plot showing the effective sample size
-#' (ESS) at each grid index used in the integrated likelihood
-#' computation.
-#'
-#' @param ess Numeric vector of effective sample sizes.
-#'
-#' @return A ggplot object visualizing ESS over grid indices.
 #'
 #' @keywords internal
 #' @noRd
@@ -34,15 +30,6 @@ build_integrate_ess_plot <- function(ess) {
 
 #' Plot relative Monte Carlo standard error
 #'
-#' @description
-#' Builds a diagnostic plot showing the relative Monte Carlo
-#' standard error at each grid index for integrated likelihood
-#' estimation.
-#'
-#' @param rel_se Numeric vector of relative standard errors.
-#'
-#' @return A ggplot object visualizing relative SE across the grid.
-#'
 #' @keywords internal
 #' @noRd
 build_integrate_rel_se_plot <- function(rel_se) {
@@ -63,14 +50,6 @@ build_integrate_rel_se_plot <- function(rel_se) {
 
 #' Plot outlier fraction across the ψ-grid
 #'
-#' @description
-#' Generates a diagnostic plot displaying the fraction of Monte Carlo
-#' samples classified as outliers at each grid index.
-#'
-#' @param outlier_fraction Numeric vector of outlier fractions.
-#'
-#' @return A ggplot object visualizing outlier fractions.
-#'
 #' @keywords internal
 #' @noRd
 build_integrate_outlier_plot <- function(outlier_fraction) {
@@ -90,14 +69,6 @@ build_integrate_outlier_plot <- function(outlier_fraction) {
 }
 
 #' Plot omega-hat covariance eigenvalues
-#'
-#' @description
-#' Visualizes the eigenvalues of the omega-hat covariance matrix,
-#' providing insight into effective dimensionality and conditioning.
-#'
-#' @param eigenvalues Numeric vector of covariance eigenvalues.
-#'
-#' @return A ggplot object, or \code{NULL} if no eigenvalues supplied.
 #'
 #' @keywords internal
 #' @noRd
@@ -127,14 +98,6 @@ build_integrate_omega_eigen_plot <- function(eigenvalues) {
 
 #' Plot omega-hat PCA scatter
 #'
-#' @description
-#' Performs PCA on the omega-hat samples and visualizes the first two
-#' principal components to assess structure and dispersion.
-#'
-#' @param Omega Numeric matrix of omega-hat samples.
-#'
-#' @return A ggplot object, or \code{NULL} if PCA is not applicable.
-#'
 #' @keywords internal
 #' @noRd
 build_integrate_omega_pca_plot <- function(Omega) {
@@ -158,15 +121,6 @@ build_integrate_omega_pca_plot <- function(Omega) {
 }
 
 #' Plot integrated log-likelihood omega-hat branches
-#'
-#' @description
-#' Visualizes Monte Carlo log-likelihood branches across ψ values.
-#' Each branch is shifted by its maximum to emphasize relative shape.
-#'
-#' @param branch_mat Numeric matrix of log-likelihood branches.
-#' @param psi_vals Numeric vector of ψ grid values.
-#'
-#' @return A ggplot object showing branch trajectories.
 #'
 #' @keywords internal
 #' @noRd
@@ -239,5 +193,5 @@ build_integrate_omega_branch_plot <- function(branch_mat, psi_vals) {
 }
 
 # ================================================================================
-# END
+# END likelihood-diagnose-integrate-plots.R
 # ================================================================================

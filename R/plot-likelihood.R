@@ -1,7 +1,13 @@
 # =====================================================================
 # plot-likelihood.R
 # Pseudolikelihood Visualization for Result and Inference Objects
+# (local-only materialization)
 # =====================================================================
+
+# NOTE:
+#   All functions in this file are **local-only**.
+#   They must never be called on HPC.
+#   Enforcement is via .assert_local_plotting() at entry.
 
 # ---------------------------------------------------------------------
 # Point cloud visualization
@@ -12,11 +18,12 @@
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_points <- function(psi_ll_df) {
+  .assert_local_plotting()
+
   type <- attr(psi_ll_df, "type")
   pseudolikelihood <- tolower(type)
 
-  p <- plot_base(plot = "points") +
-
+  plot_base(plot = "points") +
     ggplot2::geom_point(
       data = psi_ll_df,
       ggplot2::aes(x = psi, y = loglik),
@@ -24,11 +31,8 @@ plot_pseudolikelihood_points <- function(psi_ll_df) {
       size = plot_point_cloud_size(),
       alpha = plot_point_cloud_alpha()
     ) +
-
     ggplot2::labs(title = likelihood_title(type)) +
     likelihood_axes()
-
-  invisible(p)
 }
 
 # ---------------------------------------------------------------------
@@ -45,13 +49,14 @@ plot_pseudolikelihood_curve <- function(
   point_estimate_df,
   interval_estimate_df
 ) {
+  .assert_local_plotting()
+
   type <- attr(psi_ll_df, "type")
   pseudolikelihood <- tolower(type)
 
   # --------------------------------------------------
   # Axis limits
   # --------------------------------------------------
-
   psi_limits <- range(psi_ll_df$psi) +
     c(-1, 1) * 3 * head(diff(psi_ll_df$psi), 1)
 
@@ -60,7 +65,6 @@ plot_pseudolikelihood_curve <- function(
   # --------------------------------------------------
   # Curve layer
   # --------------------------------------------------
-
   curve_layer <- make_stat_fn(
     psi_endpoints = psi_limits,
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
@@ -71,13 +75,11 @@ plot_pseudolikelihood_curve <- function(
   # --------------------------------------------------
   # Confidence intervals
   # --------------------------------------------------
-
   ci_long <- extract_ci_long(interval_estimate_df)
 
   # --------------------------------------------------
   # Labels
   # --------------------------------------------------
-
   label_data <- data.frame(
     source = c(pseudolikelihood, "Truth"),
     value = c(
@@ -97,15 +99,12 @@ plot_pseudolikelihood_curve <- function(
   # --------------------------------------------------
   # Assemble plot
   # --------------------------------------------------
-
-  p <- plot_base(plot = "single_curve") +
-
+  plot_base(plot = "single_curve") +
     curve_layer +
     loglik_reference_line() +
 
     # ---- CI endpoints ----
     make_ci_vline_layer(ci_long) +
-
     ggplot2::scale_color_manual(
       name = "Confidence",
       values = plot_ci_palette(interval_estimate_df),
@@ -117,13 +116,11 @@ plot_pseudolikelihood_curve <- function(
         )
       )
     ) +
-
     ggnewscale::new_scale_color() +
 
     # ---- Labels ----
     make_label_vlines(label_data, comparison = FALSE) +
     make_label_repel(label_data, y = y_limits[1] / 2) +
-
     ggplot2::scale_color_manual(
       values = c(
         plot_point_estimate_color(pseudolikelihood),
@@ -136,13 +133,13 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::labs(title = likelihood_title(type)) +
     likelihood_axes() +
 
-    # ---- X domain restriction (real limits) ----
+    # ---- X domain restriction ----
     ggplot2::scale_x_continuous(
       expand = c(0, 0),
       limits = psi_limits
     ) +
 
-    # ---- Y zoom ONLY (no data dropping) ----
+    # ---- Y zoom ONLY ----
     ggplot2::coord_cartesian(ylim = y_limits) +
 
     ggplot2::theme(
@@ -150,8 +147,6 @@ plot_pseudolikelihood_curve <- function(
       legend.position.inside = c(1, 1),
       legend.justification = c(1, 1)
     )
-
-  invisible(p)
 }
 
 # ---------------------------------------------------------------------
@@ -163,10 +158,11 @@ plot_pseudolikelihood_curve <- function(
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_curves <- function(res_list) {
+  .assert_local_plotting()
+
   # --------------------------------------------------
   # Curve layers
   # --------------------------------------------------
-
   curve_layers <- purrr::map(
     res_list,
     \(x) {
@@ -184,7 +180,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   # Labels
   # --------------------------------------------------
-
   label_data <- purrr::imap_dfr(
     res_list,
     \(x, key) {
@@ -213,7 +208,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   # Confidence cutoffs
   # --------------------------------------------------
-
   crit_df <- purrr::map_dfr(
     res_list,
     \(x) {
@@ -236,7 +230,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   # Axis limits
   # --------------------------------------------------
-
   psi_limits <- range(
     unlist(purrr::map(res_list, \(x) x$psi_ll_df$psi))
   )
@@ -253,27 +246,22 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   # Assemble plot
   # --------------------------------------------------
-
-  p <- plot_base(plot = "comparison") +
-
+  plot_base(plot = "comparison") +
     curve_layers +
     loglik_reference_line() +
 
     # ---- CI cutoffs ----
     make_ci_hline_layer(crit_df) +
-
     ggplot2::scale_color_manual(
       name = "Confidence",
       values = crit_df$color,
       breaks = crit_df$label
     ) +
-
     ggnewscale::new_scale_color() +
 
     # ---- Labels ----
     make_label_vlines(label_data, comparison = TRUE) +
     make_label_repel(label_data, y = y_limits[1] / 2) +
-
     ggplot2::scale_color_manual(
       values = label_data$color,
       guide = "none"
@@ -299,6 +287,4 @@ plot_pseudolikelihood_curves <- function(res_list) {
       legend.position.inside = c(1, 1),
       legend.justification = c(1, 1)
     )
-
-  invisible(p)
 }

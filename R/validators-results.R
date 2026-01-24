@@ -1,6 +1,6 @@
-# ----------------------------------------------------------------------
+# ======================================================================
 # Internal type predicates
-# ----------------------------------------------------------------------
+# ======================================================================
 
 #' Check if object is a data.frame
 #'
@@ -12,41 +12,14 @@
   is.data.frame(x)
 }
 
-#' Check if object is a ggplot
-#'
-#' @param x Object to test.
-#' @return Logical scalar.
-#' @keywords internal
-#' @noRd
-.is_plot <- function(x) {
-  inherits(x, "ggplot")
-}
-
-#' Check if object is an HTML table
-#'
-#' @description
-#' Supports both \code{knitr_kable} and \code{gt_tbl} objects.
-#'
-#' @param x Object to test.
-#' @return Logical scalar.
-#' @keywords internal
-#' @noRd
-.is_table <- function(x) {
-  inherits(x, "knitr_kable") || inherits(x, "gt_tbl")
-}
-
 # ======================================================================
 # Validator: integrate
 # ======================================================================
 
 #' Validate integrated likelihood result
 #'
-#' @description
-#' Performs structural and type validation on an integrated
-#' log-likelihood result object.
-#'
 #' @param x Result object to validate.
-#' @return Invisibly returns \code{TRUE} on success.
+#' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
@@ -56,7 +29,6 @@ validate_integrate_result <- function(x) {
   }
 
   required <- c("status")
-
   missing <- setdiff(required, names(x))
   if (length(missing)) {
     stop(
@@ -70,23 +42,12 @@ validate_integrate_result <- function(x) {
     stop("status must be 'success' or 'failed'.", call. = FALSE)
   }
 
-  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df)) {
+  if (!is.null(x$psi_ll_df) && !.is_df(x$psi_ll_df)) {
     stop("psi_ll_df must be a data.frame.", call. = FALSE)
-  }
-
-  if (
-    !is.null(x$pseudolikelihood_points) &&
-      !inherits(x$pseudolikelihood_points, "ggplot")
-  ) {
-    stop(
-      "pseudolikelihood_points must be a ggplot object if present.",
-      call. = FALSE
-    )
   }
 
   invisible(TRUE)
 }
-
 
 # ======================================================================
 # Validator: profile
@@ -94,12 +55,8 @@ validate_integrate_result <- function(x) {
 
 #' Validate profile likelihood result
 #'
-#' @description
-#' Performs structural and type validation on a profile
-#' log-likelihood result object.
-#'
 #' @param x Result object to validate.
-#' @return Invisibly returns \code{TRUE} on success.
+#' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
@@ -109,7 +66,6 @@ validate_profile_result <- function(x) {
   }
 
   required <- c("psi_ll_df", "psi_mle", "param_mle", "status")
-
   missing <- setdiff(required, names(x))
   if (length(missing)) {
     stop(
@@ -119,7 +75,7 @@ validate_profile_result <- function(x) {
     )
   }
 
-  if (!is.null(x$psi_ll_df) && !is.data.frame(x$psi_ll_df)) {
+  if (!.is_df(x$psi_ll_df)) {
     stop("psi_ll_df must be a data.frame.", call. = FALSE)
   }
 
@@ -135,24 +91,17 @@ validate_profile_result <- function(x) {
     stop("status must be 'success' or 'failed'.", call. = FALSE)
   }
 
-  if (
-    !is.null(x$profile_plot) &&
-      !inherits(x$profile_plot, "ggplot")
-  ) {
-    stop("profile_plot must be a ggplot if present.", call. = FALSE)
-  }
-
   invisible(TRUE)
 }
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # Validator: diagnostics
-# ----------------------------------------------------------------------
+# ======================================================================
 
 #' Validate diagnostics result
 #'
 #' @param x Result object to validate.
-#' @return Invisibly returns \code{TRUE} on success.
+#' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
@@ -163,7 +112,6 @@ validate_diagnostics_result <- function(x) {
 
   required <- c("supported", "warnings")
   missing <- setdiff(required, names(x))
-
   if (length(missing)) {
     stop(
       "Diagnostics result missing required field(s): ",
@@ -180,10 +128,6 @@ validate_diagnostics_result <- function(x) {
     stop("'warnings' must be a character vector.", call. = FALSE)
   }
 
-  if (!is.null(x$plots) && !is.list(x$plots)) {
-    stop("'plots' must be a list.", call. = FALSE)
-  }
-
   invisible(TRUE)
 }
 
@@ -194,7 +138,7 @@ validate_diagnostics_result <- function(x) {
 #' Validate inference result
 #'
 #' @param x Result object to validate.
-#' @return Invisibly returns \code{TRUE} on success.
+#' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
@@ -203,10 +147,12 @@ validate_inference_result <- function(x) {
     stop("Inference result must be a list.", call. = FALSE)
   }
 
-  # --------------------------------------------------
-  # Required fields
-  # --------------------------------------------------
-  required <- c("estimate_df", "estimate_table")
+  required <- c(
+    "zero_max_psi_ll_fn",
+    "point_estimate_df",
+    "interval_estimate_df",
+    "estimate_df"
+  )
 
   missing <- setdiff(required, names(x))
   if (length(missing)) {
@@ -217,28 +163,20 @@ validate_inference_result <- function(x) {
     )
   }
 
-  # --------------------------------------------------
-  # Type checks
-  # --------------------------------------------------
+  if (!is.function(x$zero_max_psi_ll_fn)) {
+    stop("zero_max_psi_ll_fn must be a function.", call. = FALSE)
+  }
+
+  if (!.is_df(x$point_estimate_df)) {
+    stop("point_estimate_df must be a data.frame.", call. = FALSE)
+  }
+
+  if (!.is_df(x$interval_estimate_df)) {
+    stop("interval_estimate_df must be a data.frame.", call. = FALSE)
+  }
+
   if (!.is_df(x$estimate_df)) {
     stop("estimate_df must be a data.frame.", call. = FALSE)
-  }
-
-  if (!.is_table(x$estimate_table)) {
-    stop(
-      "estimate_table must be an HTML table (knitr_kable or gt_tbl).",
-      call. = FALSE
-    )
-  }
-
-  if (
-    !is.null(x$pseudolikelihood_curve) &&
-      !.is_plot(x$pseudolikelihood_curve)
-  ) {
-    stop(
-      "pseudolikelihood_curve must be a ggplot object if present.",
-      call. = FALSE
-    )
   }
 
   invisible(TRUE)
@@ -251,7 +189,7 @@ validate_inference_result <- function(x) {
 #' Validate comparison result
 #'
 #' @param x Result object to validate.
-#' @return Invisibly returns \code{TRUE} on success.
+#' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
@@ -260,45 +198,29 @@ validate_comparison_result <- function(x) {
     stop("Comparison result must be a list.", call. = FALSE)
   }
 
-  if (!"tables" %in% names(x)) {
-    stop("Comparison result must contain a 'tables' element.", call. = FALSE)
+  required <- c(
+    "point_estimates_df",
+    "interval_estimates_df",
+    "estimates_df"
+  )
+
+  missing <- setdiff(required, names(x))
+  if (length(missing)) {
+    stop(
+      "Comparison result missing required field(s): ",
+      paste(missing, collapse = ", "),
+      call. = FALSE
+    )
   }
 
-  if (!is.list(x$tables)) {
-    stop("'tables' must be a list.", call. = FALSE)
-  }
-
-  if (is.null(names(x$tables))) {
-    stop("'tables' must be a named list.", call. = FALSE)
-  }
-
-  # --------------------------------------------------
-  # Validate table contents
-  # --------------------------------------------------
-  for (nm in names(x$tables)) {
-    obj <- x$tables[[nm]]
-
-    if (!.is_df(obj) && !.is_table(obj)) {
+  for (nm in required) {
+    if (!.is_df(x[[nm]])) {
       stop(
-        "tables[['",
         nm,
-        "']] must be a data.frame or HTML table.",
+        " must be a data.frame.",
         call. = FALSE
       )
     }
-  }
-
-  # --------------------------------------------------
-  # Plot validation
-  # --------------------------------------------------
-  if (
-    !is.null(x$pseudolikelihood_curves) &&
-      !.is_plot(x$pseudolikelihood_curves)
-  ) {
-    stop(
-      "pseudolikelihood_curves must be a ggplot object if present.",
-      call. = FALSE
-    )
   }
 
   invisible(TRUE)

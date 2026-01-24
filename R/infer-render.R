@@ -1,5 +1,5 @@
 # =====================================================================
-# infer-render.R — Rendering helpers for likelihood inference
+# infer-render.R — Rendering helpers for likelihood inference (local-only)
 # =====================================================================
 
 # ---------------------------------------------------------------------
@@ -8,29 +8,8 @@
 
 #' Render point estimate table
 #'
-#' @param point_estimate_df Data frame with columns `psi_0`, `psi_hat`,
-#'   and `se_psi_hat`.
-#'
-#' @return A kableExtra object.
-#' Render point estimate table
-#'
-#' @description
-#' Renders a formatted table of point estimates and associated uncertainty
-#' measures using `kableExtra`.
-#'
-#' @details
-#' If the input data frame has a character attribute \code{"type"}, it is used
-#' to annotate the table caption (e.g., "Profile Log-Likelihood" or
-#' "Integrated Log-Likelihood"). If no such attribute is present, the caption
-#' is rendered without a subtitle.
-#'
-#' @param point_estimate_df Data frame with columns \code{psi_0},
-#'   \code{psi_hat}, \code{error}, and \code{se_psi_hat}.
-#'
-#' @return A `kableExtra` HTML table object.
-#'
-#' @family inference-renderers
 #' @keywords internal
+#' @noRd
 render_point_estimate_table <- function(point_estimate_df) {
   required <- c("psi_0", "psi_hat", "error", "se_psi_hat")
   stopifnot(all(required %in% names(point_estimate_df)))
@@ -62,11 +41,8 @@ render_point_estimate_table <- function(point_estimate_df) {
 
 #' Render confidence interval table
 #'
-#' @param interval_estimate_df Data frame produced by
-#'   `get_interval_estimate_df()`.
-#'
-#' @return A kableExtra object.
 #' @keywords internal
+#' @noRd
 render_interval_estimate_table <- function(interval_estimate_df) {
   required <- c(
     "Interval",
@@ -138,9 +114,8 @@ render_interval_estimate_table <- function(interval_estimate_df) {
 
 #' Render combined estimate table
 #'
-#' @param estimate_df Data frame combining point and interval estimates.
-#' @return A kableExtra object.
 #' @keywords internal
+#' @noRd
 render_estimate_table <- function(estimate_df) {
   # --------------------------------------------------
   # Validate required columns

@@ -1,6 +1,6 @@
 # ================================================================================
 # likelihood-diagnose.R
-# Unified diagnostics for integrated + profile likelihood results
+# Unified diagnostics for integrated + profile likelihood results (HPC-safe)
 # ================================================================================
 
 # ================================================================================
@@ -10,11 +10,11 @@
 #' Diagnostics for Likelyr Results
 #'
 #' @description
-#' Attaches diagnostics to each likelihood result (integrated or profile)
+#' Attaches diagnostics *data* to each likelihood result (integrated or profile)
 #' stored in a calibrated model.
 #'
-#' Integrated likelihood receives full Monte Carlo diagnostics; profile
-#' likelihood receives its own diagnostics implementation.
+#' This function performs **no plotting**. All diagnostics plots are
+#' materialized later via `plot()` (local-only).
 #'
 #' Diagnostics are attached at:
 #' \preformatted{
@@ -45,9 +45,8 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     res <- cal$workspace[[name]]
 
     # --------------------------------------------------
-    # Run diagnostics engine (type-dispatched)
+    # Run diagnostics engine (compute-only)
     # --------------------------------------------------
-
     if (is_integrate(res)) {
       diag_raw <- diagnose_integrate(res)
     } else if (is_profile(res)) {
@@ -62,9 +61,8 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     }
 
     # --------------------------------------------------
-    # Attach and mark result
+    # Attach diagnostics data only
     # --------------------------------------------------
-
     res$diagnostics <- new_diagnostics_result(diag_raw)
     cal$workspace[[name]] <- mark_diagnosed(res)
 
@@ -82,26 +80,6 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
 # ================================================================================
 
 #' Validate inputs prior to running diagnostics
-#'
-#' @description
-#' Checks that a calibrated model object is in a valid state for
-#' diagnostics and determines which results should be diagnosed.
-#'
-#' Specifically, this function:
-#' \itemize{
-#'   \item Verifies that the model has been calibrated
-#'   \item Ensures that at least one pseudolikelihood result is present
-#'   \item Silently drops any comparison results from the diagnostic set
-#' }
-#'
-#' Comparison objects are excluded automatically, since diagnostics
-#' are only defined for individual likelihood results (profile or
-#' integrated).
-#'
-#' @param cal A calibrated model object.
-#'
-#' @return A character vector of workspace result names eligible for
-#'   diagnostics (comparison results removed). Returned invisibly.
 #'
 #' @keywords internal
 #' @noRd
@@ -123,27 +101,48 @@ validate_diagnose_input <- function(cal) {
   # --------------------------------------------------
   # Drop comparison results silently
   # --------------------------------------------------
-
   which <- available[
-    !vapply(
-      cal$workspace,
-      is_comparison,
-      logical(1)
-    )
+    !vapply(cal$workspace, is_comparison, logical(1))
   ]
 
   invisible(which)
 }
 
 # ================================================================================
-# S3 Methods
+# Plot Materialization (local-only)
 # ================================================================================
-# NOTE:
-#   • Diagnostics computation lives in:
-#       - likelihood-diagnose-integrate.R
-#       - likelihood-diagnose-profile.R
-#   • Plot construction is handled *inside* those files.
-#   • This file contains only dispatch, orchestration, and presentation.
+
+#' Build diagnostics plots (dispatcher)
+#'
+#' @description
+#' Materializes diagnostics plots **on demand** from stored diagnostics data.
+#' Dispatches to likelihood-specific plot builders.
+#'
+#' @param diag A diagnostics result object.
+#'
+#' @return A named list of ggplot objects.
+#'
+#' @keywords internal
+#' @noRd
+build_diagnostics_plots <- function(diag) {
+  if (!isTRUE(diag$supported)) {
+    stop("Diagnostics plots not supported for this likelihood.", call. = FALSE)
+  }
+
+  if (inherits(diag, "diagnostics_integrate")) {
+    build_diagnostics_plots_integrate(diag)
+  } else if (inherits(diag, "diagnostics_profile")) {
+    build_diagnostics_plots_profile(diag)
+  } else {
+    stop(
+      "build_diagnostics_plots(): Unknown diagnostics class.",
+      call. = FALSE
+    )
+  }
+}
+
+# ================================================================================
+# S3 Methods
 # ================================================================================
 
 # ----------------------------------------------------------------------
@@ -155,7 +154,7 @@ print.diagnostics <- function(x, ...) {
   cat("<diagnostics>\n")
 
   if (!isTRUE(x$supported)) {
-    cat("  Type: Profile Log-Likelihood (placeholder)\n")
+    cat("  Diagnostics not supported.\n")
     cat("  Message: ", x$message, "\n", sep = "")
     return(invisible(x))
   }
@@ -239,12 +238,13 @@ print.summary_diagnostics <- function(x, ...) {
 }
 
 # ----------------------------------------------------------------------
-# Plot
+# Plot (local-only materialization)
 # ----------------------------------------------------------------------
 
 #' @export
 plot.diagnostics <- function(x, ...) {
-  x$plots %||% list()
+  .assert_local_plotting()
+  build_diagnostics_plots(x)
 }
 
 # ================================================================================

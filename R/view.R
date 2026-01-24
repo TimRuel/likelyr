@@ -16,6 +16,7 @@
 #'
 #' @export
 view <- function(x, ...) {
+  .assert_local_rendering()
   UseMethod("view")
 }
 

@@ -1,12 +1,17 @@
 # ======================================================================
-# likelihood-integrate.R  — Unified likelyr API version
+# likelihood-integrate.R  — Unified likelyr API version (HPC-safe)
 # ======================================================================
 
 #' Integrated Log-Likelihood
 #'
 #' @description
 #' Computes the integrated log-likelihood and attaches it to the input
-#' `calibrated` model object under `$workspace$integrate`. The updated object is returned.
+#' `calibrated` model object under `$workspace$integrate`. The updated object
+#' is returned.
+#'
+#' This function performs **no plotting or table rendering**. Visualization
+#' is deferred to `plot()` / `view()` methods, which materialize plots/tables
+#' locally from stored data frames.
 #'
 #' This function is **silent by default** for pipe-friendly workflows.
 #' Set `verbose = TRUE` to display diagnostic messages.
@@ -55,11 +60,15 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   param_mle <- cal$parameter$param_mle
 
   # ------------------------------------------------------------------
-  # 1. Create `integrate` working area inside workspace$integrated
+  # 1. Create `integrate` working area inside workspace$integrate
   # ------------------------------------------------------------------
   constraint_fn <- function(param) psi_fn(param) - psi_mle
   generate_init <- make_omega_hat_initgen(cal)
   sample_omega_hat <- make_omega_hat_sampler(cal)
+
+  if (is.null(cal$workspace)) {
+    cal$workspace <- list()
+  }
 
   cal$workspace$integrate <- list(
     constraint_fn = constraint_fn,
@@ -87,7 +96,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch computation
+  # 3. Branch computation (HPC-safe; may rely on nloptr, parallel, etc.)
   # ------------------------------------------------------------------
   branch_result <- generate_branches(
     cal = cal,
@@ -97,6 +106,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 
   # ------------------------------------------------------------------
   # 4. Final aggregation (log-sum-exp)
+  #    NOTE: No plotting or rendering here; only store data frames.
   # ------------------------------------------------------------------
   integrate_result <- tryCatch(
     {
@@ -105,9 +115,10 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 
       branch_avg <- average_branches(branches)
 
-      pseudolikelihood_points <- plot_pseudolikelihood_points(
-        branch_avg$psi_ll_df
-      )
+      # Ensure type attribute exists for downstream plot/view methods
+      if (!is.null(branch_avg$psi_ll_df)) {
+        attr(branch_avg$psi_ll_df, "type") <- "integrated"
+      }
 
       new_integrate_result(list(
         psi_ll_df = branch_avg$psi_ll_df,
@@ -116,8 +127,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
         omega_draws = omega_draws,
         param_mle = param_mle,
         psi_mle = psi_mle,
-        status = "success",
-        pseudolikelihood_points = pseudolikelihood_points
+        status = "success"
       ))
     },
     error = function(e) {
@@ -137,9 +147,6 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 5. Replace `integrate` working area with final result
   # ------------------------------------------------------------------
-  if (is.null(cal$workspace)) {
-    cal$workspace <- list()
-  }
   cal$workspace$integrate <- integrate_result
 
   if (verbose) {
@@ -232,28 +239,16 @@ print.integrate <- function(x, ...) {
   # -----------------------------------------------------------
   # Lifecycle flags (slot presence, not helpers)
   # -----------------------------------------------------------
-
   has_inference <- !is.null(x$inference)
   has_diagnostics <- !is.null(x$diagnostics)
 
   cat("Lifecycle:\n")
-  cat(
-    "  inferred:   ",
-    if (has_inference) "✓" else "×",
-    "\n",
-    sep = ""
-  )
-  cat(
-    "  diagnosed:  ",
-    if (has_diagnostics) "✓" else "×",
-    "\n",
-    sep = ""
-  )
+  cat("  inferred:   ", if (has_inference) "✓" else "×", "\n", sep = "")
+  cat("  diagnosed:  ", if (has_diagnostics) "✓" else "×", "\n", sep = "")
 
   # -----------------------------------------------------------
   # Estimates
   # -----------------------------------------------------------
-
   if (!is.null(x$psi_mle)) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
   }
@@ -270,7 +265,6 @@ print.integrate <- function(x, ...) {
   # -----------------------------------------------------------
   # Grid information
   # -----------------------------------------------------------
-
   if (!is.null(x$psi_ll_df)) {
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
   }
@@ -283,18 +277,18 @@ print.integrate <- function(x, ...) {
 }
 
 # =====================================================================
-# S3 Plot Method
+# S3 Plot Method (local-only materialization)
 # =====================================================================
 
 #' @method plot integrate
 #' @export
 plot.integrate <- function(x, ...) {
-  if (is.null(x$pseudolikelihood_points)) {
-    stop(
-      "No plot available in integrated log-likelihood result.",
-      call. = FALSE
-    )
+  .assert_local_plotting()
+
+  if (is.null(x$psi_ll_df)) {
+    stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  x$pseudolikelihood_points
+  # Materialize plot *at call time* (do not store ggplot objects in results)
+  plot_pseudolikelihood_points(x$psi_ll_df)
 }

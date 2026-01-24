@@ -107,3 +107,25 @@
 
   wrapper
 }
+
+#' @keywords internal
+#' @noRd
+.assert_local_plotting <- function() {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop(
+      "Plotting is local-only and requires ggplot2.\n",
+      "Do not call plot() or plot_*() on the HPC.",
+      call. = FALSE
+    )
+  }
+}
+
+.assert_local_rendering <- function() {
+  if (!requireNamespace("kableExtra", quietly = TRUE)) {
+    stop(
+      "Table rendering is local-only and requires kableExtra.\n",
+      "Do not call rendering helpers on the HPC.",
+      call. = FALSE
+    )
+  }
+}

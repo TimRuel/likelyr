@@ -10,7 +10,7 @@
 #'
 #'   • `psi_fn(param)` — mapping from θ → ψ
 #'   • optional analytic Jacobian ∂ψ/∂θ
-#'   • `search_interval_fn(data)` — allowable ψ-range
+#'   • `search_interval_fn(param_mle, data)` — allowable ψ-range
 #'   • grid `increment` for ψ exploration
 #'   • `confidence_levels` for LR confidence intervals
 #'   • `cutoff_buffer` to ensure branch depth beyond the strictest CI
@@ -24,7 +24,7 @@
 #'
 #' @param psi_fn Function(param) → scalar ψ(θ). Required.
 #' @param psi_jac Optional function(param) → gradient ∇ψ(θ).
-#' @param search_interval_fn Function(data) → c(lower, upper). Required.
+#' @param search_interval_fn Function(param_mle, data) → c(lower, upper). Required.
 #' @param increment Positive scalar giving ψ-grid spacing.
 #' @param confidence_levels Numeric vector strictly inside (0, 1).
 #'   These are **coverage levels** (not α). Example: `c(0.90, 0.95)`.
@@ -113,7 +113,7 @@ estimand_spec <- function(
   # search interval ---------------------------------------------
   if (!is.function(x$search_interval_fn)) {
     stop(
-      "search_interval_fn must be a function(data) → c(lower, upper).",
+      "search_interval_fn must be a function(param_mle, data) → c(lower, upper).",
       call. = FALSE
     )
   }

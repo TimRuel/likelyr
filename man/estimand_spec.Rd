@@ -21,7 +21,7 @@ estimand_spec(
 
 \item{psi_jac}{Optional function(param) → gradient ∇ψ(θ).}
 
-\item{search_interval_fn}{Function(data) → c(lower, upper). Required.}
+\item{search_interval_fn}{Function(param_mle, data) → c(lower, upper). Required.}
 
 \item{increment}{Positive scalar giving ψ-grid spacing.}
 
@@ -47,7 +47,7 @@ generating profile or integrated log-likelihood curves:
 
 • \code{psi_fn(param)} — mapping from θ → ψ
 • optional analytic Jacobian ∂ψ/∂θ
-• \code{search_interval_fn(data)} — allowable ψ-range
+• \code{search_interval_fn(param_mle, data)} — allowable ψ-range
 • grid \code{increment} for ψ exploration
 • \code{confidence_levels} for LR confidence intervals
 • \code{cutoff_buffer} to ensure branch depth beyond the strictest CI

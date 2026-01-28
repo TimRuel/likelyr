@@ -69,13 +69,13 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
   # -------------------------------------------------------------
   # 5. Compute search interval
   # -------------------------------------------------------------
-  si <- estimand$search_interval_fn(data)
+  si <- estimand$search_interval_fn(param_mle, data)
 
   if (
     !is.numeric(si) || length(si) != 2L || any(!is.finite(si)) || si[1] >= si[2]
   ) {
     stop(
-      "search_interval_fn(data) must return c(lower, upper) with finite lower < upper.",
+      "search_interval_fn(param_mle, data) must return c(lower, upper) with finite lower < upper.",
       call. = FALSE
     )
   }

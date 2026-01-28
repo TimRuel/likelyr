@@ -7,5 +7,9 @@
 compare(cal)
 }
 \description{
-Compare Integrated and Profile Likelihood Inference
+Computes \strong{comparison data only} between integrated and profile
+likelihood inference results. No tables or plots are rendered here.
+
+Tables and plots are materialized later via \code{view()} and \code{plot()}
+(local-only), using the stored data frames.
 }

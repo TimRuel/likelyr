@@ -2,12 +2,12 @@
 % Please edit documentation in R/compare-synthesize.R
 \name{synthesize_comparison}
 \alias{synthesize_comparison}
-\title{Synthesize pseudolikelihood comparison res_listults}
+\title{Synthesize Pseudolikelihood Comparison Results}
 \usage{
 synthesize_comparison(res_list)
 }
 \arguments{
-\item{res_list}{A fitted likelihood res_listult object. Must be compatible with
+\item{res_list}{A fitted likelihood result object. Must be compatible with
 \code{get_point_estimates_df()} and
 \code{get_interval_estimates_df()}.}
 }
@@ -16,62 +16,23 @@ A named list with the following elements:
 
 \describe{
 \item{\code{point_estimates_df}}{
-Data frame of point estimates and uncertainty measures_list.
+Data frame of point estimates and uncertainty measures.
 }
 \item{\code{interval_estimates_df}}{
-Data frame of interval estimates and diagnostics, including attached
-attributes used for rendering.
+Data frame of interval estimates and diagnostics.
 }
 \item{\code{estimates_df}}{
-Unified data frame combining point and interval information, suitable
-for combined rendering.
-}
-\item{\code{point_estimates_comparison_table}}{
-\code{kableExtra} HTML table comparing point estimates.
-}
-\item{\code{interval_estimates_comparison_table}}{
-\code{kableExtra} HTML table comparing interval estimates.
-}
-\item{\code{estimates_comparison_table}}{
-\code{kableExtra} HTML table combining point and interval estimates.
+Unified data frame combining point and interval information,
+suitable for downstream table/plot materialization.
 }
 }
 }
 \description{
 High-level orchestration helper that synthesizes point estimates and
-interval estimates from a fitted likelihood res_listult object, and renders
-a complete set of comparison tables.
-}
-\details{
-This function coordinates the following steps:
+interval estimates from a fitted likelihood result object.
 
-\enumerate{
-\item Extract point estimates via \code{get_point_estimates_df()}
-\item Render the point estimate comparison table
-\item Extract interval estimates via \code{get_interval_estimates_df()}
-\item Render the interval estimate comparison table
-\item Combine point and interval estimates into a unified data frame
-\item Render the combined comparison table
+This function performs \strong{no rendering or plotting}. It computes and
+returns only the data frames required to later construct tables and
+plots via \code{view()} and \code{plot()} methods (local-only).
 }
-
-The combined \code{estimates_df} is constructed by repeating point
-estimates across confidence levels and column-binding the interval
-diagnostics, ensuring alignment required by
-\code{render_estimates_comparison_table()}.
-
-This function performs \strong{no estimation} itself; it is purely a
-synthesis and rendering layer.
-}
-\seealso{
-\code{\link{render_point_estimates_comparison_table}},
-\code{\link{render_interval_estimates_comparison_table}},
-\code{\link{render_estimates_comparison_table}}
-
-Other inference-renderers: 
-\code{\link{render_estimates_comparison_table}()},
-\code{\link{render_interval_estimates_comparison_table}()},
-\code{\link{render_point_estimate_table}()},
-\code{\link{render_point_estimates_comparison_table}()}
-}
-\concept{inference-renderers}
 \keyword{internal}

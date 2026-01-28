@@ -10,16 +10,14 @@ diagnose_integrate(res)
 \item{res}{An \code{integrate} result object.}
 }
 \value{
-A named list containing diagnostics metrics, warnings,
-summaries, and pre-built ggplot objects.
+A named list containing diagnostics metrics, warnings, summaries,
+and plot-ready inputs (but no ggplot objects).
 }
 \description{
-Computes Monte Carlo diagnostics for an integrated log-likelihood result
-and constructs diagnostic plots \emph{as soon as their inputs are available}.
+Computes Monte Carlo diagnostics for an integrated log-likelihood result.
 
-Diagnostics are computed via modular metric helpers, and plots are built
-incrementally during execution. This function performs no printing or
-attachment; it returns a fully-formed diagnostics object to be consumed
-by \code{diagnose()}.
+This function is \strong{HPC-safe}: it performs \strong{no plotting} and does not
+require \code{ggplot2}. Any plots are materialized later by \code{plot(diagnostics)}
+via \code{build_diagnostics_plots()}, which is local-only.
 }
 \keyword{internal}

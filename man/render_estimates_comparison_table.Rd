@@ -16,18 +16,13 @@ A \code{kableExtra} HTML table object.
 \description{
 Renders a unified comparison table containing both point estimates and
 interval estimates for multiple pseudolikelihood methods.
-}
-\details{
-This table aligns point estimates with their corresponding confidence
-intervals and uses row collapsing and hidden HTML markers to preserve
-grouping by pseudolikelihood.
+
+This function is \strong{local-only} and must not be called on HPC.
 }
 \seealso{
 Other inference-renderers: 
 \code{\link{render_interval_estimates_comparison_table}()},
-\code{\link{render_point_estimate_table}()},
-\code{\link{render_point_estimates_comparison_table}()},
-\code{\link{synthesize_comparison}()}
+\code{\link{render_point_estimates_comparison_table}()}
 }
 \concept{inference-renderers}
 \keyword{internal}

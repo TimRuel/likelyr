@@ -12,8 +12,7 @@ representing the evaluated log-likelihood curve.}
 
 \item{alpha_levels}{Numeric vector of significance levels.}
 
-\item{psi_0}{Optional numeric scalar giving the true value of ψ.
-(e.g. \code{"profile"}, \code{"integrated"}). Used for labeling and rendering.}
+\item{psi_0}{Optional numeric scalar giving the true value of ψ.}
 
 \item{expand_factor}{Numeric scalar controlling multiplicative expansion
 of the search bounds for confidence interval root finding.}
@@ -21,19 +20,19 @@ of the search bounds for confidence interval root finding.}
 \value{
 A named list containing:
 \describe{
-\item{psi_ll_fn}{Smoothed log-likelihood function.}
-\item{point_estimate_df}{Data frame with ψ₀, ψ̂, and SE(ψ̂).}
-\item{interval_estimate_df}{Formatted confidence interval table.}
-\item{inference_df}{Combined point and interval estimate summary table.}
-\item{point_estimate_table}{Rendered point estimate table}
-\item{interval_estimate_table}{Rendered interval estimate table}
-\item{estimate_table}{Rendered combined estimate table}
+\item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function with max at 0.}
+\item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
+\item{interval_estimate_df}{Confidence interval diagnostics table (numeric).}
+\item{estimate_df}{Combined point + interval summary table (numeric).}
 }
 }
 \description{
 Orchestrates point estimation and confidence interval construction from
 a ψ log-likelihood grid, returning a unified inference object containing
-both numeric results and (optionally) rendered summaries.
+numeric results and the data required for downstream presentation.
+
+This function performs \strong{no table rendering or plotting}. Tables/plots
+are materialized later by \code{view()} and \code{plot()} (local-only).
 
 This function assumes that likelihood evaluation has already been
 performed and that \code{psi_ll_df} represents a unimodal likelihood curve.

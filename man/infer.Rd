@@ -7,5 +7,9 @@
 infer(cal, which = NULL, alpha_levels = NULL)
 }
 \description{
-Likelihood-Based Inference for a Calibrated Model
+Computes likelihood-based inference \strong{data only} (point estimates and
+confidence interval diagnostics) for each pseudolikelihood result.
+
+This function performs \strong{no table rendering and no plotting}.
+Presentation is deferred to \code{view()} and \code{plot()} (local-only).
 }

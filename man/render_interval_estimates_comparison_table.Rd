@@ -16,35 +16,13 @@ A \code{kableExtra} HTML table object.
 \description{
 Renders a comparison table of confidence intervals and associated
 diagnostics across pseudolikelihoods and confidence levels.
-}
-\details{
-The input data frame must include specific attributes used for rendering:
 
-\describe{
-\item{\code{interval_estimates_raw}}{Data frame containing raw lower and upper bounds.}
-\item{\code{point_estimates}}{Numeric vector of point estimates aligned with rows.}
-\item{\code{psi_0}}{Scalar true parameter value.}
-}
-
-Required columns:
-\itemize{
-\item \code{Level}
-\item \code{Pseudolikelihood}
-\item \code{Interval}
-\item \code{Length}
-\item \code{Lower Deviation}
-\item \code{Upper Deviation}
-\item \code{Status}
-}
-
-Interval diagrams are rendered inline using \code{spec_pointrange()}.
+This function is \strong{local-only} and must not be called on HPC.
 }
 \seealso{
 Other inference-renderers: 
 \code{\link{render_estimates_comparison_table}()},
-\code{\link{render_point_estimate_table}()},
-\code{\link{render_point_estimates_comparison_table}()},
-\code{\link{synthesize_comparison}()}
+\code{\link{render_point_estimates_comparison_table}()}
 }
 \concept{inference-renderers}
 \keyword{internal}

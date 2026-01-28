@@ -20,7 +20,12 @@ The SAME \code{calibrated} model object, augmented with:
 }
 \description{
 Computes the integrated log-likelihood and attaches it to the input
-\code{calibrated} model object under \verb{$workspace$integrate}. The updated object is returned.
+\code{calibrated} model object under \verb{$workspace$integrate}. The updated object
+is returned.
+
+This function performs \strong{no plotting or table rendering}. Visualization
+is deferred to \code{plot()} / \code{view()} methods, which materialize plots/tables
+locally from stored data frames.
 
 This function is \strong{silent by default} for pipe-friendly workflows.
 Set \code{verbose = TRUE} to display diagnostic messages.

@@ -14,7 +14,7 @@ profile(cal, ...)
 \item{verbose}{Logical; print diagnostic messages (default FALSE).}
 }
 \value{
-The SAME \code{calibrated} model object object, augmented with:
+The SAME \code{calibrated} model object, augmented with:
 \itemize{
 \item class \code{profiled}
 \item \code{workspace$profile} — a \code{profile} object
@@ -37,12 +37,8 @@ deterministic branch}. The result is attached to:
 \preformatted{
   cal$workspace$profile
 }
-}
-\examples{
-\dontrun{
-cal <- calibrate(model, data)
-cal <- profile(cal)
-plot(cal$workspace$profile)
-}
 
+This function performs \strong{no plotting or table rendering}. Visualization
+is deferred to \code{plot()} / \code{view()} methods, which materialize plots/tables
+locally from stored data frames.
 }

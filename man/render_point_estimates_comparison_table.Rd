@@ -15,26 +15,13 @@ A \code{kableExtra} HTML table object.
 \description{
 Renders a formatted comparison table of point estimates and associated
 uncertainty measures (error and standard error) across pseudolikelihoods.
-}
-\details{
-The input data frame is expected to contain one row per pseudolikelihood.
-Missing values are rendered as em dashes for visual clarity.
 
-Required columns:
-\itemize{
-\item \code{psi_0}
-\item \code{psi_hat}
-\item \code{error}
-\item \code{se_psi_hat}
-\item \code{pseudolikelihood}
-}
+This function is \strong{local-only} and must not be called on HPC.
 }
 \seealso{
 Other inference-renderers: 
 \code{\link{render_estimates_comparison_table}()},
-\code{\link{render_interval_estimates_comparison_table}()},
-\code{\link{render_point_estimate_table}()},
-\code{\link{synthesize_comparison}()}
+\code{\link{render_interval_estimates_comparison_table}()}
 }
 \concept{inference-renderers}
 \keyword{internal}

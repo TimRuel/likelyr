@@ -16,11 +16,11 @@ The same \code{calibrated} model object, with each likelihood result
 marked as diagnosed.
 }
 \description{
-Attaches diagnostics to each likelihood result (integrated or profile)
+Attaches diagnostics \emph{data} to each likelihood result (integrated or profile)
 stored in a calibrated model.
 
-Integrated likelihood receives full Monte Carlo diagnostics; profile
-likelihood receives its own diagnostics implementation.
+This function performs \strong{no plotting}. All diagnostics plots are
+materialized later via \code{plot()} (local-only).
 
 Diagnostics are attached at:
 \preformatted{

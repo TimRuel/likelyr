@@ -145,6 +145,7 @@ view.comparison <- function(x, ...) {
 # Plot (local-only)
 # ---------------------------------------------------------------------
 
+#' @export
 plot.comparison <- function(x, ...) {
   .assert_local_plotting()
 

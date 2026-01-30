@@ -12,6 +12,7 @@ estimand_spec(
   confidence_levels,
   cutoff_buffer = 0.1,
   uniroot_expand_factor = 0.02,
+  psi_0 = NULL,
   name = NULL,
   ...
 )
@@ -25,14 +26,14 @@ estimand_spec(
 
 \item{increment}{Positive scalar giving ψ-grid spacing.}
 
-\item{confidence_levels}{Numeric vector strictly inside (0, 1).
-These are \strong{coverage levels} (not α). Example: \code{c(0.90, 0.95)}.}
+\item{confidence_levels}{Numeric vector strictly inside (0, 1).}
 
-\item{cutoff_buffer}{Nonnegative scalar. Branches are extended to at
-least \code{(1 + cutoff_buffer)} times the deepest LR cutoff.}
+\item{cutoff_buffer}{Nonnegative scalar.}
 
-\item{uniroot_expand_factor}{Nonnegative scalar. Used by CI routines
-to expand root-finding intervals.}
+\item{uniroot_expand_factor}{Nonnegative scalar.}
+
+\item{psi_0}{Optional numeric scalar giving the true value of ψ.
+If supplied, overrides internal ψ₀ computation during calibration.}
 
 \item{name}{Optional descriptive name.}
 
@@ -43,19 +44,9 @@ An \code{estimand_spec} object.
 }
 \description{
 Defines the estimand function ψ(θ) and all metadata needed for
-generating profile or integrated log-likelihood curves:
+generating profile or integrated log-likelihood curves.
 
-• \code{psi_fn(param)} — mapping from θ → ψ
-• optional analytic Jacobian ∂ψ/∂θ
-• \code{search_interval_fn(param_mle, data)} — allowable ψ-range
-• grid \code{increment} for ψ exploration
-• \code{confidence_levels} for LR confidence intervals
-• \code{cutoff_buffer} to ensure branch depth beyond the strictest CI
-• \code{uniroot_expand_factor} to widen search intervals for CI endpoints
-
-\code{cutoff_buffer} ensures that branch construction explores \emph{past} the
-deepest LR cutoff induced by the smallest CI level.
-
-\code{uniroot_expand_factor} helps \code{compute_ci()} succeed even when roots
-lie just outside the discrete ψ-grid envelope.
+Optionally, the true value ψ₀ may be supplied directly via \code{psi_0}.
+If provided, this value will override internal computation of ψ₀
+during calibration.
 }

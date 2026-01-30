@@ -1,37 +1,26 @@
 # ======================================================================
-# Estimand Specification (v3.2)
+# Estimand Specification (v3.3)
 # ======================================================================
 
 #' Specify an Estimand ψ(θ) for Profile / Integrated Log-Likelihood
 #'
 #' @description
 #' Defines the estimand function ψ(θ) and all metadata needed for
-#' generating profile or integrated log-likelihood curves:
+#' generating profile or integrated log-likelihood curves.
 #'
-#'   • `psi_fn(param)` — mapping from θ → ψ
-#'   • optional analytic Jacobian ∂ψ/∂θ
-#'   • `search_interval_fn(param_mle, data)` — allowable ψ-range
-#'   • grid `increment` for ψ exploration
-#'   • `confidence_levels` for LR confidence intervals
-#'   • `cutoff_buffer` to ensure branch depth beyond the strictest CI
-#'   • `uniroot_expand_factor` to widen search intervals for CI endpoints
-#'
-#' `cutoff_buffer` ensures that branch construction explores *past* the
-#' deepest LR cutoff induced by the smallest CI level.
-#'
-#' `uniroot_expand_factor` helps `compute_ci()` succeed even when roots
-#' lie just outside the discrete ψ-grid envelope.
+#' Optionally, the true value ψ₀ may be supplied directly via `psi_0`.
+#' If provided, this value will override internal computation of ψ₀
+#' during calibration.
 #'
 #' @param psi_fn Function(param) → scalar ψ(θ). Required.
 #' @param psi_jac Optional function(param) → gradient ∇ψ(θ).
 #' @param search_interval_fn Function(param_mle, data) → c(lower, upper). Required.
 #' @param increment Positive scalar giving ψ-grid spacing.
 #' @param confidence_levels Numeric vector strictly inside (0, 1).
-#'   These are **coverage levels** (not α). Example: `c(0.90, 0.95)`.
-#' @param cutoff_buffer Nonnegative scalar. Branches are extended to at
-#'   least `(1 + cutoff_buffer)` times the deepest LR cutoff.
-#' @param uniroot_expand_factor Nonnegative scalar. Used by CI routines
-#'   to expand root-finding intervals.
+#' @param cutoff_buffer Nonnegative scalar.
+#' @param uniroot_expand_factor Nonnegative scalar.
+#' @param psi_0 Optional numeric scalar giving the true value of ψ.
+#'   If supplied, overrides internal ψ₀ computation during calibration.
 #' @param name Optional descriptive name.
 #' @param ... Additional user metadata (stored but unused).
 #'
@@ -45,6 +34,7 @@ estimand_spec <- function(
   confidence_levels,
   cutoff_buffer = 0.1,
   uniroot_expand_factor = 0.02,
+  psi_0 = NULL,
   name = NULL,
   ...
 ) {
@@ -52,6 +42,7 @@ estimand_spec <- function(
     name = name %||% "<estimand>",
     psi_fn = psi_fn,
     psi_jac = psi_jac,
+    psi_0 = psi_0,
     search_interval_fn = search_interval_fn,
     increment = increment,
     confidence_levels = confidence_levels,
@@ -64,7 +55,6 @@ estimand_spec <- function(
   .validate_estimand_spec(x)
   x
 }
-
 
 # ======================================================================
 # INTERNAL VALIDATOR
@@ -88,6 +78,7 @@ estimand_spec <- function(
 #' \itemize{
 #'   \item \code{psi_fn}: must be a function mapping parameters to a scalar estimand.
 #'   \item \code{psi_jac}: optional; if provided, must be a function.
+#'   \item \code{psi_0}: optional; if provided, must be a numeric scalar.
 #'   \item \code{search_interval_fn}: function returning \code{c(lower, upper)}.
 #'   \item \code{increment}: positive numeric scalar.
 #'   \item \code{confidence_levels}: numeric vector strictly in (0, 1), no duplicates.
@@ -108,6 +99,13 @@ estimand_spec <- function(
   # ∂ψ/∂θ --------------------------------------------------------
   if (!is.null(x$psi_jac) && !is.function(x$psi_jac)) {
     stop("psi_jac must be NULL or a function(param).", call. = FALSE)
+  }
+
+  # ψ₀ override --------------------------------------------------
+  if (!is.null(x$psi_0)) {
+    if (!is.numeric(x$psi_0) || length(x$psi_0) != 1) {
+      stop("psi_0 must be NULL or a numeric scalar.", call. = FALSE)
+    }
   }
 
   # search interval ---------------------------------------------
@@ -171,5 +169,6 @@ print.estimand_spec <- function(x, ...) {
   )
   cat("- Cutoff buffer:         ", x$cutoff_buffer, "\n", sep = "")
   cat("- uniroot expand factor: ", x$uniroot_expand_factor, "\n", sep = "")
+  cat("- psi_0:                 ", x$psi_0, "\n", sep = "")
   invisible(x)
 }

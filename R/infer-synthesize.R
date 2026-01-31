@@ -120,6 +120,7 @@ synthesize_inference <- function(
   # Return data only (no tables, no plots)
   # --------------------------------------------------
   list(
+    psi_ll_df = psi_ll_df,
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     point_estimate_df = point_estimate_df,
     interval_estimate_df = interval_estimate_df,

@@ -34,6 +34,7 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
 
     # Attach inference data only
     res$inference <- new_inference_result(synthesis)
+    res$psi_ll_df <- NULL
     cal$workspace[[name]] <- mark_inferred(res)
   }
 

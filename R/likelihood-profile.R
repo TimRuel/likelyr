@@ -250,10 +250,14 @@ print.profile <- function(x, ...) {
 plot.profile <- function(x, ...) {
   .assert_local_plotting()
 
-  if (is.null(x$psi_ll_df)) {
+  psi_ll_df <- x$psi_ll_df
+  if (is.null(psi_ll_df) && !is.null(x$inference)) {
+    psi_ll_df <- x$inference$psi_ll_df
+  }
+
+  if (is.null(psi_ll_df)) {
     stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  # Materialize plot at call time
-  plot_pseudolikelihood_points(x$psi_ll_df)
+  plot_pseudolikelihood_points(psi_ll_df)
 }

@@ -115,11 +115,6 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 
       branch_avg <- average_branches(branches)
 
-      # Ensure type attribute exists for downstream plot/view methods
-      if (!is.null(branch_avg$psi_ll_df)) {
-        attr(branch_avg$psi_ll_df, "type") <- "integrated"
-      }
-
       new_integrate_result(list(
         psi_ll_df = branch_avg$psi_ll_df,
         branch_mat = branch_avg$branch_mat,

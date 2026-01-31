@@ -2,30 +2,53 @@
 % Please edit documentation in R/branch-utils.R
 \name{compute_required_branch_alpha}
 \alias{compute_required_branch_alpha}
-\title{Compute Required Per-Branch Alpha}
+\title{Compute Branch-Level Tail Probability for Integrated Likelihood Cutoff}
 \usage{
-compute_required_branch_alpha(R, alpha)
+compute_required_branch_alpha(R, alpha, gamma = 0.5)
 }
 \arguments{
-\item{R}{Positive integer number of branches.}
+\item{R}{Positive integer giving the number of Monte Carlo branches.}
 
-\item{alpha}{Global tail probability in \verb{(0, 1)}.}
+\item{alpha}{Numeric scalar in \eqn{(0,1)} giving the desired global
+significance level.}
+
+\item{gamma}{Numeric scalar in \eqn{(0,1]} tempering the \eqn{\log(R)}
+correction; smaller values reduce conservativeness. Defaults to \code{0.5}.}
 }
 \value{
-Numeric scalar \code{alpha_branch}.
+A numeric scalar giving the branch-level tail probability
+\eqn{\alpha_\text{branch}} corresponding to the required branch cutoff.
 }
 \description{
-Computes the per-branch tail probability \code{alpha_branch} such that
-each branch is extended far enough to guarantee the \strong{global}
-integrated-likelihood cutoff for tail probability \code{alpha}.
+Computes a branch-level tail probability \eqn{\alpha_\text{branch}} such
+that, when \eqn{R} Monte Carlo integrated-likelihood branches are averaged
+via a log-sum-exp operation, the resulting integrated log-likelihood is
+very likely to reach the desired global confidence level
+\eqn{1 - \alpha}.
 
-The requirement is:
-\deqn{
-  \text{branch\_cutoff} \ge c_{\text{global}} + \log R
+The calculation is based on a likelihood-ratio cutoff for a scalar
+parameter of interest, with a tempered correction for branch averaging.
+The tempering parameter \code{gamma} reduces the conservativeness of the
+worst-case \eqn{\log(R)} penalty, reflecting the fact that only a subset
+of branches typically contribute meaningfully to the integrated likelihood.
 }
+\details{
+Let \eqn{c_\text{global} = \tfrac{1}{2}\chi^2_{1,\,1-\alpha}} denote the
+standard likelihood-ratio cutoff defining a \eqn{1-\alpha} confidence
+interval. When averaging \eqn{R} branches, a sufficient condition for the
+integrated log-likelihood to fall below this cutoff is that each branch
+falls below
+\deqn{
+  c_\text{branch} = c_\text{global} + \gamma \log(R),
+}
+where \eqn{\gamma \in (0,1]} controls the degree of conservativeness.
 
-where:
-
-\deqn{c_{\text{global}} = \tfrac12 \chi^2_1(1 - \alpha)}
+Setting \code{gamma = 1} recovers a worst-case bound in which all branches
+contribute equally. Smaller values of \code{gamma} provide a less
+conservative but typically adequate cutoff, reflecting unequal branch
+weights in practice.
+}
+\seealso{
+\code{\link{integrate}}, \code{\link{profile}}
 }
 \keyword{internal}

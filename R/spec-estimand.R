@@ -17,6 +17,10 @@
 #' @param search_interval_fn Function(param_mle, data) → c(lower, upper). Required.
 #' @param increment Positive scalar giving ψ-grid spacing.
 #' @param confidence_levels Numeric vector strictly inside (0, 1).
+#' @param gamma Numeric scalar in (0,1] tempering the conservativeness of
+#'   integrated likelihood branch cutoffs. Smaller values reduce the worst-case
+#'   \eqn{\log(R)} correction when averaging Monte Carlo branches, reflecting
+#'   unequal branch contributions in practice. Defaults to \code{0.5}.
 #' @param cutoff_buffer Nonnegative scalar.
 #' @param uniroot_expand_factor Nonnegative scalar.
 #' @param psi_0 Optional numeric scalar giving the true value of ψ.
@@ -32,6 +36,7 @@ estimand_spec <- function(
   search_interval_fn,
   increment,
   confidence_levels,
+  gamma = 0.5,
   cutoff_buffer = 0.1,
   uniroot_expand_factor = 0.02,
   psi_0 = NULL,
@@ -46,6 +51,7 @@ estimand_spec <- function(
     search_interval_fn = search_interval_fn,
     increment = increment,
     confidence_levels = confidence_levels,
+    gamma = gamma,
     cutoff_buffer = cutoff_buffer,
     uniroot_expand_factor = uniroot_expand_factor,
     extra = list(...)
@@ -82,6 +88,7 @@ estimand_spec <- function(
 #'   \item \code{search_interval_fn}: function returning \code{c(lower, upper)}.
 #'   \item \code{increment}: positive numeric scalar.
 #'   \item \code{confidence_levels}: numeric vector strictly in (0, 1), no duplicates.
+#'   \item \code{gamma}: numeric scalar strictly in (0, 1].
 #'   \item \code{cutoff_buffer}: non-negative numeric scalar.
 #'   \item \code{uniroot_expand_factor}: non-negative numeric scalar.
 #' }
@@ -134,6 +141,12 @@ estimand_spec <- function(
     stop("confidence_levels must not contain duplicates.", call. = FALSE)
   }
 
+  # gamma ------------------------------------------------
+  gamma <- x$gamma
+  if (!is.numeric(gamma) || gamma <= 0 || gamma > 1) {
+    stop("`gamma` must be in (0, 1].", call. = FALSE)
+  }
+
   # cutoff buffer ------------------------------------------------
   cb <- x$cutoff_buffer
   if (!is.numeric(cb) || length(cb) != 1 || cb < 0) {
@@ -167,6 +180,7 @@ print.estimand_spec <- function(x, ...) {
     "\n",
     sep = ""
   )
+  cat("- Gamma:                 ", x$gamma, "\n", sep = "")
   cat("- Cutoff buffer:         ", x$cutoff_buffer, "\n", sep = "")
   cat("- uniroot expand factor: ", x$uniroot_expand_factor, "\n", sep = "")
   cat("- psi_0:                 ", x$psi_0, "\n", sep = "")

@@ -216,7 +216,8 @@ generate_branches <- function(cal, verbose = TRUE) {
   # LR cutoff and buffer
   # -------------------------------------------------------------------
   alpha_target <- min(1 - estimand$confidence_levels)
-  alpha_branch <- compute_required_branch_alpha(R, alpha_target)
+  gamma <- estimand$gamma %||% 0.5
+  alpha_branch <- compute_required_branch_alpha(R, alpha_target, gamma)
   crit <- 0.5 * stats::qchisq(1 - alpha_branch, df = 1)
 
   cutoff_buffer <- estimand$cutoff_buffer %||% 0

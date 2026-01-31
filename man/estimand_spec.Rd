@@ -10,6 +10,7 @@ estimand_spec(
   search_interval_fn,
   increment,
   confidence_levels,
+  gamma = 0.5,
   cutoff_buffer = 0.1,
   uniroot_expand_factor = 0.02,
   psi_0 = NULL,
@@ -27,6 +28,11 @@ estimand_spec(
 \item{increment}{Positive scalar giving ψ-grid spacing.}
 
 \item{confidence_levels}{Numeric vector strictly inside (0, 1).}
+
+\item{gamma}{Numeric scalar in (0,1] tempering the conservativeness of
+integrated likelihood branch cutoffs. Smaller values reduce the worst-case
+\eqn{\log(R)} correction when averaging Monte Carlo branches, reflecting
+unequal branch contributions in practice. Defaults to \code{0.5}.}
 
 \item{cutoff_buffer}{Nonnegative scalar.}
 

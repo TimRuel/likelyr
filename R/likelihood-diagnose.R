@@ -49,10 +49,16 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     # --------------------------------------------------
     if (is_integrate(res)) {
       diag_raw <- diagnose_integrate(res)
-      res$diagnostics <- new_diagnostics_integrate_result(diag_raw)
+      res$diagnostics <- new_diagnostics_result(
+        diag_raw,
+        likelihood = "integrate"
+      )
     } else if (is_profile(res)) {
       diag_raw <- diagnose_profile(res)
-      res$diagnostics <- new_diagnostics_profile_result(diag_raw)
+      res$diagnostics <- new_diagnostics_result(
+        diag_raw,
+        likelihood = "profile"
+      )
     } else {
       stop(
         "diagnose(): Unsupported result type for '",
@@ -126,20 +132,25 @@ validate_diagnose_input <- function(cal) {
 #' @keywords internal
 #' @noRd
 build_diagnostics_plots <- function(diag) {
+  if (!inherits(diag, "diagnostics")) {
+    stop("Expected a diagnostics result object.", call. = FALSE)
+  }
+
   if (!isTRUE(diag$supported)) {
     stop("Diagnostics plots not supported for this likelihood.", call. = FALSE)
   }
 
-  if (inherits(diag, "diagnostics_integrate")) {
-    build_diagnostics_plots_integrate(diag)
-  } else if (inherits(diag, "diagnostics_profile")) {
-    build_diagnostics_plots_profile(diag)
-  } else {
+  switch(
+    diag$likelihood,
+    integrate = build_diagnostics_plots_integrate(diag),
+    profile = build_diagnostics_plots_profile(diag),
     stop(
-      "build_diagnostics_plots(): Unknown diagnostics class.",
+      "build_diagnostics_plots(): Unknown diagnostics likelihood '",
+      diag$likelihood,
+      "'.",
       call. = FALSE
     )
-  }
+  )
 }
 
 # ================================================================================
@@ -160,6 +171,7 @@ print.diagnostics <- function(x, ...) {
     return(invisible(x))
   }
 
+  cat("  Likelihood:  ", x$likelihood, "\n", sep = "")
   cat("  R (branches): ", x$R, "\n", sep = "")
   cat("  ESS (min):    ", sprintf("%.1f", x$summary$ess_min), "\n", sep = "")
   cat("  ESS (median): ", sprintf("%.1f", x$summary$ess_median), "\n", sep = "")
@@ -204,6 +216,7 @@ print.diagnostics <- function(x, ...) {
 #' @export
 summary.diagnostics <- function(diag, ...) {
   out <- list(
+    likelihood = diag$likelihood,
     supported = diag$supported,
     summary = diag$summary %||% NULL,
     warnings = diag$warnings
@@ -221,6 +234,8 @@ print.summary_diagnostics <- function(x, ...) {
     cat("Diagnostics not supported for this likelihood.\n")
     return(invisible(x))
   }
+
+  cat("Likelihood: ", x$likelihood, "\n\n", sep = "")
 
   if (!is.null(x$summary)) {
     for (nm in names(x$summary)) {
@@ -245,7 +260,14 @@ print.summary_diagnostics <- function(x, ...) {
 #' @export
 plot.diagnostics <- function(x, ...) {
   .assert_local_plotting()
-  build_diagnostics_plots(x)
+
+  plots <- build_diagnostics_plots(x)
+
+  for (p in plots) {
+    print(p)
+  }
+
+  invisible(x)
 }
 
 # ================================================================================

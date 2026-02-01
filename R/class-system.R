@@ -103,15 +103,33 @@ new_comparison_result <- function(x) {
   .new_typed_result(x, "comparison", validate_comparison_result)
 }
 
-# ---- sub-results (inherit parent result) ----
+# ----------------------------------------------------------------------
+# Sub-results
+# ----------------------------------------------------------------------
 
-new_diagnostics_integrate_result <- function(x) {
-  .new_typed_result(x, "diagnostics_integrate", validate_diagnostics_result)
+# ---- diagnostics (UNIFIED) ----
+# Likelihood-specific behavior is stored as data, not class
+
+new_diagnostics_result <- function(x, pseudolikelihood) {
+  if (!is.character(pseudolikelihood) || length(pseudolikelihood) != 1L) {
+    stop("'likelihood' must be a single character string.", call. = FALSE)
+  }
+
+  if (!pseudolikelihood %in% c("integrate", "profile")) {
+    stop(
+      "Invalid diagnostics likelihood: '",
+      pseudolikelihood,
+      "'.",
+      call. = FALSE
+    )
+  }
+
+  x$pseudolikelihood <- pseudolikelihood
+
+  .new_typed_result(x, "diagnostics", validate_diagnostics_result)
 }
 
-new_diagnostics_profile_result <- function(x) {
-  .new_typed_result(x, "diagnostics_profile", validate_diagnostics_result)
-}
+# ---- inference ----
 
 new_inference_result <- function(x) {
   validate_inference_result(x)
@@ -124,11 +142,6 @@ new_inference_result <- function(x) {
 
 # ---- model-level ----
 
-#' Mark a calibrated model as profiled
-#'
-#' @param x A calibrated model object.
-#' @return The same object with class \code{"profiled"} prepended.
-#' @keywords internal
 mark_profiled <- function(x) {
   if (!inherits(x, "calibrated")) {
     stop("mark_profiled() requires a calibrated model.", call. = FALSE)
@@ -136,11 +149,6 @@ mark_profiled <- function(x) {
   .prepend_class(x, "profiled")
 }
 
-#' Mark a calibrated model as integrated
-#'
-#' @param x A calibrated model object.
-#' @return The same object with class \code{"integrated"} prepended.
-#' @keywords internal
 mark_integrated <- function(x) {
   if (!inherits(x, "calibrated")) {
     stop("mark_integrated() requires a calibrated model.", call. = FALSE)
@@ -150,11 +158,6 @@ mark_integrated <- function(x) {
 
 # ---- result-level ----
 
-#' Mark a result as inferred
-#'
-#' @param x A result object.
-#' @return The same object with class \code{"inference"} prepended.
-#' @keywords internal
 mark_inferred <- function(x) {
   if (!inherits(x, "result")) {
     stop("mark_inferred() requires a result object.", call. = FALSE)
@@ -162,11 +165,6 @@ mark_inferred <- function(x) {
   .prepend_class(x, "inferred")
 }
 
-#' Mark a result as diagnosed
-#'
-#' @param x A result object.
-#' @return The same object with class \code{"diagnostics"} prepended.
-#' @keywords internal
 mark_diagnosed <- function(x) {
   if (!inherits(x, "result")) {
     stop("mark_diagnosed() requires a result object.", call. = FALSE)
@@ -176,11 +174,6 @@ mark_diagnosed <- function(x) {
 
 # ---- workspace-level ----
 
-#' Mark a workspace as compared
-#'
-#' @param x A workspace object.
-#' @return The same object with class \code{"compared"} prepended.
-#' @keywords internal
 mark_compared <- function(x) {
   if (!inherits(x, "workspace")) {
     stop("mark_compared() requires a workspace.", call. = FALSE)
@@ -192,48 +185,21 @@ mark_compared <- function(x) {
 # STATE QUERIES
 # ======================================================================
 
-#' Test if object is calibrated
-#' @keywords internal
 is_calibrated <- function(x) inherits(x, "calibrated")
-
-#' Test if object is profiled
-#' @keywords internal
 is_profiled <- function(x) inherits(x, "profiled")
-
-#' Test if object is integrated
-#' @keywords internal
 is_integrated <- function(x) inherits(x, "integrated")
 
-#' Test if object is a workspace
-#' @keywords internal
 is_workspace <- function(x) inherits(x, "workspace")
-
-#' Test if workspace has been compared
-#' @keywords internal
 is_compared <- function(x) inherits(x, "compared")
 
-#' Test if object is a result
-#' @keywords internal
 is_result <- function(x) inherits(x, "result")
 
-#' Test if result is profile likelihood
-#' @keywords internal
 is_profile <- function(x) inherits(x, "profile")
-
-#' Test if result is integrated likelihood
-#' @keywords internal
 is_integrate <- function(x) inherits(x, "integrate")
 
-#' Test if result has inference attached
-#' @keywords internal
 is_inferred <- function(x) inherits(x, "inference")
-
-#' Test if result has diagnostics attached
-#' @keywords internal
 is_diagnosed <- function(x) inherits(x, "diagnostics")
 
-#' Test if result is a comparison object
-#' @keywords internal
 is_comparison <- function(x) inherits(x, "comparison")
 
 # ======================================================================

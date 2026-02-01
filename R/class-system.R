@@ -105,8 +105,12 @@ new_comparison_result <- function(x) {
 
 # ---- sub-results (inherit parent result) ----
 
-new_diagnostics_result <- function(x) {
-  .new_typed_result(x, "diagnostics", validate_diagnostics_result)
+new_diagnostics_integrate_result <- function(x) {
+  .new_typed_result(x, "diagnostics_integrate", validate_diagnostics_result)
+}
+
+new_diagnostics_profile_result <- function(x) {
+  .new_typed_result(x, "diagnostics_profile", validate_diagnostics_result)
 }
 
 new_inference_result <- function(x) {

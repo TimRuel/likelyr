@@ -49,8 +49,10 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     # --------------------------------------------------
     if (is_integrate(res)) {
       diag_raw <- diagnose_integrate(res)
+      res$diagnostics <- new_diagnostics_integrate_result(diag_raw)
     } else if (is_profile(res)) {
       diag_raw <- diagnose_profile(res)
+      res$diagnostics <- new_diagnostics_profile_result(diag_raw)
     } else {
       stop(
         "diagnose(): Unsupported result type for '",
@@ -63,7 +65,6 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     # --------------------------------------------------
     # Attach diagnostics data only
     # --------------------------------------------------
-    res$diagnostics <- new_diagnostics_result(diag_raw)
     cal$workspace[[name]] <- mark_diagnosed(res)
 
     if (verbose) {

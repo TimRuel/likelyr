@@ -135,12 +135,11 @@ plot_pseudolikelihood_curve <- function(
 
     # ---- X domain restriction ----
     ggplot2::scale_x_continuous(
-      expand = c(0, 0),
-      limits = psi_limits
+      expand = c(0, 0)
     ) +
 
     # ---- Y zoom ONLY ----
-    ggplot2::coord_cartesian(ylim = y_limits) +
+    ggplot2::coord_cartesian(xlim = psi_limits, ylim = y_limits) +
 
     ggplot2::theme(
       legend.position = "inside",
@@ -275,12 +274,11 @@ plot_pseudolikelihood_curves <- function(res_list) {
 
     # ---- X domain restriction ----
     ggplot2::scale_x_continuous(
-      expand = c(0, 0),
-      limits = psi_limits
+      expand = c(0, 0)
     ) +
 
     # ---- Y zoom ONLY ----
-    ggplot2::coord_cartesian(ylim = y_limits) +
+    ggplot2::coord_cartesian(xlim = psi_limits, ylim = y_limits) +
 
     ggplot2::theme(
       legend.position = "inside",

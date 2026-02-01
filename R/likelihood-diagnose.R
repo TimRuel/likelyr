@@ -1,6 +1,6 @@
 # ================================================================================
 # likelihood-diagnose.R
-# Unified diagnostics for integrated + profile likelihood results (HPC-safe)
+# Unified diagnostics for integrated + profile pseudolikelihood results (HPC-safe)
 # ================================================================================
 
 # ================================================================================
@@ -10,7 +10,7 @@
 #' Diagnostics for Likelyr Results
 #'
 #' @description
-#' Attaches diagnostics *data* to each likelihood result (integrated or profile)
+#' Attaches diagnostics *data* to each pseudolikelihood result (integrated or profile)
 #' stored in a calibrated model.
 #'
 #' This function performs **no plotting**. All diagnostics plots are
@@ -24,7 +24,7 @@
 #' @param cal A `calibrated` model object with pseudolikelihood results.
 #' @param verbose Logical; print diagnostic summaries.
 #'
-#' @return The same `calibrated` model object, with each likelihood result
+#' @return The same `calibrated` model object, with each pseudolikelihood result
 #'   marked as diagnosed.
 #'
 #' @export
@@ -51,13 +51,13 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
       diag_raw <- diagnose_integrate(res)
       res$diagnostics <- new_diagnostics_result(
         diag_raw,
-        likelihood = "integrate"
+        pseudolikelihood = "integrate"
       )
     } else if (is_profile(res)) {
       diag_raw <- diagnose_profile(res)
       res$diagnostics <- new_diagnostics_result(
         diag_raw,
-        likelihood = "profile"
+        pseudolikelihood = "profile"
       )
     } else {
       stop(
@@ -123,7 +123,7 @@ validate_diagnose_input <- function(cal) {
 #'
 #' @description
 #' Materializes diagnostics plots **on demand** from stored diagnostics data.
-#' Dispatches to likelihood-specific plot builders.
+#' Dispatches to pseudolikelihood-specific plot builders.
 #'
 #' @param diag A diagnostics result object.
 #'
@@ -137,16 +137,19 @@ build_diagnostics_plots <- function(diag) {
   }
 
   if (!isTRUE(diag$supported)) {
-    stop("Diagnostics plots not supported for this likelihood.", call. = FALSE)
+    stop(
+      "Diagnostics plots not supported for this pseudolikelihood",
+      call. = FALSE
+    )
   }
 
   switch(
-    diag$likelihood,
+    diag$pseudolikelihood,
     integrate = build_diagnostics_plots_integrate(diag),
     profile = build_diagnostics_plots_profile(diag),
     stop(
-      "build_diagnostics_plots(): Unknown diagnostics likelihood '",
-      diag$likelihood,
+      "build_diagnostics_plots(): Unknown diagnostics pseudolikelihood '",
+      diag$pseudolikelihood,
       "'.",
       call. = FALSE
     )
@@ -171,11 +174,26 @@ print.diagnostics <- function(x, ...) {
     return(invisible(x))
   }
 
-  cat("  Likelihood:  ", x$likelihood, "\n", sep = "")
-  cat("  R (branches): ", x$R, "\n", sep = "")
-  cat("  ESS (min):    ", sprintf("%.1f", x$summary$ess_min), "\n", sep = "")
-  cat("  ESS (median): ", sprintf("%.1f", x$summary$ess_median), "\n", sep = "")
-  cat("  Rel SE max:   ", sprintf("%.3f", x$summary$rel_se_max), "\n", sep = "")
+  cat("  Pseudolikelihood:  ", x$pseudolikelihood, "\n", sep = "")
+  cat("  R (branches):      ", x$R, "\n", sep = "")
+  cat(
+    "  ESS (min):         ",
+    sprintf("%.1f", x$summary$ess_min),
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  ESS (median):      ",
+    sprintf("%.1f", x$summary$ess_median),
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Rel SE max:        ",
+    sprintf("%.3f", x$summary$rel_se_max),
+    "\n",
+    sep = ""
+  )
   cat(
     "  Outlier max:  ",
     sprintf("%.3f", x$summary$outlier_max),
@@ -216,7 +234,7 @@ print.diagnostics <- function(x, ...) {
 #' @export
 summary.diagnostics <- function(diag, ...) {
   out <- list(
-    likelihood = diag$likelihood,
+    pseudolikelihood = diag$pseudolikelihood,
     supported = diag$supported,
     summary = diag$summary %||% NULL,
     warnings = diag$warnings
@@ -231,11 +249,11 @@ print.summary_diagnostics <- function(x, ...) {
   cat("<summary of diagnostics>\n\n")
 
   if (!isTRUE(x$supported)) {
-    cat("Diagnostics not supported for this likelihood.\n")
+    cat("Diagnostics not supported for this pseudolikelihood\n")
     return(invisible(x))
   }
 
-  cat("Likelihood: ", x$likelihood, "\n\n", sep = "")
+  cat("Pseudolikelihood: ", x$pseudolikelihood, "\n\n", sep = "")
 
   if (!is.null(x$summary)) {
     for (nm in names(x$summary)) {

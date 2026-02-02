@@ -12,11 +12,11 @@ diagnose(cal, verbose = TRUE)
 \item{verbose}{Logical; print diagnostic summaries.}
 }
 \value{
-The same \code{calibrated} model object, with each likelihood result
+The same \code{calibrated} model object, with each pseudolikelihood result
 marked as diagnosed.
 }
 \description{
-Attaches diagnostics \emph{data} to each likelihood result (integrated or profile)
+Attaches diagnostics \emph{data} to each pseudolikelihood result (integrated or profile)
 stored in a calibrated model.
 
 This function performs \strong{no plotting}. All diagnostics plots are

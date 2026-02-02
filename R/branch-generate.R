@@ -257,7 +257,7 @@ generate_branches <- function(cal, verbose = TRUE) {
       mode_obj <- branch_mode_solve(
         eval_psi_fun = eval_psi_fun,
         psi_init = psi_mle,
-        pmega_hat = omega_hat,
+        omega_hat = omega_hat,
         search_interval = interval,
         max_iter = max_iter,
         tol = tol

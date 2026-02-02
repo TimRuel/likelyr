@@ -223,6 +223,9 @@ generate_branches <- function(cal, verbose = TRUE) {
   cutoff_buffer <- estimand$cutoff_buffer %||% 0
   effective_crit <- crit * (1 + cutoff_buffer)
 
+  max_iter <- optimizer$branch_mode_params$max_iter %||% 20L
+  tol <- optimizer$branch_mode_params$tol %||% 1e-6
+
   # ψ-conditional optimizer factory
   eval_psi_builder <- build_eval_psi_fun(cal)
 
@@ -252,10 +255,12 @@ generate_branches <- function(cal, verbose = TRUE) {
 
       # 3. Solve branch mode
       mode_obj <- branch_mode_solve(
-        psi_mle = psi_mle,
         eval_psi_fun = eval_psi_fun,
-        param_init = param_mle,
-        search_interval = interval
+        psi_init = psi_mle,
+        pmega_hat = omega_hat,
+        search_interval = interval,
+        max_iter = max_iter,
+        tol = tol
       )
 
       psi_hat_branch <- mode_obj$psi_hat

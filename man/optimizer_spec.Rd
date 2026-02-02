@@ -2,7 +2,7 @@
 % Please edit documentation in R/spec-optimizer.R
 \name{optimizer_spec}
 \alias{optimizer_spec}
-\title{Specify Optimization Settings for nloptr::auglag}
+\title{Specify Optimization Settings for Likelihood Computation}
 \usage{
 optimizer_spec(
   localsolver = "SLSQP",
@@ -10,43 +10,57 @@ optimizer_spec(
   localtol = 1e-06,
   max_retries = 10,
   drop_mult = 5,
+  branch_mode_params = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{localsolver}{Character scalar. Inner solver used inside \code{nloptr::auglag}.
-Default: \code{"SLSQP"}.}
+\item{localsolver}{Character scalar. Local solver used inside \code{nloptr::auglag()}.
+Default is \code{"SLSQP"}.}
 
-\item{control}{Named list of nloptr/auglag control options.}
+\item{control}{Named list of control parameters passed to \code{nloptr::auglag()}.}
 
-\item{localtol}{Numeric scalar specifying local solver tolerance.}
+\item{localtol}{Numeric scalar specifying the convergence tolerance for the local solver.}
 
-\item{max_retries}{Numeric scalar giving number of restart attempts allowed when
-optimization fails to converge.}
+\item{max_retries}{Non-negative integer giving the maximum number of restart attempts allowed
+when constrained optimization fails to converge.}
 
-\item{drop_mult}{Numeric scalar controlling how large a log-likelihood drop
-is allowed relative to the previous drop during continuation.
-Values > 1 are required. Typical range: 3–10.}
+\item{drop_mult}{Numeric scalar greater than 1 controlling how large a log-likelihood drop
+is allowed relative to the previous drop during continuation-based sweeps.
+Typical values range from 3 to 10.}
 
-\item{name}{Optional descriptive name.}
+\item{branch_mode_params}{Optional named list of control parameters passed to
+\code{branch_mode_solve()} when locating the \strong{continuous branch mode}
+prior to branch construction.
 
-\item{...}{Additional stored but unused user metadata.}
+Recognized entries include:
+\describe{
+\item{max_iter}{Maximum number of Brent iterations used when solving for
+the branch mode ψ̂.}
+\item{tol}{Convergence tolerance for the ψ optimization.}
+}
+
+If \code{NULL} (default), internal defaults are used.}
+
+\item{name}{Optional descriptive name for the optimizer specification.}
+
+\item{...}{Additional user metadata stored but not interpreted by the optimizer.}
 }
 \value{
-An \code{optimizer_spec} object with classes:
-\code{c("optimizer_spec", "likelyr")}.
+An object of class \code{c("optimizer_spec", "likelyr")}.
 }
 \description{
-Defines optimization behavior for estimating θ using
-\code{nloptr::auglag()}. This specification controls:
+Defines optimization behavior used throughout the likelihood workflow,
+including:
 
-• Local solver (e.g., "SLSQP")
-• nloptr control parameters
-• Local solver tolerance
-• Restart policy (max_retries)
-• Drop consistency tolerance (drop_mult)
+\itemize{
+\item nuisance parameter optimization via \code{nloptr::auglag()};
+\item restart and continuation behavior for constrained solves;
+\item tolerance and stability controls for branch construction;
+\item optional control parameters for locating continuous branch modes.
+}
 
-These settings are used by both profile and integrated likelihood
-routines when solving constrained optimization problems.
+A single \code{optimizer_spec} is shared by both \strong{profile} and
+\strong{integrated} likelihood routines to ensure consistent numerical behavior.
 }

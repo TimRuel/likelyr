@@ -1,5 +1,5 @@
 # ======================================================================
-# Optimizer Specification (v3.2, unified class system)
+# Optimizer Specification (v3.4, unified class system)
 # ======================================================================
 
 #' Specify Optimization Settings for Likelihood Computation
@@ -12,7 +12,8 @@
 #'   \item nuisance parameter optimization via \code{nloptr::auglag()};
 #'   \item restart and continuation behavior for constrained solves;
 #'   \item tolerance and stability controls for branch construction;
-#'   \item optional control parameters for locating continuous branch modes.
+#'   \item method selection for locating continuous branch modes;
+#'   \item stopping and evaluation behavior at ψ bounds during branch sweeps.
 #' }
 #'
 #' A single \code{optimizer_spec} is shared by both **profile** and
@@ -27,29 +28,27 @@
 #'
 #' @param localtol
 #'   Numeric scalar specifying the convergence tolerance for the local solver.
+
 #'
-#' @param max_retries
-#'   Non-negative integer giving the maximum number of restart attempts allowed
-#'   when constrained optimization fails to converge.
+#' @param branch_mode_locator_method
+#'   Character scalar specifying how the **branch mode**
+#'   (the maximizer of the ω̂-conditioned log-likelihood) is located.
 #'
-#' @param drop_mult
-#'   Numeric scalar greater than 1 controlling how large a log-likelihood drop
-#'   is allowed relative to the previous drop during continuation-based sweeps.
-#'   Typical values range from 3 to 10.
-#'
-#' @param branch_mode_params
-#'   Optional named list of control parameters passed to
-#'   \code{branch_mode_solve()} when locating the **continuous branch mode**
-#'   prior to branch construction.
-#'
-#'   Recognized entries include:
-#'   \describe{
-#'     \item{max_iter}{Maximum number of Brent iterations used when solving for
-#'       the branch mode ψ̂.}
-#'     \item{tol}{Convergence tolerance for the ψ optimization.}
+#'   Must be one of:
+#'   \itemize{
+#'     \item \code{"hybrid"} — grid bracketing followed by local refinement (default)
+#'     \item \code{"grid_scan"} — pure grid-based search over ψ
+#'     \item \code{"brent"} — direct 1D Brent maximization in ψ
+#'     \item \code{"multiplier_root"} — root-finding via constraint multipliers
 #'   }
 #'
-#'   If \code{NULL} (default), internal defaults are used.
+#' @param stop_at_bounds
+#'   Logical scalar. If TRUE (default), branch sweeps stop when a ψ bound
+#'   is reached.
+#'
+#' @param eval_at_bounds
+#'   Logical scalar. If TRUE (default), the branch is evaluated once at the
+#'   ψ bound before stopping. Requires \code{stop_at_bounds = TRUE}.
 #'
 #' @param name
 #'   Optional descriptive name for the optimizer specification.
@@ -65,20 +64,30 @@ optimizer_spec <- function(
   localsolver = "SLSQP",
   control = list(),
   localtol = 1e-6,
-  max_retries = 10,
-  drop_mult = 5,
-  branch_mode_params = NULL,
+  branch_mode_locator_method = c(
+    "hybrid",
+    "grid_scan",
+    "brent",
+    "multiplier_root"
+  ),
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE,
   name = NULL,
   ...
 ) {
+  # -------------------------------------------------------------------
+  # Normalize branch mode locator method
+  # -------------------------------------------------------------------
+  branch_mode_locator_method <- match.arg(branch_mode_locator_method)
+
   x <- list(
     name = name %||% "<optimizer>",
     localsolver = localsolver,
     control = control,
     localtol = localtol,
-    max_retries = max_retries,
-    drop_mult = drop_mult,
-    branch_mode_params = branch_mode_params,
+    branch_mode_locator_method = branch_mode_locator_method,
+    stop_at_bounds = stop_at_bounds,
+    eval_at_bounds = eval_at_bounds,
     extra = list(...)
   )
 
@@ -87,21 +96,11 @@ optimizer_spec <- function(
   x
 }
 
-
 # ======================================================================
 # INTERNAL VALIDATOR
 # ======================================================================
 
 #' Validate optimizer specification
-#'
-#' @description
-#' Internal validator for \code{optimizer_spec} objects. Ensures that all
-#' required optimizer configuration fields are present and correctly typed
-#' before numerical optimization routines are invoked.
-#'
-#' @param x A list representing an \code{optimizer_spec} object.
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
 #'
 #' @keywords internal
 #' @noRd
@@ -133,54 +132,20 @@ optimizer_spec <- function(
     stop("localtol must be a positive numeric scalar.", call. = FALSE)
   }
 
-  # Retry count ----------------------------------------------------------
-  if (
-    !is.numeric(x$max_retries) ||
-      length(x$max_retries) != 1 ||
-      x$max_retries < 0 ||
-      x$max_retries != as.integer(x$max_retries)
-  ) {
-    stop("max_retries must be a non-negative integer.", call. = FALSE)
+  # ψ-bound behavior -----------------------------------------------------
+  if (!is.logical(x$stop_at_bounds) || length(x$stop_at_bounds) != 1L) {
+    stop("stop_at_bounds must be a single logical value.", call. = FALSE)
   }
 
-  # Drop multiplier ------------------------------------------------------
-  if (
-    !is.numeric(x$drop_mult) ||
-      length(x$drop_mult) != 1 ||
-      !is.finite(x$drop_mult) ||
-      x$drop_mult <= 1
-  ) {
-    stop("drop_mult must be a numeric scalar > 1.", call. = FALSE)
+  if (!is.logical(x$eval_at_bounds) || length(x$eval_at_bounds) != 1L) {
+    stop("eval_at_bounds must be a single logical value.", call. = FALSE)
   }
 
-  # Branch mode params ---------------------------------------------------
-  if (!is.null(x$branch_mode_params)) {
-    if (!is.list(x$branch_mode_params)) {
-      stop(
-        "branch_mode_params must be a named list or NULL.",
-        call. = FALSE
-      )
-    }
-
-    if (!is.null(x$branch_mode_params$max_iter)) {
-      mi <- x$branch_mode_params$max_iter
-      if (!is.numeric(mi) || length(mi) != 1 || mi <= 0) {
-        stop(
-          "branch_mode_params$max_iter must be a positive numeric scalar.",
-          call. = FALSE
-        )
-      }
-    }
-
-    if (!is.null(x$branch_mode_params$tol)) {
-      tol <- x$branch_mode_params$tol
-      if (!is.numeric(tol) || length(tol) != 1 || tol <= 0) {
-        stop(
-          "branch_mode_params$tol must be a positive numeric scalar.",
-          call. = FALSE
-        )
-      }
-    }
+  if (!x$stop_at_bounds && x$eval_at_bounds) {
+    stop(
+      "eval_at_bounds = TRUE requires stop_at_bounds = TRUE.",
+      call. = FALSE
+    )
   }
 
   invisible(x)
@@ -196,8 +161,6 @@ print.optimizer_spec <- function(x, ...) {
   cat("- Name:           ", x$name, "\n", sep = "")
   cat("- Local solver:   ", x$localsolver, "\n", sep = "")
   cat("- Local tol:      ", x$localtol, "\n", sep = "")
-  cat("- Max retries:    ", x$max_retries, "\n", sep = "")
-  cat("- Drop mult:      ", x$drop_mult, "\n", sep = "")
 
   cat(
     "- Control list:   ",
@@ -211,20 +174,14 @@ print.optimizer_spec <- function(x, ...) {
   )
 
   cat(
-    "- Branch mode:    ",
-    if (is.null(x$branch_mode_params)) {
-      "<defaults>"
-    } else {
-      paste(
-        names(x$branch_mode_params),
-        unlist(x$branch_mode_params),
-        sep = "=",
-        collapse = ", "
-      )
-    },
+    "- Branch mode locator method: ",
+    x$branch_mode_locator_method,
     "\n",
     sep = ""
   )
+
+  cat("- Stop at ψ bounds:     ", x$stop_at_bounds, "\n", sep = "")
+  cat("- Evaluate at bounds:   ", x$eval_at_bounds, "\n", sep = "")
 
   invisible(x)
 }

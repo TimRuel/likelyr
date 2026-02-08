@@ -1,14 +1,17 @@
 # ======================================================================
-# Parameter Calibration (v1.1)
+# Parameter Calibration (v1.2) — equality + inequality constraints
 #
 # This calibration step:
 #   • Computes param_MLE using likelihood$param_mle_fn(data)
 #   • Ensures the MLE respects parameter dimension & constraints
+#   • Validates equality and inequality constraints at the MLE
 #   • Stores param_MLE inside the parameter_spec object
 #
 # NOTE:
 #   • Requires both parameter_spec AND likelihood_spec, because the
 #     MLE comes from the likelihood's analytic initializer.
+#   • Equality constraints are treated as *structural feasibility*
+#     conditions and must be satisfied (up to tolerance) by param_MLE.
 # ======================================================================
 
 #' Calibrate Parameter Component
@@ -51,6 +54,8 @@ calibrate_parameter <- function(parameter, likelihood, data) {
     )
   }
 
+  param_mle <- as.numeric(param_mle)
+
   # -------------------------------------------------------------------
   # 2. Check box constraints (if present)
   # -------------------------------------------------------------------
@@ -69,7 +74,27 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   }
 
   # -------------------------------------------------------------------
-  # 3. Check inequality constraints (if present)
+  # 3. Check equality constraints (if present)
+  # -------------------------------------------------------------------
+  if (!is.null(parameter$eq)) {
+    h_val <- parameter$eq(param_mle)
+
+    if (!is.numeric(h_val)) {
+      stop("eq(param_mle) must return numeric vector.", call. = FALSE)
+    }
+
+    # strict but numerically tolerant feasibility check
+    tol <- 1e-8
+    if (any(abs(h_val) > tol)) {
+      stop(
+        "Computed param_mle violates equality constraints: eq(param) = 0.",
+        call. = FALSE
+      )
+    }
+  }
+
+  # -------------------------------------------------------------------
+  # 4. Check inequality constraints (if present)
   # -------------------------------------------------------------------
   if (!is.null(parameter$ineq)) {
     g_val <- parameter$ineq(param_mle)
@@ -87,7 +112,7 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   }
 
   # -------------------------------------------------------------------
-  # 4. Store MLE inside the parameter specification
+  # 5. Store MLE inside the parameter specification
   # -------------------------------------------------------------------
   parameter$param_mle <- param_mle
 

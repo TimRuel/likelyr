@@ -1,5 +1,5 @@
 # ======================================================================
-# Parameter Specification (v3.2) — list support for param_0
+# Parameter Specification (v3.3) — equality + inequality constraints
 # ======================================================================
 
 #' Specify the Parameter Space for a Likelihood Model
@@ -10,6 +10,7 @@
 #'   • dimension
 #'   • optional true value(s)
 #'   • box constraints (lower, upper)
+#'   • equality constraints h(param) = 0 and Jacobian
 #'   • inequality constraints h(param) ≤ 0 and Jacobian
 #'
 #' Exactly one of `param_0` or `param_dim` must be supplied.
@@ -19,6 +20,8 @@
 #' @param param_dim Optional integer giving the parameter dimension.
 #' @param param_lower Optional numeric scalar or vector of lower bounds.
 #' @param param_upper Optional numeric scalar or vector of upper bounds.
+#' @param eq Optional function(param) → numeric vector = 0.
+#' @param eq_jac Optional Jacobian function(param) → matrix.
 #' @param ineq Optional function(param) → numeric vector ≤ 0.
 #' @param ineq_jac Optional Jacobian function(param) → matrix.
 #' @param name Optional descriptive name.
@@ -31,6 +34,8 @@ parameter_spec <- function(
   param_dim = NULL,
   param_lower = NULL,
   param_upper = NULL,
+  eq = NULL,
+  eq_jac = NULL,
   ineq = NULL,
   ineq_jac = NULL,
   name = NULL,
@@ -42,6 +47,8 @@ parameter_spec <- function(
     param_dim = param_dim,
     param_lower = param_lower,
     param_upper = param_upper,
+    eq = eq,
+    eq_jac = eq_jac,
     ineq = ineq,
     ineq_jac = ineq_jac,
     extra = list(...)
@@ -61,6 +68,8 @@ parameter_spec <- function(
   param_dim <- x$param_dim
   param_lower <- x$param_lower
   param_upper <- x$param_upper
+  eq <- x$eq
+  eq_jac <- x$eq_jac
   ineq <- x$ineq
   ineq_jac <- x$ineq_jac
 
@@ -120,7 +129,6 @@ parameter_spec <- function(
         integer(1)
       )
 
-      # 🔹 NEW: total dimension = sum of sub-dimensions
       J <- sum(lens)
     } else if (is.matrix(param_0)) {
       if (ncol(param_0) != 1) {
@@ -210,7 +218,47 @@ parameter_spec <- function(
   }
 
   # --------------------------------------------------------------
-  # 5. Validate inequality constraints
+  # 5a. Validate equality constraints
+  # --------------------------------------------------------------
+  if (!is.null(eq) && !is.function(eq)) {
+    stop("eq must be NULL or a function(param).", call. = FALSE)
+  }
+
+  if (!is.null(eq_jac) && !is.function(eq_jac)) {
+    stop("eq_jac must be NULL or a function(param).", call. = FALSE)
+  }
+
+  if (!is.null(eq) && !is.null(eq_jac)) {
+    test_param <-
+      if (!is.null(param_0)) {
+        p0 <- if (is.list(param_0)) param_0[[1]] else param_0
+        if (is.matrix(p0)) as.numeric(p0) else p0
+      } else if (!is.null(param_lower) && !is.null(param_upper)) {
+        (param_lower + param_upper) / 2
+      } else {
+        rep(0, J)
+      }
+
+    h <- eq(test_param)
+    if (!is.numeric(h)) {
+      stop("eq(param) must return a numeric vector.", call. = FALSE)
+    }
+
+    jac <- eq_jac(test_param)
+    if (!is.matrix(jac)) {
+      stop("eq_jac(param) must return a matrix.", call. = FALSE)
+    }
+
+    if (nrow(jac) != length(h) || ncol(jac) != J) {
+      stop(
+        "eq_jac(param) must be a matrix of size n_constraints × param_dim.",
+        call. = FALSE
+      )
+    }
+  }
+
+  # --------------------------------------------------------------
+  # 5b. Validate inequality constraints
   # --------------------------------------------------------------
   if (!is.null(ineq) && !is.function(ineq)) {
     stop("ineq must be NULL or a function(param).", call. = FALSE)
@@ -256,6 +304,8 @@ parameter_spec <- function(
   x$param_0 <- param_0
   x$param_lower <- param_lower
   x$param_upper <- param_upper
+  x$eq <- eq
+  x$eq_jac <- eq_jac
 
   x
 }
@@ -273,9 +323,6 @@ print.parameter_spec <- function(x, ...) {
   if (!is.null(x$param_0)) {
     cat("- True value(s):\n")
 
-    # ---------------------------
-    # Helper to format one vector
-    # ---------------------------
     fmt_vec <- function(v) {
       nms <- names(v)
       vals <- format(v)
@@ -287,9 +334,6 @@ print.parameter_spec <- function(x, ...) {
       }
     }
 
-    # ---------------------------
-    # Case: list of starts
-    # ---------------------------
     if (is.list(x$param_0)) {
       list_names <- names(x$param_0)
 
@@ -308,18 +352,10 @@ print.parameter_spec <- function(x, ...) {
 
         cat("(", fmt_vec(v), ")\n", sep = "")
       }
-
-      # ---------------------------
-      # Case: single matrix
-      # ---------------------------
     } else if (is.matrix(x$param_0)) {
       v <- as.numeric(x$param_0)
       names(v) <- rownames(x$param_0)
       cat("  (", fmt_vec(v), ")\n", sep = "")
-
-      # ---------------------------
-      # Case: single vector
-      # ---------------------------
     } else {
       cat("  (", fmt_vec(x$param_0), ")\n", sep = "")
     }
@@ -341,6 +377,10 @@ print.parameter_spec <- function(x, ...) {
       ")\n",
       sep = ""
     )
+  }
+
+  if (!is.null(x$eq)) {
+    cat("- Equality constraints: present\n")
   }
 
   if (!is.null(x$ineq)) {

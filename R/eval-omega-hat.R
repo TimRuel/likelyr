@@ -1,16 +1,12 @@
 # ======================================================================
-# eval-omega-hat.R (v5.1)
+# eval-omega-hat.R (v5.3)
 #
 # Improvements:
 #   • Multi-scale perturbations (local + global)
 #   • Tangent-space dispersion using an orthonormal basis
 #   • Optional recentering around previous ω̂ samples
-#   • Full parameter_spec() constraint support (bounds + ineq)
-#
-# This is now fully aligned with the calibrated model layout:
-#   - param_mle       in cal$parameter$param_mle
-#   - psi_fn, psi_jac in cal$estimand$psi_fn / $psi_jac
-#   - psi_mle         in cal$estimand$psi_mle
+#   • Full parameter_spec() constraint support (bounds + eq + ineq)
+#   • Branch-free heq / heqjac closures for solver efficiency
 # ======================================================================
 
 # ======================================================================
@@ -18,13 +14,6 @@
 # ======================================================================
 
 #' Compute an orthonormal basis for the tangent space at param_mle
-#'
-#' @description
-#' Given a gradient g = ∇ψ(θ_MLE), we find an orthonormal basis B
-#' for the subspace:
-#'     { v ∈ R^J : gᵀ v = 0 }
-#'
-#' If no ψ_jac exists, returns NULL.
 #'
 #' @keywords internal
 #' @noRd
@@ -45,44 +34,17 @@
     return(NULL)
   }
 
-  # normalize gradient
   g <- g / sqrt(sum(g * g))
+  M <- cbind(g, diag(J)[, -1, drop = FALSE])
+  Q <- qr.Q(qr(M), complete = TRUE)
 
-  # Build J x J matrix whose first column is g, others standard basis
-  M <- cbind(g, diag(J)[, -1, drop = FALSE]) # J x J
-
-  # QR decomposition: Q = [g | tangent basis]
-  Q <- qr.Q(qr(M), complete = TRUE) # J x J
-
-  # Tangent basis = all columns except the first
-  B <- Q[, -1, drop = FALSE] # J x (J-1)
-
-  B
+  Q[, -1, drop = FALSE]
 }
-
 
 # ======================================================================
 # 1. Initial-Guess Generator
 # ======================================================================
 
-#' Construct Advanced Initial-Guess Generator for ω̂ Sampling
-#'
-#' @description
-#' This generator provides **geometrically diverse** initial guesses by:
-#'
-#'   • Combining *local* and *global* tangent-space perturbations
-#'   • Using an orthonormal tangent basis at θ_MLE
-#'   • Occasionally recentering around a previously sampled ω̂
-#'   • Respecting model bounds (θ_lower, θ_upper)
-#'
-#' The result is far more uniform exploration of the manifold
-#' ψ(ω̂) = ψ_MLE before projecting with auglag().
-#'
-#' @param cal A `likelyr_calibrated` model object.
-#'
-#' @return A function \code{f(history, p_recenter = 0.1)} returning
-#'         high-dispersion initial guesses.
-#' @keywords internal
 make_omega_hat_initgen <- function(cal) {
   param <- cal$parameter
   estimand <- cal$estimand
@@ -94,70 +56,35 @@ make_omega_hat_initgen <- function(cal) {
   lower <- param$param_lower %||% rep(-Inf, J)
   upper <- param$param_upper %||% rep(Inf, J)
 
-  # Build tangent-space basis at θ_MLE (may be NULL)
   B <- .tangent_basis(param_mle, psi_jac)
 
-  # scales for multi-scale perturbations
   local_scale <- 0.15
   global_scale <- 0.60
 
   function(history = NULL, p_recenter = 0.10) {
-    # ----------------------------------------------------------
-    # 1. Choose center: θ_MLE OR a previous ω̂
-    # ----------------------------------------------------------
     if (!is.null(history) && length(history) > 0 && runif(1) < p_recenter) {
       center <- history[[sample.int(length(history), 1)]]
     } else {
       center <- param_mle
     }
 
-    # ----------------------------------------------------------
-    # 2. Base perturbation in tangent directions (if B exists)
-    # ----------------------------------------------------------
     if (!is.null(B)) {
-      # choose local vs global
       s <- if (runif(1) < 0.70) local_scale else global_scale
-
-      # tangent coefficients ~ Normal(0, s^2 I)
       a <- rnorm(ncol(B), sd = s)
-
       candidate <- center + c(B %*% a)
     } else {
-      # fallback: multiplicative jitter if tangent info unavailable
-      jitter <- rlnorm(J, meanlog = 0, sdlog = 0.25) - 1
+      jitter <- rlnorm(J, 0, 0.25) - 1
       candidate <- center * (1 + jitter)
     }
 
-    # ----------------------------------------------------------
-    # 3. Clip to model bounds (prevent x0 < lb / x0 > ub)
-    # ----------------------------------------------------------
-    candidate <- pmin(pmax(candidate, lower), upper)
-
-    as.numeric(candidate)
+    pmin(pmax(candidate, lower), upper)
   }
 }
-
 
 # ======================================================================
 # 2. Omega-Hat Sampler
 # ======================================================================
 
-#' Construct ω̂ Sampler for ψ(ω̂) = ψ_MLE
-#'
-#' @description
-#' Solves the manifold equation:
-#'      ψ(ω̂) - ψ_MLE = 0
-#' using `nloptr::auglag()` and incorporating:
-#'
-#'   • θ_lower / θ_upper bounds
-#'   • inequality constraints h(θ) ≤ 0
-#'   • Jacobians for constraints (if supplied)
-#'   • optimizer_spec settings only for SLSQP/local solver
-#'
-#' @param cal A `likelyr_calibrated` model object.
-#'
-#' @return A function \code{f(init_guess)} returning ω̂.
-#' @keywords internal
 make_omega_hat_sampler <- function(cal) {
   force(cal)
 
@@ -167,38 +94,63 @@ make_omega_hat_sampler <- function(cal) {
     opt <- cal$optimizer
 
     psi_fn <- estimand$psi_fn
-    psi_mle <- estimand$psi_mle
     psi_jac <- estimand$psi_jac
+    psi_mle <- estimand$psi_mle
+
+    eq_fn <- param$eq
+    eq_jac <- param$eq_jac
+
+    hin_fn <- param$ineq
+    hin_jac <- param$ineq_jac
 
     J <- param$param_dim
-
     lower <- param$param_lower %||% rep(-Inf, J)
     upper <- param$param_upper %||% rep(Inf, J)
 
-    # Inequality constraints (may be NULL)
-    hin_fn <- param$ineq
-    hinjac_fn <- param$ineq_jac
+    fn0 <- function(theta) 0.0
 
-    # Objective is zero — pure feasibility problem on the manifold
-    fn0 <- function(param) 0
-    heq_fn <- function(param) psi_fn(param) - psi_mle
-    heqjac <- psi_jac
+    # ------------------------------------------------------------
+    # Construct heq_fn (branch-free)
+    # ------------------------------------------------------------
+    heq_fn <- if (is.null(eq_fn)) {
+      function(theta) psi_fn(theta) - psi_mle
+    } else {
+      function(theta) {
+        c(
+          psi_fn(theta) - psi_mle,
+          eq_fn(theta)
+        )
+      }
+    }
+
+    # ------------------------------------------------------------
+    # Construct heqjac (branch-free)
+    # ------------------------------------------------------------
+    heqjac <- if (is.null(psi_jac) && is.null(eq_jac)) {
+      NULL
+    } else if (!is.null(psi_jac) && is.null(eq_jac)) {
+      function(theta) {
+        Jpsi <- psi_jac(theta)
+        if (is.vector(Jpsi)) matrix(Jpsi, nrow = 1) else Jpsi
+      }
+    } else if (is.null(psi_jac) && !is.null(eq_jac)) {
+      function(theta) {
+        eq_jac(theta)
+      }
+    } else {
+      function(theta) {
+        Jpsi <- psi_jac(theta)
+        if (is.vector(Jpsi)) {
+          Jpsi <- matrix(Jpsi, nrow = 1)
+        }
+        rbind(Jpsi, eq_jac(theta))
+      }
+    }
 
     function(init_guess) {
-      # ------------------------------------------------------
-      # 0. Ensure initial guess respects bounds
-      #    (prevents "at least one element in x0 < lb")
-      # ------------------------------------------------------
       x0 <- as.numeric(init_guess)
-
-      # Clamp to bounds; note that -Inf / +Inf leave components unchanged
       x0 <- pmax(x0, lower)
       x0 <- pmin(x0, upper)
-
-      # Optional sanity check (can be commented out for speed)
-      # if (any(x0 < lower) || any(x0 > upper)) {
-      #   stop("Initial ω̂ guess violates bounds even after clamping.", call. = FALSE)
-      # }
 
       res <- nloptr::auglag(
         x0 = x0,
@@ -206,7 +158,7 @@ make_omega_hat_sampler <- function(cal) {
         heq = heq_fn,
         heqjac = heqjac,
         hin = hin_fn,
-        hinjac = hinjac_fn,
+        hinjac = hin_jac,
         lower = lower,
         upper = upper,
         localsolver = opt$localsolver,

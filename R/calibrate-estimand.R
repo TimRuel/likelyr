@@ -1,12 +1,12 @@
 # ======================================================================
-# Estimand Calibration
+# Estimand Calibration (v1.2) — bounded ψ support
 # ======================================================================
 
 #' Calibrate Estimand Component
 #'
 #' @description
 #' Binds data into psi_fn(), computes psi_MLE and (optionally) psi_0,
-#' and evaluates the search interval.
+#' evaluates the search interval, and enforces geometric bounds on ψ.
 #'
 #' If psi_0 is already present on the estimand_spec (e.g. supplied
 #' directly by the user or injected earlier), it is respected and
@@ -22,11 +22,14 @@
 #'   • psi_jac (data-bound if present)
 #'   • psi_mle
 #'   • psi_0 (if available)
-#'   • search_interval
+#'   • search_interval (clipped to ψ bounds)
 #'
 #' @keywords internal
 calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
   stopifnot(inherits(estimand, "estimand_spec"))
+
+  psi_lower <- estimand$psi_lower
+  psi_upper <- estimand$psi_upper
 
   # -------------------------------------------------------------
   # 1. Bind ψ(θ, data)
@@ -55,6 +58,14 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
     stop("psi_fn(param_mle) must return a finite scalar.", call. = FALSE)
   }
 
+  # Enforce ψ bounds at the MLE
+  if (!is.null(psi_lower) && psi_mle < psi_lower) {
+    stop("Computed psi_mle lies below psi_lower.", call. = FALSE)
+  }
+  if (!is.null(psi_upper) && psi_mle > psi_upper) {
+    stop("Computed psi_mle lies above psi_upper.", call. = FALSE)
+  }
+
   estimand$psi_mle <- psi_mle
 
   # -------------------------------------------------------------
@@ -67,11 +78,19 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
       stop("psi_fn(param_0) must return a finite scalar.", call. = FALSE)
     }
 
+    # Enforce ψ bounds for ψ₀ as well
+    if (!is.null(psi_lower) && psi_0 < psi_lower) {
+      stop("Computed psi_0 lies below psi_lower.", call. = FALSE)
+    }
+    if (!is.null(psi_upper) && psi_0 > psi_upper) {
+      stop("Computed psi_0 lies above psi_upper.", call. = FALSE)
+    }
+
     estimand$psi_0 <- psi_0
   }
 
   # -------------------------------------------------------------
-  # 5. Compute search interval
+  # 5. Compute and clip search interval
   # -------------------------------------------------------------
   si <- estimand$search_interval_fn(param_mle, data)
 
@@ -83,6 +102,21 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
   ) {
     stop(
       "search_interval_fn(param_mle, data) must return c(lower, upper) with finite lower < upper.",
+      call. = FALSE
+    )
+  }
+
+  # Clip to ψ bounds if present
+  if (!is.null(psi_lower)) {
+    si[1] <- max(si[1], psi_lower)
+  }
+  if (!is.null(psi_upper)) {
+    si[2] <- min(si[2], psi_upper)
+  }
+
+  if (si[1] >= si[2]) {
+    stop(
+      "Search interval collapses after applying ψ bounds.",
       call. = FALSE
     )
   }

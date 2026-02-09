@@ -127,25 +127,77 @@ compute_required_branch_alpha <- function(R, alpha, gamma = 0.5) {
 #'
 #' Used for branch sweeps where only relative grid indices matter.
 #'
+#' Optional bounds \code{psi_lower} and \code{psi_upper} describe the
+#' geometric domain of ψ and are used to terminate branch traversal.
+#'
 #' @param psi_mle Numeric: ψ_MLE.
 #' @param increment Positive numeric: grid spacing.
+#' @param psi_lower Optional numeric scalar: lower bound of ψ.
+#' @param psi_upper Optional numeric scalar: upper bound of ψ.
 #'
 #' @return An object of class `"psi_grid"`.
 #' @keywords internal
-psi_grid_anchor <- function(psi_mle, increment) {
-  if (!is.numeric(increment) || increment <= 0) {
+psi_grid_anchor <- function(
+  psi_mle,
+  increment,
+  psi_lower = NULL,
+  psi_upper = NULL
+) {
+  if (!is.numeric(psi_mle) || length(psi_mle) != 1L || !is.finite(psi_mle)) {
+    stop("`psi_mle` must be a finite numeric scalar.", call. = FALSE)
+  }
+
+  if (!is.numeric(increment) || length(increment) != 1L || increment <= 0) {
     stop("`increment` must be a strictly positive scalar.", call. = FALSE)
+  }
+
+  if (!is.null(psi_lower)) {
+    if (
+      !is.numeric(psi_lower) || length(psi_lower) != 1L || !is.finite(psi_lower)
+    ) {
+      stop(
+        "`psi_lower` must be NULL or a finite numeric scalar.",
+        call. = FALSE
+      )
+    }
+  }
+
+  if (!is.null(psi_upper)) {
+    if (
+      !is.numeric(psi_upper) || length(psi_upper) != 1L || !is.finite(psi_upper)
+    ) {
+      stop(
+        "`psi_upper` must be NULL or a finite numeric scalar.",
+        call. = FALSE
+      )
+    }
+  }
+
+  if (!is.null(psi_lower) && !is.null(psi_upper)) {
+    if (psi_lower > psi_upper) {
+      stop("`psi_lower` must be <= `psi_upper`.", call. = FALSE)
+    }
+  }
+
+  # Optional sanity check: ψ_MLE must lie inside bounds
+  if (!is.null(psi_lower) && psi_mle < psi_lower) {
+    stop("`psi_mle` lies below `psi_lower`.", call. = FALSE)
+  }
+
+  if (!is.null(psi_upper) && psi_mle > psi_upper) {
+    stop("`psi_mle` lies above `psi_upper`.", call. = FALSE)
   }
 
   structure(
     list(
       psi_mle = psi_mle,
-      increment = increment
+      increment = increment,
+      psi_lower = psi_lower,
+      psi_upper = psi_upper
     ),
     class = "psi_grid"
   )
 }
-
 
 # ======================================================================
 # 4. Snap ψ to Nearest Grid Point (rarely used)

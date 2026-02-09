@@ -16,6 +16,19 @@
   slot %in% c("parameter", "likelihood", "estimand", "nuisance")
 }
 
+#' @keywords internal
+.slot_is_spec <- function(slot) {
+  slot %in%
+    c(
+      "parameter",
+      "likelihood",
+      "estimand",
+      "nuisance",
+      "optimizer",
+      "execution"
+    )
+}
+
 # ======================================================================
 # MODEL SPECIFICATION CONSTRUCTOR (high-level wrapper)
 # ======================================================================
@@ -23,20 +36,22 @@
 #' Create a Model Specification
 #'
 #' @description
-#' A model specification declares the structural and computational
-#' components needed for likelihood-based inference:
+#' A model specification declares the components needed for
+#' likelihood-based inference.
 #'
-#' **Structural components (must be present before calibration):**
+#' All components are required *prior to calibration*:
 #'   • parameter_spec()
 #'   • likelihood_spec()
 #'   • estimand_spec()
 #'   • nuisance_spec()
-#'
-#' **Computational components (required for integrate()/profile()):**
 #'   • optimizer_spec()
 #'   • execution_spec()
 #'
-#' Structural components cannot be modified *after* calibration.
+#' However, \code{model_spec()} is intentionally permissive at construction:
+#' you may initialize with \code{NULL} components and add them incrementally
+#' via [add()].
+#'
+#' Once calibrated, **no specification component may be modified**.
 #'
 #' @export
 model_spec <- function(
@@ -61,7 +76,8 @@ model_spec <- function(
   ) |>
     new_model_spec()
 
-  .validate_structural_specs(x)
+  # Validate any provided components (NULL allowed)
+  .validate_model_specs(x)
 
   x
 }
@@ -79,19 +95,19 @@ add <- function(model, spec, ...) {
 add.model_spec <- function(model, spec, ...) {
   slot <- .identify_model_slot(spec)
 
-  # Structural specs cannot change after calibration
-  if (is_calibrated(model) && .slot_is_structural(slot)) {
+  # No specs can change after calibration
+  if (is_calibrated(model) && .slot_is_spec(slot)) {
     stop(
-      sprintf("Cannot modify structural slot '%s' after calibration.", slot),
+      sprintf("Cannot modify slot '%s' after calibration.", slot),
       call. = FALSE
     )
   }
 
-  # Overwrite allowed
+  # Overwrite allowed pre-calibration
   model[[slot]] <- spec
 
-  # Validate structural parts only
-  .validate_structural_specs(model)
+  # Validate any provided components (NULL allowed)
+  .validate_model_specs(model)
 
   model
 }
@@ -130,38 +146,26 @@ add.default <- function(model, spec, ...) {
 }
 
 # ======================================================================
-# INTERNAL: Validation of STRUCTURAL SPECS ONLY
+# INTERNAL: Validation (validate only what is supplied)
 # ======================================================================
 
-#' Validate structural specification components
+#' Validate model specification components
 #'
 #' @description
-#' Internal validator that checks whether the structural components
-#' attached to a model object (if present) inherit from the correct
-#' specification classes.
+#' Internal validator that checks whether any components attached to a
+#' model object (if present) inherit from the correct specification classes.
 #'
 #' This function is intentionally permissive: each component is only
-#' validated *if it exists*. Missing components are allowed here and
-#' are validated later by stage-specific validators (e.g.,
-#' \code{validate_profile_input()}, \code{validate_integrate_input()}).
+#' validated *if it exists*. Missing components are allowed at construction
+#' time and are enforced prior to calibration by calibration-stage validators.
 #'
 #' @param x A list representing a model specification object.
-#'
-#' @details
-#' The following fields are checked when non-NULL:
-#'
-#' \itemize{
-#'   \item \code{parameter} must inherit from \code{"parameter_spec"}
-#'   \item \code{likelihood} must inherit from \code{"likelihood_spec"}
-#'   \item \code{estimand} must inherit from \code{"estimand_spec"}
-#'   \item \code{nuisance} must inherit from \code{"nuisance_spec"}
-#' }
 #'
 #' @return Invisibly returns \code{x} if validation succeeds.
 #'
 #' @keywords internal
 #' @noRd
-.validate_structural_specs <- function(x) {
+.validate_model_specs <- function(x) {
   if (
     !is.null(x$parameter) &&
       !inherits(x$parameter, "parameter_spec")
@@ -190,11 +194,25 @@ add.default <- function(model, spec, ...) {
     stop("nuisance must be a nuisance_spec().", call. = FALSE)
   }
 
+  if (
+    !is.null(x$optimizer) &&
+      !inherits(x$optimizer, "optimizer_spec")
+  ) {
+    stop("optimizer must be an optimizer_spec().", call. = FALSE)
+  }
+
+  if (
+    !is.null(x$execution) &&
+      !inherits(x$execution, "execution_spec")
+  ) {
+    stop("execution must be an execution_spec().", call. = FALSE)
+  }
+
   invisible(x)
 }
 
 # ======================================================================
-# INTERNAL: Complete Check for integrate() / profile()
+# INTERNAL: Complete Check for calibration / integrate() / profile()
 # ======================================================================
 
 #' @keywords internal

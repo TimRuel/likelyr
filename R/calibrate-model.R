@@ -7,11 +7,8 @@
 #' @description
 #' Prepares a model for computing profile or integrated likelihoods.
 #' Calibration is modular: each structural component (parameter,
-#' likelihood, estimand, nuisance) is processed by its own calibration
-#' helper.
-#'
-#' Optimizer and execution specs are *not required at calibration time*.
-#' They may be supplied later and are validated by integrate()/profile().
+#' likelihood, estimand, nuisance, optimizer, execution) is processed
+#' by its own calibration helper.
 #'
 #' @param model   A `model_spec` object.
 #' @param data    User data.
@@ -41,7 +38,7 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   model$data <- data
 
   # -------------------------------------------------------------------
-  # 2. Modular calibration of each spec component
+  # 2. Modular calibration of structural components
   # -------------------------------------------------------------------
 
   model$parameter <- calibrate_parameter(
@@ -67,22 +64,34 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
     data = data
   )
 
+  model$optimizer <- calibrate_optimizer(
+    optimizer = model$optimizer,
+    estimand = model$estimand,
+    parameter = model$parameter,
+    likelihood = model$likelihood,
+    nuisance = model$nuisance
+  )
+
+  # -------------------------------------------------------------------
+  # 3. Optional execution calibration
+  # -------------------------------------------------------------------
+
   if (!is.null(model$execution)) {
     model$execution <- calibrate_execution(model$execution)
   }
 
   # -------------------------------------------------------------------
-  # 3. Wrap into calibrated model object
+  # 4. Wrap into calibrated model object
   # -------------------------------------------------------------------
   cal <- new_calibrated_model(model)
 
   # -------------------------------------------------------------------
-  # 4. Initialize results workspace (ALWAYS present)
+  # 5. Initialize results workspace (ALWAYS present)
   # -------------------------------------------------------------------
   cal$workspace <- new_workspace()
 
   # -------------------------------------------------------------------
-  # 5. Optional console output
+  # 6. Optional console output
   # -------------------------------------------------------------------
   if (verbose) {
     print(cal)
@@ -99,18 +108,16 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 #'
 #' @description
 #' Ensures that a model object contains all required structural
-#' components before calibration is attempted. Specifically, this
-#' checks for:
+#' components before calibration is attempted.
+#'
+#' Required components:
 #' \itemize{
 #'   \item \code{parameter_spec()}
 #'   \item \code{likelihood_spec()}
 #'   \item \code{estimand_spec()}
 #'   \item \code{nuisance_spec()}
+#'   \item \code{optimizer_spec()}
 #' }
-#'
-#' Optimizer and execution specifications are *not* required at this
-#' stage and are validated later by \code{integrate()} or
-#' \code{profile()}.
 #'
 #' @param model A model specification object to validate.
 #'
@@ -143,6 +150,13 @@ validate_calibrate_input <- function(model) {
   if (!inherits(model$nuisance, "nuisance_spec")) {
     stop(
       "model$nuisance must be a nuisance_spec() before calibration.",
+      call. = FALSE
+    )
+  }
+
+  if (!inherits(model$optimizer, "optimizer_spec")) {
+    stop(
+      "model$optimizer must be an optimizer_spec() before calibration.",
       call. = FALSE
     )
   }

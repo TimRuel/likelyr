@@ -62,7 +62,6 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 1. Create `integrate` working area inside workspace$integrate
   # ------------------------------------------------------------------
-  constraint_fn <- function(param) psi_fn(param) - psi_mle
   generate_init <- make_omega_hat_initgen(cal)
   sample_omega_hat <- make_omega_hat_sampler(cal)
 
@@ -71,7 +70,6 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   cal$workspace$integrate <- list(
-    constraint_fn = constraint_fn,
     generate_init = generate_init,
     sample_omega_hat = sample_omega_hat
   )

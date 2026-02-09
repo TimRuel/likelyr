@@ -9,8 +9,10 @@ build_one_branch(
   param_hat_branch,
   branch_cutoff,
   grid,
-  eval_psi_fun,
-  max_retries
+  branch_fn,
+  max_retries,
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE
 )
 }
 \arguments{
@@ -27,8 +29,8 @@ Must contain components:
 \item increment — step size between ψ-grid points
 }}
 
-\item{eval_psi_fun}{Function of the form
-\code{eval_psi_fun(psi_value, param_init) -> list(param_hat, branch_val)}
+\item{branch_fn}{Function of the form
+\code{branch_fn(psi_value, param_init) -> list(param_hat, branch_val)}
 used to locally maximize the log-likelihood at fixed ψ.}
 
 \item{max_retries}{Integer. Maximum number of jitter retries for
@@ -47,12 +49,6 @@ with attributes:
 \item{psi_MLE}{Global ψ̂_MLE}
 }
 \description{
-Given the branch mode (ψ̂_branch, θ̂_branch), this function sweeps
-outward along the ψ-grid in both directions (left and right) until
-the log-likelihood falls below a supplied cutoff.
-
-This is used for \strong{integrated log-likelihood branches only}; the cutoff
-threshold (including any user-specified buffer) is computed upstream
-in \code{\link[=generate_branches]{generate_branches()}}.
+Build a Full Branch on the ψ-Grid (Integrated Log-Likelihood)
 }
 \keyword{internal}

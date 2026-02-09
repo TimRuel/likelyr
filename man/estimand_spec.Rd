@@ -13,6 +13,8 @@ estimand_spec(
   gamma = 0.5,
   cutoff_buffer = 0.1,
   uniroot_expand_factor = 0.02,
+  psi_lower = NULL,
+  psi_upper = NULL,
   psi_0 = NULL,
   name = NULL,
   ...
@@ -30,13 +32,15 @@ estimand_spec(
 \item{confidence_levels}{Numeric vector strictly inside (0, 1).}
 
 \item{gamma}{Numeric scalar in (0,1] tempering the conservativeness of
-integrated likelihood branch cutoffs. Smaller values reduce the worst-case
-\eqn{\log(R)} correction when averaging Monte Carlo branches, reflecting
-unequal branch contributions in practice. Defaults to \code{0.5}.}
+integrated likelihood branch cutoffs.}
 
 \item{cutoff_buffer}{Nonnegative scalar.}
 
 \item{uniroot_expand_factor}{Nonnegative scalar.}
+
+\item{psi_lower}{Optional numeric scalar giving lower bound of ψ.}
+
+\item{psi_upper}{Optional numeric scalar giving upper bound of ψ.}
 
 \item{psi_0}{Optional numeric scalar giving the true value of ψ.
 If supplied, overrides internal ψ₀ computation during calibration.}
@@ -55,4 +59,8 @@ generating profile or integrated log-likelihood curves.
 Optionally, the true value ψ₀ may be supplied directly via \code{psi_0}.
 If provided, this value will override internal computation of ψ₀
 during calibration.
+
+Optional bounds \code{psi_lower} and \code{psi_upper} may be supplied to
+describe the \emph{geometric domain} of ψ. These bounds are treated as
+hard constraints on branch traversal (not likelihood cutoffs).
 }

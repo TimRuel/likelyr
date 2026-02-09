@@ -9,8 +9,9 @@ optimizer_spec(
   control = list(),
   localtol = 1e-06,
   max_retries = 10,
-  drop_mult = 5,
-  branch_mode_params = NULL,
+  branch_mode_locator_method = c("hybrid", "grid_scan", "brent", "multiplier_root"),
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE,
   name = NULL,
   ...
 )
@@ -26,22 +27,22 @@ Default is \code{"SLSQP"}.}
 \item{max_retries}{Non-negative integer giving the maximum number of restart attempts allowed
 when constrained optimization fails to converge.}
 
-\item{drop_mult}{Numeric scalar greater than 1 controlling how large a log-likelihood drop
-is allowed relative to the previous drop during continuation-based sweeps.
-Typical values range from 3 to 10.}
+\item{branch_mode_locator_method}{Character scalar specifying how the \strong{branch mode}
+(the maximizer of the ω̂-conditioned log-likelihood) is located.
 
-\item{branch_mode_params}{Optional named list of control parameters passed to
-\code{branch_mode_solve()} when locating the \strong{continuous branch mode}
-prior to branch construction.
+Must be one of:
+\itemize{
+\item \code{"hybrid"} — grid bracketing followed by local refinement (default)
+\item \code{"grid_scan"} — pure grid-based search over ψ
+\item \code{"brent"} — direct 1D Brent maximization in ψ
+\item \code{"multiplier_root"} — root-finding via constraint multipliers
+}}
 
-Recognized entries include:
-\describe{
-\item{max_iter}{Maximum number of Brent iterations used when solving for
-the branch mode ψ̂.}
-\item{tol}{Convergence tolerance for the ψ optimization.}
-}
+\item{stop_at_bounds}{Logical scalar. If TRUE (default), branch sweeps stop when a ψ bound
+is reached.}
 
-If \code{NULL} (default), internal defaults are used.}
+\item{eval_at_bounds}{Logical scalar. If TRUE (default), the branch is evaluated once at the
+ψ bound before stopping. Requires \code{stop_at_bounds = TRUE}.}
 
 \item{name}{Optional descriptive name for the optimizer specification.}
 
@@ -58,7 +59,8 @@ including:
 \item nuisance parameter optimization via \code{nloptr::auglag()};
 \item restart and continuation behavior for constrained solves;
 \item tolerance and stability controls for branch construction;
-\item optional control parameters for locating continuous branch modes.
+\item method selection for locating continuous branch modes;
+\item stopping and evaluation behavior at ψ bounds during branch sweeps.
 }
 
 A single \code{optimizer_spec} is shared by both \strong{profile} and

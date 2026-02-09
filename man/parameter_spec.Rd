@@ -9,6 +9,8 @@ parameter_spec(
   param_dim = NULL,
   param_lower = NULL,
   param_upper = NULL,
+  eq = NULL,
+  eq_jac = NULL,
   ineq = NULL,
   ineq_jac = NULL,
   name = NULL,
@@ -24,6 +26,10 @@ OR list of such objects giving true / initial parameters.}
 \item{param_lower}{Optional numeric scalar or vector of lower bounds.}
 
 \item{param_upper}{Optional numeric scalar or vector of upper bounds.}
+
+\item{eq}{Optional function(param) → numeric vector = 0.}
+
+\item{eq_jac}{Optional Jacobian function(param) → matrix.}
 
 \item{ineq}{Optional function(param) → numeric vector ≤ 0.}
 
@@ -42,6 +48,7 @@ Defines the parameter space, including:
 • dimension
 • optional true value(s)
 • box constraints (lower, upper)
+• equality constraints h(param) = 0 and Jacobian
 • inequality constraints h(param) ≤ 0 and Jacobian
 
 Exactly one of \code{param_0} or \code{param_dim} must be supplied.

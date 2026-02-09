@@ -4,12 +4,16 @@
 \alias{psi_grid_anchor}
 \title{Create a ψ-Grid Anchor}
 \usage{
-psi_grid_anchor(psi_mle, increment)
+psi_grid_anchor(psi_mle, increment, psi_lower = NULL, psi_upper = NULL)
 }
 \arguments{
 \item{psi_mle}{Numeric: ψ_MLE.}
 
 \item{increment}{Positive numeric: grid spacing.}
+
+\item{psi_lower}{Optional numeric scalar: lower bound of ψ.}
+
+\item{psi_upper}{Optional numeric scalar: upper bound of ψ.}
 }
 \value{
 An object of class \code{"psi_grid"}.
@@ -21,5 +25,8 @@ Constructs a lightweight, regular ψ-grid representation:
 }
 
 Used for branch sweeps where only relative grid indices matter.
+
+Optional bounds \code{psi_lower} and \code{psi_upper} describe the
+geometric domain of ψ and are used to terminate branch traversal.
 }
 \keyword{internal}

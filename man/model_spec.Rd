@@ -16,18 +16,20 @@ model_spec(
 )
 }
 \description{
-A model specification declares the structural and computational
-components needed for likelihood-based inference:
+A model specification declares the components needed for
+likelihood-based inference.
 
-\strong{Structural components (must be present before calibration):}
+All components are required \emph{prior to calibration}:
 • parameter_spec()
 • likelihood_spec()
 • estimand_spec()
 • nuisance_spec()
-
-\strong{Computational components (required for integrate()/profile()):}
 • optimizer_spec()
 • execution_spec()
 
-Structural components cannot be modified \emph{after} calibration.
+However, \code{model_spec()} is intentionally permissive at construction:
+you may initialize with \code{NULL} components and add them incrementally
+via \code{\link[=add]{add()}}.
+
+Once calibrated, \strong{no specification component may be modified}.
 }

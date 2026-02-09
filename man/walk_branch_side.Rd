@@ -10,33 +10,13 @@ walk_branch_side(
   k_start,
   branch_cutoff,
   init_guess,
-  eval_psi_fun,
-  max_retries
+  branch_fn,
+  max_retries,
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE
 )
 }
-\arguments{
-\item{grid}{A psi_grid object created by psi_grid_anchor().}
-
-\item{k_direction}{+1 (right sweep) or -1 (left sweep)}
-
-\item{k_start}{Integer index where sweeping begins}
-
-\item{branch_cutoff}{Numeric threshold for terminating the sweep}
-
-\item{init_guess}{Initial θ̂ used at ψ_MLE}
-
-\item{eval_psi_fun}{Function(psi_value, param_init) → list(param_hat, branch_val)}
-
-\item{max_retries}{Integer number of jitter retries for monotonicity}
-}
-\value{
-A tibble with columns k and loglik, sorted by k.
-}
 \description{
-Performs a one-sided sweep of the branch log-likelihood by stepping
-through integer grid indices k, computing ψ_k from the supplied ψ-grid,
-and calling:
-
-eval_psi_fun(psi_k, param_init)
+One-Sided Branch Sweep Along the ψ-Grid (Internal)
 }
 \keyword{internal}

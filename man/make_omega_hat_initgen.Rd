@@ -2,26 +2,55 @@
 % Please edit documentation in R/eval-omega-hat.R
 \name{make_omega_hat_initgen}
 \alias{make_omega_hat_initgen}
-\title{Construct Advanced Initial-Guess Generator for ω̂ Sampling}
+\title{Construct an Initial-Guess Generator for ω̂ Sampling}
 \usage{
 make_omega_hat_initgen(cal)
 }
 \arguments{
-\item{cal}{A \code{likelyr_calibrated} model object.}
+\item{cal}{A calibrated model object. Must contain:
+\itemize{
+\item \code{cal$parameter$param_mle}
+\item \code{cal$parameter$param_dim}
+\item \code{cal$parameter$param_lower}, \code{param_upper} (optional)
+\item \code{cal$estimand$psi_jac} (optional)
+}}
 }
 \value{
-A function \code{f(history, p_recenter = 0.1)} returning
-high-dispersion initial guesses.
+A function with signature
+\code{function(history = NULL, p_recenter = 0.10)} that generates
+a single numeric parameter vector suitable for use as an initial
+guess in ω̂-constrained optimization.
 }
 \description{
-This generator provides \strong{geometrically diverse} initial guesses by:
+Creates a stochastic generator for initial guesses of the
+zero-score expectation (ZSE) parameter \eqn{\hat\omega}.
 
-• Combining \emph{local} and \emph{global} tangent-space perturbations
-• Using an orthonormal tangent basis at θ_MLE
-• Occasionally recentering around a previously sampled ω̂
-• Respecting model bounds (θ_lower, θ_upper)
+The generator produces candidate parameter vectors by perturbing
+the MLE \eqn{\hat\theta} using a mixture of:
+\itemize{
+\item \strong{Local tangent-space perturbations} aligned with the
+constraint manifold \eqn{\psi(\theta) = \psi_{\text{MLE}}}
+\item \strong{Occasional global jumps} to escape local structure
+\item \strong{Optional recentering} around previously accepted
+\eqn{\hat\omega} samples
+}
 
-The result is far more uniform exploration of the manifold
-ψ(ω̂) = ψ_MLE before projecting with auglag().
+When a Jacobian for \eqn{\psi(\theta)} is available, perturbations are
+restricted to the tangent space orthogonal to \eqn{\nabla\psi}, ensuring
+first-order feasibility with respect to the ψ-constraint. If no Jacobian
+is available, multiplicative jitter is applied directly in parameter
+space.
+
+All generated candidates are clipped to respect parameter bounds
+specified in the associated \code{parameter_spec()}.
+}
+\details{
+The returned generator supports adaptive exploration:
+\itemize{
+\item If \code{history} is supplied, previous ω̂ samples may be reused
+as perturbation centers with probability \code{p_recenter}.
+\item Local and global perturbation scales are mixed to balance
+stability and exploration.
+}
 }
 \keyword{internal}

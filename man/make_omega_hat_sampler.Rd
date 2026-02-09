@@ -2,24 +2,58 @@
 % Please edit documentation in R/eval-omega-hat.R
 \name{make_omega_hat_sampler}
 \alias{make_omega_hat_sampler}
-\title{Construct ω̂ Sampler for ψ(ω̂) = ψ_MLE}
+\title{Construct an ω̂ Sampler via Constrained Augmented Lagrangian Optimization}
 \usage{
 make_omega_hat_sampler(cal)
 }
 \arguments{
-\item{cal}{A \code{likelyr_calibrated} model object.}
+\item{cal}{A calibrated model object containing:
+\itemize{
+\item ψ mapping and Jacobian: \code{cal$estimand$psi_fn},
+\code{psi_jac}, \code{psi_mle}
+\item Parameter constraints: equality, inequality, and bounds
+\item Optimizer settings from \code{optimizer_spec()}
+}}
 }
 \value{
-A function \code{f(init_guess)} returning ω̂.
+A function with signature \code{function(init_guess)} that returns
+a numeric vector representing a feasible ω̂ value satisfying all
+constraints.
 }
 \description{
-Solves the manifold equation:
-ψ(ω̂) - ψ_MLE = 0
-using \code{nloptr::auglag()} and incorporating:
+Builds a closure that maps an initial parameter guess to a
+zero-score expectation (ZSE) parameter \eqn{\hat\omega} by solving
+a constrained optimization problem.
 
-• θ_lower / θ_upper bounds
-• inequality constraints h(θ) ≤ 0
-• Jacobians for constraints (if supplied)
-• optimizer_spec settings only for SLSQP/local solver
+The sampler enforces:
+\itemize{
+\item The ψ-constraint: \eqn{\psi(\theta) = \psi_{\text{MLE}}}
+\item Any additional equality constraints declared in
+\code{parameter_spec()}
+\item Any inequality and bound constraints declared in
+\code{parameter_spec()}
+}
+
+Optimization is performed using \code{nloptr::auglag()} with a
+constant objective function. The solution therefore corresponds
+to a feasible point satisfying all constraints, rather than a
+likelihood maximizer.
+
+Constraint functions and Jacobians are constructed \strong{once}
+and closed over, avoiding conditional logic inside the solver
+evaluation loop for improved performance.
+}
+\details{
+The returned sampler:
+\itemize{
+\item Projects the supplied initial guess onto parameter bounds
+\item Solves the constrained feasibility problem using an augmented
+Lagrangian method
+\item Returns only the optimized parameter vector, discarding
+solver diagnostics
+}
+
+This sampler is intended for repeated use inside Monte Carlo
+integrated likelihood algorithms and branch construction routines.
 }
 \keyword{internal}

@@ -21,11 +21,11 @@ The same estimand_spec object, enriched with:
 • psi_jac (data-bound if present)
 • psi_mle
 • psi_0 (if available)
-• search_interval
+• search_interval (clipped to ψ bounds)
 }
 \description{
 Binds data into psi_fn(), computes psi_MLE and (optionally) psi_0,
-and evaluates the search interval.
+evaluates the search interval, and enforces geometric bounds on ψ.
 
 If psi_0 is already present on the estimand_spec (e.g. supplied
 directly by the user or injected earlier), it is respected and

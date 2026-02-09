@@ -1,3 +1,15 @@
+# ======================================================================
+# branch-factory.R (v3.2) — equality + inequality constraints
+#
+# Builds a factory that produces branch evaluators:
+#   ψ ↦ max_θ E[ℓ(θ); ω̂] subject to
+#     • ψ(θ) = ψ_target
+#     • eq(θ) = 0
+#     • ineq(θ) ≤ 0
+#
+# All constraint branching is resolved ONCE for efficiency.
+# ======================================================================
+
 build_branch_fn_factory <- function(
   parameter,
   likelihood,
@@ -22,8 +34,10 @@ build_branch_fn_factory <- function(
   lower <- parameter$param_lower %||% rep(-Inf, J)
   upper <- parameter$param_upper %||% rep(Inf, J)
 
-  hin <- parameter$ineq
-  hinjac <- parameter$ineq_jac
+  eq_fn <- parameter$eq
+  eq_jac <- parameter$eq_jac
+  hin_fn <- parameter$ineq
+  hin_jac <- parameter$ineq_jac
 
   # -------------------------------------------------------------------
   # Static, data-bound components
@@ -55,7 +69,7 @@ build_branch_fn_factory <- function(
   )
 
   # -------------------------------------------------------------------
-  # Objective and constraints for auglag
+  # Objective and gradient
   # -------------------------------------------------------------------
   fn <- function(param) {
     -E_loglik(param, eval_env$omega_hat)
@@ -67,8 +81,41 @@ build_branch_fn_factory <- function(
     NULL
   }
 
-  heq <- function(param) {
-    psi_fn(param) - eval_env$psi_target
+  # -------------------------------------------------------------------
+  # Equality constraints (branch-free construction)
+  # -------------------------------------------------------------------
+  heq <- if (is.null(eq_fn)) {
+    function(param) {
+      psi_fn(param) - eval_env$psi_target
+    }
+  } else {
+    function(param) {
+      c(
+        psi_fn(param) - eval_env$psi_target,
+        eq_fn(param)
+      )
+    }
+  }
+
+  heqjac <- if (is.null(psi_jac) && is.null(eq_jac)) {
+    NULL
+  } else if (!is.null(psi_jac) && is.null(eq_jac)) {
+    function(param) {
+      Jpsi <- psi_jac(param)
+      if (is.vector(Jpsi)) matrix(Jpsi, nrow = 1) else Jpsi
+    }
+  } else if (is.null(psi_jac) && !is.null(eq_jac)) {
+    function(param) {
+      eq_jac(param)
+    }
+  } else {
+    function(param) {
+      Jpsi <- psi_jac(param)
+      if (is.vector(Jpsi)) {
+        Jpsi <- matrix(Jpsi, nrow = 1)
+      }
+      rbind(Jpsi, eq_jac(param))
+    }
   }
 
   # -------------------------------------------------------------------
@@ -83,14 +130,18 @@ build_branch_fn_factory <- function(
     function(psi_target, param_init) {
       eval_env$psi_target <- psi_target
 
+      x0 <- as.numeric(param_init)
+      x0 <- pmax(x0, lower)
+      x0 <- pmin(x0, upper)
+
       res <- nloptr::auglag(
-        x0 = param_init,
+        x0 = x0,
         fn = fn,
         gr = gr,
         heq = heq,
-        heqjac = psi_jac,
-        hin = hin,
-        hinjac = hinjac,
+        heqjac = heqjac,
+        hin = hin_fn,
+        hinjac = hin_jac,
         lower = lower,
         upper = upper,
         localsolver = localsolver,

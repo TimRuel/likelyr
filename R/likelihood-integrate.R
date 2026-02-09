@@ -111,11 +111,12 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
       branches <- branch_result$branches
       omega_draws <- branch_result$omega_draws
 
-      branch_avg <- average_branches(branches)
+      branch_agg <- aggregate_branches(branches)
 
       new_integrate_result(list(
-        psi_ll_df = branch_avg$psi_ll_df,
-        branch_mat = branch_avg$branch_mat,
+        psi_ll_df = branch_agg$psi_ll_df,
+        branch_mat = branch_agg$branch_mat,
+        R_eff = branch_agg$R_eff,
         branches = branches,
         omega_draws = omega_draws,
         param_mle = param_mle,

@@ -28,7 +28,10 @@
 #'
 #' @param localtol
 #'   Numeric scalar specifying the convergence tolerance for the local solver.
-
+#'
+#' @param max_retries
+#'   Non-negative integer giving the maximum number of restart attempts allowed
+#'   when constrained optimization fails to converge.
 #'
 #' @param branch_mode_locator_method
 #'   Character scalar specifying how the **branch mode**
@@ -64,6 +67,7 @@ optimizer_spec <- function(
   localsolver = "SLSQP",
   control = list(),
   localtol = 1e-6,
+  max_retries = 10,
   branch_mode_locator_method = c(
     "hybrid",
     "grid_scan",
@@ -85,6 +89,7 @@ optimizer_spec <- function(
     localsolver = localsolver,
     control = control,
     localtol = localtol,
+    max_retries = max_retries,
     branch_mode_locator_method = branch_mode_locator_method,
     stop_at_bounds = stop_at_bounds,
     eval_at_bounds = eval_at_bounds,
@@ -132,6 +137,16 @@ optimizer_spec <- function(
     stop("localtol must be a positive numeric scalar.", call. = FALSE)
   }
 
+  # Retry count ----------------------------------------------------------
+  if (
+    !is.numeric(x$max_retries) ||
+      length(x$max_retries) != 1 ||
+      x$max_retries < 0 ||
+      x$max_retries != as.integer(x$max_retries)
+  ) {
+    stop("max_retries must be a non-negative integer.", call. = FALSE)
+  }
+
   # ψ-bound behavior -----------------------------------------------------
   if (!is.logical(x$stop_at_bounds) || length(x$stop_at_bounds) != 1L) {
     stop("stop_at_bounds must be a single logical value.", call. = FALSE)
@@ -161,6 +176,7 @@ print.optimizer_spec <- function(x, ...) {
   cat("- Name:           ", x$name, "\n", sep = "")
   cat("- Local solver:   ", x$localsolver, "\n", sep = "")
   cat("- Local tol:      ", x$localtol, "\n", sep = "")
+  cat("- Max retries:    ", x$max_retries, "\n", sep = "")
 
   cat(
     "- Control list:   ",

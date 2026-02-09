@@ -1,22 +1,5 @@
 #' One-Sided Branch Sweep Along the ψ-Grid (Internal)
 #'
-#' @description
-#' Performs a one-sided sweep of the branch log-likelihood by stepping
-#' through integer grid indices k, computing ψ_k from the supplied ψ-grid,
-#' and calling:
-#'
-#'   eval_psi_fun(psi_k, param_init)
-#'
-#' @param grid A psi_grid object created by psi_grid_anchor().
-#' @param k_direction +1 (right sweep) or -1 (left sweep)
-#' @param k_start Integer index where sweeping begins
-#' @param branch_cutoff Numeric threshold for terminating the sweep
-#' @param init_guess Initial θ̂ used at ψ_MLE
-#' @param eval_psi_fun Function(psi_value, param_init) → list(param_hat, branch_val)
-#' @param max_retries Integer number of jitter retries for monotonicity
-#'
-#' @return A tibble with columns k and loglik, sorted by k.
-#'
 #' @keywords internal
 walk_branch_side <- function(
   grid,
@@ -24,32 +7,56 @@ walk_branch_side <- function(
   k_start,
   branch_cutoff,
   init_guess,
-  eval_psi_fun,
-  max_retries
+  branch_fn,
+  max_retries,
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE
 ) {
   k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
+
+  psi_lower <- grid$psi_lower
+  psi_upper <- grid$psi_upper
 
   df <- tibble::tibble(k = integer(), loglik = numeric())
 
   repeat {
     retry <- 0L
 
-    # Convert k → psi
+    # --------------------------------------------------------------
+    # Convert k → ψ
+    # --------------------------------------------------------------
     psi_k <- grid$psi_mle + k_curr * grid$increment
+
+    # --------------------------------------------------------------
+    # Geometry: ψ bounds
+    # --------------------------------------------------------------
+    hit_lower <- !is.null(psi_lower) && psi_k < psi_lower
+    hit_upper <- !is.null(psi_upper) && psi_k > psi_upper
+
+    if (hit_lower || hit_upper) {
+      if (!stop_at_bounds) {
+        # ignore geometry, continue
+      } else {
+        if (eval_at_bounds) {
+          psi_k <- if (hit_lower) psi_lower else psi_upper
+        } else {
+          break
+        }
+      }
+    }
 
     # --------------------------------------------------------------
     # Evaluate, retrying with jitter if monotonicity violated
     # --------------------------------------------------------------
     repeat {
-      eval <- eval_psi_fun(psi_k, current_par)
+      eval <- branch_fn(psi_k, current_par)
 
       if (eval$branch_val <= current_val || retry >= max_retries) {
         break
       }
 
-      # Monotonicity violated: jitter initial guess
       retry <- retry + 1L
       scale <- 0.1 * retry
 
@@ -60,7 +67,7 @@ walk_branch_side <- function(
         )
     }
 
-    # Final fallback: if monotonicity still violated
+    # Final fallback if monotonicity still violated
     if (eval$branch_val > current_val && max_retries > 0L) {
       warning(
         sprintf(
@@ -70,20 +77,14 @@ walk_branch_side <- function(
         ),
         call. = FALSE
       )
-      eval <- eval_psi_fun(psi_k, current_par)
+      eval <- branch_fn(psi_k, current_par)
     }
 
-    # ------------------------------
-    # Update first
-    # ------------------------------
+    # --------------------------------------------------------------
+    # Update
+    # --------------------------------------------------------------
     current_val <- eval$branch_val
 
-    # Record
-    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
-
-    # ------------------------------
-    # Terminate
-    # ------------------------------
     if (!is.finite(current_val)) {
       stop(
         "walk_branch_side(): Non-finite log-likelihood at k = ",
@@ -95,14 +96,26 @@ walk_branch_side <- function(
       )
     }
 
-    if (current_val < branch_cutoff) {
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
+
+    # --------------------------------------------------------------
+    # Likelihood cutoff
+    # --------------------------------------------------------------
+    if (!is.null(branch_cutoff) && current_val < branch_cutoff) {
       break
     }
 
-    # Update θ̂
-    current_par <- eval$param_hat
+    # --------------------------------------------------------------
+    # If we evaluated exactly at a bound, stop after recording
+    # --------------------------------------------------------------
+    if (stop_at_bounds && (hit_lower || hit_upper)) {
+      break
+    }
 
-    # Next grid index
+    # --------------------------------------------------------------
+    # Prepare next step
+    # --------------------------------------------------------------
+    current_par <- eval$param_hat
     k_curr <- k_curr + k_direction
   }
 

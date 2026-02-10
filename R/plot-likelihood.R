@@ -108,7 +108,7 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::scale_color_manual(
       name = "Confidence",
       values = plot_ci_palette(interval_estimate_df),
-      breaks = interval_estimate_df$Level,
+      breaks = interval_estimate_df$level,
       guide = ggplot2::guide_legend(
         override.aes = list(
           linetype = "solid",

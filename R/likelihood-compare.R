@@ -137,7 +137,10 @@ view.comparison <- function(x, ...) {
       x$interval_estimates_df
     ),
 
-    combined = render_estimates_comparison_table(x$estimates_df)
+    combined = render_estimates_comparison_table(
+      x$point_estimates_df,
+      x$interval_estimates_df
+    )
   )
 }
 

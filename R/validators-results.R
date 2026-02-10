@@ -150,8 +150,7 @@ validate_inference_result <- function(x) {
   required <- c(
     "zero_max_psi_ll_fn",
     "point_estimate_df",
-    "interval_estimate_df",
-    "estimate_df"
+    "interval_estimate_df"
   )
 
   missing <- setdiff(required, names(x))
@@ -175,10 +174,6 @@ validate_inference_result <- function(x) {
     stop("interval_estimate_df must be a data.frame.", call. = FALSE)
   }
 
-  if (!.is_df(x$estimate_df)) {
-    stop("estimate_df must be a data.frame.", call. = FALSE)
-  }
-
   invisible(TRUE)
 }
 
@@ -200,8 +195,7 @@ validate_comparison_result <- function(x) {
 
   required <- c(
     "point_estimates_df",
-    "interval_estimates_df",
-    "estimates_df"
+    "interval_estimates_df"
   )
 
   missing <- setdiff(required, names(x))

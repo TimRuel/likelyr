@@ -29,23 +29,23 @@
 get_interval_estimates_df <- function(res) {
   interval_estimates_df <- res |>
     purrr::map(\(x) x$inference$interval_estimate_df) |>
-    dplyr::bind_rows(.id = "Pseudolikelihood") |>
+    dplyr::bind_rows(.id = "pseudolikelihood") |>
     dplyr::mutate(
-      Pseudolikelihood = dplyr::recode(
-        Pseudolikelihood,
+      pseudolikelihood = dplyr::recode(
+        pseudolikelihood,
         profile = "Profile",
         integrate = "Integrated"
       )
     ) |>
-    dplyr::arrange(Level) |>
+    dplyr::arrange(level) |>
     dplyr::select(
-      Interval,
-      Pseudolikelihood,
-      Length,
-      `Lower Deviation`,
-      `Upper Deviation`,
-      Status,
-      Level
+      interval,
+      pseudolikelihood,
+      length,
+      lower_dev,
+      upper_dev,
+      contains_truth,
+      level
     )
 
   attr(interval_estimates_df, "point_estimates") <- res |>

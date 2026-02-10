@@ -9,18 +9,8 @@
 
 #' Render point estimate comparison table
 #'
-#' @description
-#' Renders a formatted comparison table of point estimates and associated
-#' uncertainty measures (error and standard error) across pseudolikelihoods.
-#'
-#' This function is **local-only** and must not be called on HPC.
-#'
-#' @param point_estimates_df A data frame of point estimates and diagnostics.
-#'
-#' @return A `kableExtra` HTML table object.
-#'
-#' @family inference-renderers
 #' @keywords internal
+#' @noRd
 render_point_estimates_comparison_table <- function(point_estimates_df) {
   required <- c("psi_0", "psi_hat", "error", "se_psi_hat", "pseudolikelihood")
   stopifnot(all(required %in% names(point_estimates_df)))
@@ -51,28 +41,17 @@ render_point_estimates_comparison_table <- function(point_estimates_df) {
 
 #' Render interval estimate comparison table
 #'
-#' @description
-#' Renders a comparison table of confidence intervals and associated
-#' diagnostics across pseudolikelihoods and confidence levels.
-#'
-#' This function is **local-only** and must not be called on HPC.
-#'
-#' @param interval_estimates_df A formatted interval estimates data frame
-#'   with required attributes attached.
-#'
-#' @return A `kableExtra` HTML table object.
-#'
-#' @family inference-renderers
 #' @keywords internal
+#' @noRd
 render_interval_estimates_comparison_table <- function(interval_estimates_df) {
   required <- c(
-    "Level",
-    "Pseudolikelihood",
-    "Interval",
-    "Length",
-    "Lower Deviation",
-    "Upper Deviation",
-    "Status"
+    "level",
+    "pseudolikelihood",
+    "interval",
+    "length",
+    "lower_dev",
+    "upper_dev",
+    "contains_truth"
   )
   stopifnot(all(required %in% names(interval_estimates_df)))
 
@@ -92,14 +71,21 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
   df_render <- interval_estimates_df |>
     dplyr::mutate(
       psi_0 = round(psi_0, 2),
-      .before = Interval
+      .before = interval
     ) |>
     dplyr::mutate(
-      Diagram = "",
-      .after = Pseudolikelihood
+      diagram = "",
+      .after = pseudolikelihood
+    ) |>
+    dplyr::mutate(
+      contains_truth = dplyr::case_when(
+        is.na(contains_truth) ~ NA_character_,
+        contains_truth ~ "✅",
+        TRUE ~ "❌"
+      )
     )
 
-  bg <- .interval_level_bg(df_render$Level)
+  bg <- .interval_level_bg(df_render$level)
 
   .render_interval_estimate_base(
     df = df_render,
@@ -134,30 +120,50 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
 
 #' Render combined point and interval comparison table
 #'
-#' @description
-#' Renders a unified comparison table containing both point estimates and
-#' interval estimates for multiple pseudolikelihood methods.
-#'
-#' This function is **local-only** and must not be called on HPC.
-#'
-#' @param estimates_df Data frame combining point and interval estimates
-#'   across pseudolikelihoods and confidence levels.
-#'
-#' @return A `kableExtra` HTML table object.
-#'
-#' @family inference-renderers
 #' @keywords internal
-render_estimates_comparison_table <- function(estimates_df) {
+#' @noRd
+render_estimates_comparison_table <- function(
+  point_estimates_df,
+  interval_estimates_df
+) {
+  n_levels <- interval_estimates_df |>
+    dplyr::select(level) |>
+    dplyr::n_distinct()
+
+  estimates_df <- point_estimates_df |>
+    dplyr::rename(method = pseudolikelihood) |>
+    tidyr::uncount(n_levels) |>
+    dplyr::bind_cols(interval_estimates_df) |>
+    dplyr::select(
+      method,
+      se_psi_hat,
+      error,
+      psi_hat,
+      psi_0,
+      interval,
+      pseudolikelihood,
+      length,
+      lower_dev,
+      upper_dev,
+      contains_truth,
+      level
+    )
+
   df_render <- estimates_df |>
-    dplyr::mutate(Diagram = "", .after = "Pseudolikelihood") |>
+    dplyr::mutate(diagram = "", .after = "pseudolikelihood") |>
     dplyr::mutate(
       dplyr::across(
         c(psi_hat, error, se_psi_hat),
         ~ paste0(.x, "<span style='display:none'>", pseudolikelihood, "</span>")
+      ),
+      contains_truth = dplyr::case_when(
+        is.na(contains_truth) ~ NA_character_,
+        contains_truth ~ "✅",
+        TRUE ~ "❌"
       )
     )
 
-  bg_interval <- .interval_level_bg(df_render$Level)
+  bg_interval <- .interval_level_bg(df_render$level)
   bg_pe <- .pe_row_bg(df_render$pseudolikelihood)
 
   body_spec_fun <- function(tbl) {
@@ -173,8 +179,8 @@ render_estimates_comparison_table <- function(estimates_df) {
         8,
         image = kableExtra::spec_pointrange(
           x = estimates_df$psi_hat,
-          xmin = estimates_df$psi_hat - estimates_df$`Lower Deviation`,
-          xmax = estimates_df$psi_hat + estimates_df$`Upper Deviation`,
+          xmin = estimates_df$psi_hat - estimates_df$lower_dev,
+          xmax = estimates_df$psi_hat + estimates_df$upper_dev,
           vline = estimates_df$psi_0,
           line_col = table_text_body("diagram"),
           width = 300,

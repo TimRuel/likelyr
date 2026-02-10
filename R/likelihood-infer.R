@@ -277,9 +277,18 @@ view.inference <- function(x, ...) {
   }
 
   list(
-    point = render_point_estimate_table(x$point_estimate_df),
-    interval = render_interval_estimate_table(x$interval_estimate_df),
-    combined = render_estimate_table(x$estimate_df)
+    point_estimate = render_point_estimate_table(
+      x$point_estimate_df
+    ),
+
+    interval_estimate = render_interval_estimate_table(
+      x$interval_estimate_df
+    ),
+
+    combined = render_estimate_table(
+      x$point_estimate_df,
+      x$interval_estimate_df
+    )
   )
 }
 

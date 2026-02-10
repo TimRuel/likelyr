@@ -45,12 +45,12 @@ render_point_estimate_table <- function(point_estimate_df) {
 #' @noRd
 render_interval_estimate_table <- function(interval_estimate_df) {
   required <- c(
-    "Interval",
-    "Length",
-    "Lower Deviation",
-    "Upper Deviation",
-    "Status",
-    "Level"
+    "interval",
+    "length",
+    "lower_dev",
+    "upper_dev",
+    "contains_truth",
+    "level"
   )
   stopifnot(all(required %in% names(interval_estimate_df)))
 
@@ -69,16 +69,23 @@ render_interval_estimate_table <- function(interval_estimate_df) {
     !is.null(psi_0)
   )
 
-  stripe_bg <- .interval_level_bg(interval_estimate_df$Level)
+  stripe_bg <- .interval_level_bg(interval_estimate_df$level)
 
   df_render <- interval_estimate_df |>
     dplyr::mutate(
       psi_0 = round(psi_0, 2),
-      .before = "Interval"
+      .before = "interval"
     ) |>
     dplyr::mutate(
-      Diagram = "",
-      .after = "Interval"
+      diagram = "",
+      .after = "interval"
+    ) |>
+    dplyr::mutate(
+      contains_truth = dplyr::case_when(
+        is.na(contains_truth) ~ NA_character_,
+        contains_truth ~ "✅",
+        TRUE ~ "❌"
+      )
     )
 
   .render_interval_estimate_base(
@@ -116,41 +123,65 @@ render_interval_estimate_table <- function(interval_estimate_df) {
 #'
 #' @keywords internal
 #' @noRd
-render_estimate_table <- function(estimate_df) {
+render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
   # --------------------------------------------------
   # Validate required columns
   # --------------------------------------------------
-  required <- c(
+  required_point_estimate_cols <- c(
     "se_psi_hat",
     "error",
     "psi_hat",
-    "psi_0",
-    "Interval",
-    "Length",
-    "Lower Deviation",
-    "Upper Deviation",
-    "Status",
-    "Level"
+    "psi_0"
   )
-  stopifnot(all(required %in% names(estimate_df)))
+
+  required_interval_estimate_cols <- c(
+    "psi_0",
+    "interval",
+    "length",
+    "lower_dev",
+    "upper_dev",
+    "contains_truth",
+    "level"
+  )
+
+  stopifnot(all(required_point_estimate_cols %in% names(point_estimate_df)))
+  stopifnot(all(
+    required_interval_estimate_cols %in% names(interval_estimate_df)
+  ))
 
   # --------------------------------------------------
   # Extract rendering metadata
   # --------------------------------------------------
-  type <- attr(estimate_df, "type", exact = TRUE)
+  type <- attr(point_estimate_df, "type", exact = TRUE)
   if (length(type) == 0) {
     type <- NULL
   }
 
-  interval_estimate_raw <- attr(estimate_df, "interval_estimate_raw")
+  interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
   stopifnot(!is.null(interval_estimate_raw))
 
-  psi_0 <- unique(estimate_df$psi_0)
+  psi_0 <- unique(point_estimate_df$psi_0)
   stopifnot(length(psi_0) == 1)
 
   # --------------------------------------------------
   # Prepare render data
   # --------------------------------------------------
+
+  estimate_df <- point_estimate_df |>
+    dplyr::bind_cols(interval_estimate_df) |>
+    dplyr::select(
+      se_psi_hat,
+      error,
+      psi_hat,
+      psi_0,
+      interval,
+      length,
+      lower_dev,
+      upper_dev,
+      contains_truth,
+      level
+    )
+
   df_render <- estimate_df |>
     dplyr::mutate(
       dplyr::across(
@@ -159,19 +190,26 @@ render_estimate_table <- function(estimate_df) {
           error,
           psi_hat,
           psi_0,
-          Length,
-          `Lower Deviation`,
-          `Upper Deviation`
+          length,
+          lower_dev,
+          upper_dev
         ),
         ~ round(.x, 2)
       )
     ) |>
     dplyr::mutate(
-      Diagram = "",
-      .after = "Interval"
+      diagram = "",
+      .after = "interval"
+    ) |>
+    dplyr::mutate(
+      contains_truth = dplyr::case_when(
+        is.na(contains_truth) ~ NA_character_,
+        contains_truth ~ "✅",
+        TRUE ~ "❌"
+      )
     )
 
-  bg_interval <- .interval_level_bg(df_render$Level)
+  bg_interval <- .interval_level_bg(df_render$level)
   bg_pe <- table_pe_row_bg(type)
 
   body_spec_fun <- function(tbl) {

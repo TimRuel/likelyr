@@ -33,41 +33,12 @@
 #'
 #' @keywords internal
 synthesize_comparison <- function(res_list) {
-  # ------------------------------------------------------------------
-  # Compute-only layer (HPC-safe)
-  # ------------------------------------------------------------------
   point_estimates_df <- get_point_estimates_df(res_list)
 
   interval_estimates_df <- get_interval_estimates_df(res_list)
 
-  n_levels <- interval_estimates_df |>
-    dplyr::select(Level) |>
-    dplyr::n_distinct()
-
-  estimates_df <- point_estimates_df |>
-    tidyr::uncount(n_levels) |>
-    dplyr::bind_cols(interval_estimates_df) |>
-    dplyr::select(
-      pseudolikelihood,
-      se_psi_hat,
-      error,
-      psi_hat,
-      psi_0,
-      Interval,
-      Pseudolikelihood,
-      Length,
-      `Lower Deviation`,
-      `Upper Deviation`,
-      Status,
-      Level
-    )
-
-  # ------------------------------------------------------------------
-  # Return data only (no tables, no plots)
-  # ------------------------------------------------------------------
   list(
     point_estimates_df = point_estimates_df,
-    interval_estimates_df = interval_estimates_df,
-    estimates_df = estimates_df
+    interval_estimates_df = interval_estimates_df
   )
 }

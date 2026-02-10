@@ -173,19 +173,19 @@ add_interval_diagnostics <- function(
 ) {
   interval_estimate_df <- interval_estimate_df |>
     dplyr::mutate(
-      Length = dplyr::if_else(
+      length = dplyr::if_else(
         is.na(lower) | is.na(upper),
         NA_real_,
         upper - lower
       ),
 
-      `Lower Deviation` = dplyr::if_else(
+      lower_dev = dplyr::if_else(
         is.na(lower),
         NA_real_,
         point_estimate - lower
       ),
 
-      `Upper Deviation` = dplyr::if_else(
+      upper_dev = dplyr::if_else(
         is.na(upper),
         NA_real_,
         upper - point_estimate
@@ -194,12 +194,6 @@ add_interval_diagnostics <- function(
       contains_truth = dplyr::case_when(
         is.na(psi_0) ~ NA,
         TRUE ~ (!is.na(lower) & !is.na(upper) & lower <= psi_0 & upper >= psi_0)
-      ),
-
-      Status = dplyr::case_when(
-        is.na(contains_truth) ~ NA_character_,
-        contains_truth ~ "✅",
-        TRUE ~ "❌"
       )
     )
 
@@ -234,21 +228,21 @@ add_interval_diagnostics <- function(
 format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
   formatted_df <- interval_estimate_df |>
     dplyr::mutate(
-      Level = scales::percent(1 - alpha),
+      level = scales::percent(1 - alpha),
 
-      Interval = dplyr::if_else(
+      interval = dplyr::if_else(
         is.na(lower) | is.na(upper),
         NA_character_,
         sprintf("[%.2f, %.2f]", lower, upper)
       )
     ) |>
     dplyr::select(
-      Interval,
-      Length,
-      `Lower Deviation`,
-      `Upper Deviation`,
-      Status,
-      Level,
+      interval,
+      length,
+      lower_dev,
+      upper_dev,
+      contains_truth,
+      level,
     ) |>
     dplyr::mutate(
       dplyr::across(

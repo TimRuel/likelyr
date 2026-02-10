@@ -93,37 +93,12 @@ synthesize_inference <- function(
   attr(interval_estimate_df, "type") <- type
 
   # --------------------------------------------------
-  # Synthesis table (numeric only)
-  # --------------------------------------------------
-  estimate_df <- point_estimate_df |>
-    dplyr::bind_cols(interval_estimate_df) |>
-    dplyr::select(
-      se_psi_hat,
-      error,
-      psi_hat,
-      psi_0,
-      Interval,
-      Length,
-      `Lower Deviation`,
-      `Upper Deviation`,
-      Status,
-      Level
-    )
-
-  attr(estimate_df, "type") <- type
-  attr(estimate_df, "interval_estimate_raw") <- attr(
-    interval_estimate_df,
-    "interval_estimate_raw"
-  )
-
-  # --------------------------------------------------
   # Return data only (no tables, no plots)
   # --------------------------------------------------
   list(
     psi_ll_df = psi_ll_df,
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     point_estimate_df = point_estimate_df,
-    interval_estimate_df = interval_estimate_df,
-    estimate_df = estimate_df
+    interval_estimate_df = interval_estimate_df
   )
 }

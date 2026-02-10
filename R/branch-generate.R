@@ -122,7 +122,7 @@ generate_branches <- function(cal, verbose = TRUE) {
   nuisance <- cal$nuisance
   optimizer <- cal$optimizer
   execution <- cal$execution
-  data <- data
+  data <- cal$data
 
   integrate_result <- cal$workspace$integrate
   if (

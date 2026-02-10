@@ -98,8 +98,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   branch_result <- generate_branches(
     cal = cal,
-    verbose = verbose,
-    ...
+    verbose = verbose
   )
 
   # ------------------------------------------------------------------
@@ -109,7 +108,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   integrate_result <- tryCatch(
     {
       branches <- branch_result$branches
-      branch_agg_args <- cal$optimizer$agg_args
+      branch_agg_args <- cal$optimizer$branch_agg_args
 
       branch_agg <- aggregate_branches(
         branches,

@@ -12,6 +12,7 @@ optimizer_spec(
   branch_mode_locator_method = c("hybrid", "grid_scan", "brent", "multiplier_root"),
   stop_at_bounds = TRUE,
   eval_at_bounds = TRUE,
+  branch_agg_args = NULL,
   name = NULL,
   ...
 )
@@ -28,21 +29,18 @@ Default is \code{"SLSQP"}.}
 when constrained optimization fails to converge.}
 
 \item{branch_mode_locator_method}{Character scalar specifying how the \strong{branch mode}
-(the maximizer of the ω̂-conditioned log-likelihood) is located.
-
-Must be one of:
-\itemize{
-\item \code{"hybrid"} — grid bracketing followed by local refinement (default)
-\item \code{"grid_scan"} — pure grid-based search over ψ
-\item \code{"brent"} — direct 1D Brent maximization in ψ
-\item \code{"multiplier_root"} — root-finding via constraint multipliers
-}}
+(the maximizer of the ω̂-conditioned log-likelihood) is located.}
 
 \item{stop_at_bounds}{Logical scalar. If TRUE (default), branch sweeps stop when a ψ bound
 is reached.}
 
 \item{eval_at_bounds}{Logical scalar. If TRUE (default), the branch is evaluated once at the
 ψ bound before stopping. Requires \code{stop_at_bounds = TRUE}.}
+
+\item{branch_agg_args}{Optional named list of arguments passed to
+\code{aggregate_branches()} during inference for integrated
+likelihood results. Controls branch filtering and ψ-wise aggregation
+without requiring recomputation of branches.}
 
 \item{name}{Optional descriptive name for the optimizer specification.}
 
@@ -52,7 +50,7 @@ is reached.}
 An object of class \code{c("optimizer_spec", "likelyr")}.
 }
 \description{
-Defines optimization behavior used throughout the likelihood workflow,
+Defines numerical behavior used throughout the likelihood workflow,
 including:
 
 \itemize{
@@ -60,9 +58,13 @@ including:
 \item restart and continuation behavior for constrained solves;
 \item tolerance and stability controls for branch construction;
 \item method selection for locating continuous branch modes;
-\item stopping and evaluation behavior at ψ bounds during branch sweeps.
+\item stopping and evaluation behavior at ψ bounds during branch sweeps;
+\item aggregation and filtering policy for integrated likelihood
+curves during inference.
 }
 
 A single \code{optimizer_spec} is shared by both \strong{profile} and
-\strong{integrated} likelihood routines to ensure consistent numerical behavior.
+\strong{integrated} likelihood routines, and also governs numerical
+aggregation behavior used when calling \code{infer()} on integrated
+likelihood results.
 }

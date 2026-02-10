@@ -31,5 +31,12 @@ However, \code{model_spec()} is intentionally permissive at construction:
 you may initialize with \code{NULL} components and add them incrementally
 via \code{\link[=add]{add()}}.
 
-Once calibrated, \strong{no specification component may be modified}.
+After calibration:
+\itemize{
+\item Structural specifications (parameter, likelihood, estimand,
+nuisance) are frozen.
+\item Numerical and procedural specifications (optimizer, execution)
+may be updated to support alternative inference or execution
+behavior without recalibration.
+}
 }

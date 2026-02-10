@@ -10,47 +10,72 @@ generate_profile(
   loglik_at_mle,
   increment,
   cutoff,
-  eval_psi_fun,
+  branch_fn,
   max_retries,
-  drop_mult
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE,
+  psi_lower = NULL,
+  psi_upper = NULL
 )
 }
 \arguments{
-\item{psi_mle}{Numeric scalar. The ψ-value at θ̂.}
+\item{psi_mle}{Numeric scalar giving the MLE of ψ (ψ̂).}
 
-\item{param_mle}{Numeric vector. MLE θ̂.}
+\item{param_mle}{Numeric vector giving the constrained optimizer solution θ̂ at ψ̂.}
 
-\item{loglik_at_mle}{Numeric scalar. log-likelihood at θ̂.}
+\item{loglik_at_mle}{Numeric scalar giving the profile log-likelihood value at ψ̂.}
 
-\item{increment}{Numeric scalar. ψ-grid spacing.}
+\item{increment}{Numeric scalar giving the ψ-grid spacing (Δψ).}
 
-\item{cutoff}{Numeric scalar. loglik cutoff (loglik_at_mle − χ²/2).}
+\item{cutoff}{Numeric scalar giving the stopping threshold for the profile
+log-likelihood.}
 
-\item{eval_psi_fun}{Function ψ → loglik(ψ) constructed by
-\code{build_eval_psi_fun(cal)(param_mle)}.}
+\item{branch_fn}{Function with signature
+\code{function(psi, param_init)} returning a list with elements:
+\itemize{
+\item \code{param_hat} — constrained optimizer solution θ̂,
+\item \code{branch_val} — profile log-likelihood at ψ.
+}}
 
-\item{max_retries}{Integer. Max retries for monotonicity enforcement
-inside \code{walk_profile_side()}.}
+\item{max_retries}{Non-negative integer giving the maximum number of jitter retries
+allowed when enforcing monotonicity.}
+
+\item{stop_at_bounds}{Logical scalar. If TRUE, the sweep stops when a ψ bound is reached.}
+
+\item{eval_at_bounds}{Logical scalar. If TRUE, the profile log-likelihood is evaluated
+once at the ψ bound before stopping. Requires
+\code{stop_at_bounds = TRUE}.}
+
+\item{psi_lower}{Optional numeric scalar giving the lower ψ bound.}
+
+\item{psi_upper}{Optional numeric scalar giving the upper ψ bound.}
 }
 \value{
-A tibble with:
+A tibble with columns:
 \itemize{
-\item k               – integer grid index
-\item psi             – ψ-values
-\item loglik           – log-likelihood at ψ
-\item loglik_centered  – loglik − max(loglik)
+\item \code{k} — integer ψ-grid index,
+\item \code{psi} — ψ-grid value,
+\item \code{loglik} — profile log-likelihood at ψ,
+\item \code{loglik_centered} — centered log-likelihood
 }
 
-The tibble is sorted in increasing order of ψ.
+with attributes:
+\itemize{
+\item \code{n_points} — number of grid points,
+\item \code{psi_MLE} — ψ̂,
+\item \code{type} — \code{"profile"}
+}
 }
 \description{
-Internal helper used by \code{\link[=profile]{profile()}} to construct the \emph{profile
-log-likelihood branch} by sweeping left and right from ψ̂ using a fixed
-increment. Nuisance parameters remain fixed at θ̂ throughout.
+Internal helper used by \code{\link[=profile]{profile()}} to construct the \strong{profile
+log-likelihood curve} by sweeping left and right from the MLE ψ̂
+along a fixed ψ-grid.
 
-The function performs:
-• Left sweep:  ψ = ψ̂ - k·increment
-• Right sweep: ψ = ψ̂ + k·increment
-• Termination when loglik < cutoff
+At each ψ-grid location, the nuisance parameters are optimized
+subject to the constraint \eqn{ψ(θ) = ψ_k}, using continuation
+(warm starts) to stabilize the path.
+
+The sweep terminates when the profile log-likelihood drops below
+the supplied cutoff or when ψ-bounds are reached.
 }
 \keyword{internal}

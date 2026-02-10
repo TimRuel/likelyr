@@ -2,64 +2,80 @@
 % Please edit documentation in R/profile-walk.R
 \name{walk_profile_side}
 \alias{walk_profile_side}
-\title{One-Sided Profile Log-Likelihood Sweep}
+\title{One-Sided Profile Log-Likelihood Sweep Along the ψ-Grid}
 \usage{
 walk_profile_side(
-  psi_mle,
-  increment,
-  k_direction,
+  grid,
+  k_start,
   cutoff,
   init_guess,
-  eval_psi_fun,
+  branch_fn,
   max_retries,
-  drop_mult
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE
 )
 }
 \arguments{
-\item{psi_mle}{Numeric scalar giving the MLE of ψ (ψ̂).}
+\item{grid}{Grid specification list containing at least:
+\itemize{
+\item \code{psi_mle} — numeric scalar ψ̂,
+\item \code{increment} — grid spacing Δψ,
+\item \code{psi_lower} — optional lower ψ bound,
+\item \code{psi_upper} — optional upper ψ bound.
+}}
 
-\item{increment}{Numeric scalar giving the ψ-grid spacing (Δψ).}
+\item{k_start}{Integer grid index at which to start the sweep (typically
+\code{+1} or \code{-1}).}
 
-\item{k_direction}{Integer scalar equal to \code{+1} (right sweep) or \code{-1}
-(left sweep).}
+\item{cutoff}{Numeric scalar giving the stopping threshold for the profile
+log-likelihood. The sweep terminates once the log-likelihood
+falls below this value.}
 
-\item{cutoff}{Numeric scalar giving the stopping threshold for the
-log-likelihood value.}
+\item{init_guess}{Numeric vector giving the initial constrained optimizer solution
+at ψ̂, used as the warm start for continuation.}
 
-\item{init_guess}{Numeric vector giving the initial θ̂ at ψ̂, used as the warm-start.}
-
-\item{eval_psi_fun}{Function with signature
-\code{function(psi, param_init)} returning a list with elements
-\code{param_hat} (optimizer solution) and
-\code{branch_val} (profile log-likelihood at ψ).}
+\item{branch_fn}{Function with signature
+\code{function(psi, param_init)} returning a list with elements:
+\itemize{
+\item \code{param_hat} — constrained optimizer solution θ̂,
+\item \code{branch_val} — profile log-likelihood at ψ.
+}}
 
 \item{max_retries}{Non-negative integer giving the maximum number of jitter retries
-allowed when monotonicity or drop-consistency is violated.}
+allowed when monotonicity is violated.}
 
-\item{drop_mult}{Numeric scalar greater than 1 controlling how large a log-likelihood
-drop is allowed relative to the previous drop. Larger values make
-the continuation more permissive; smaller values enforce stricter
-smoothness of the profile curve.}
+\item{stop_at_bounds}{Logical scalar. If TRUE (default), the sweep stops when a ψ bound
+is reached.}
+
+\item{eval_at_bounds}{Logical scalar. If TRUE (default), the profile log-likelihood is
+evaluated once at the ψ bound before stopping. Requires
+\code{stop_at_bounds = TRUE}.}
 }
 \value{
-A tibble with columns \code{k} and \code{loglik}, sorted by \code{k},
-representing the one-sided profile log-likelihood path.
+A tibble with columns:
+\itemize{
+\item \code{k} — integer ψ-grid index,
+\item \code{loglik} — profile log-likelihood at ψ_k.
+}
+
+Rows are sorted by \code{k}. Duplicate grid indices (if any) are
+removed.
 }
 \description{
-Performs a one-sided sweep of the profile log-likelihood by moving
-outward from ψ̂ along increments of size \code{increment}. At each ψ_k,
-the solver is warm-started from the previous θ̂, enforcing a
-continuation method along the constrained manifold
-\eqn{ψ(θ) = ψ_k}.
+Performs a one-sided continuation sweep of the \strong{profile
+log-likelihood} by moving outward from the MLE ψ̂ along a fixed
+ψ-grid. At each grid location ψ_k, the constrained optimization
+problem is solved using the previous solution as a warm start,
+enforcing continuity along the manifold \eqn{ψ(θ) = ψ_k}.
 
-Monotonicity of the profile curve is enforced via limited jittering.
-In addition, large downward jumps are guarded against using an
-\emph{adaptive drop-consistency rule}: each new log-likelihood decrease
-must be commensurate with the previous decrease. If a proposed step
-exhibits an unusually large drop relative to recent history, the
-evaluation is rejected and retried with jittered initial conditions.
+Monotonicity of the profile log-likelihood is enforced via limited
+jittering of the initial conditions. If a proposed step increases
+the log-likelihood relative to the previous value, the evaluation
+is retried up to \code{max_retries} times using increasingly large
+perturbations.
 
-This adaptive rule stabilizes the continuation path while preserving
-the fixed ψ-grid structure required for downstream inference.
+ψ-bound geometry is handled explicitly via \code{stop_at_bounds}
+and \code{eval_at_bounds}, mirroring the behavior of
+\code{walk_branch_side()}.
 }
 \keyword{internal}

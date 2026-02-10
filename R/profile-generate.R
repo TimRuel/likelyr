@@ -88,6 +88,12 @@ generate_profile <- function(
   psi_lower = NULL,
   psi_upper = NULL
 ) {
+  grid <- psi_grid_anchor(
+    psi_mle = psi_mle,
+    increment = increment,
+    psi_lower = psi_lower,
+    psi_upper = psi_upper
+  )
   # ------------------------------------------------------------
   # Left sweep
   # ------------------------------------------------------------

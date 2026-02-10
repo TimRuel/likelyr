@@ -115,6 +115,8 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   increment <- estimand$increment %||% 0.05
   max_retries <- optimizer$max_retries %||% 4
+  psi_lower <- estimand$psi_lower
+  psi_upper <- estimand$psi_upper
   stop_at_bounds <- optimizer$stop_at_bounds %||% TRUE
   eval_at_bounds <- optimizer$eval_at_bounds %||% TRUE
 
@@ -128,7 +130,9 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
       branch_fn = branch_fn,
       max_retries = max_retries,
       stop_at_bounds = stop_at_bounds,
-      eval_at_bounds = eval_at_bounds
+      eval_at_bounds = eval_at_bounds,
+      psi_lower = psi_lower,
+      psi_upper = psi_upper
     ),
     error = function(e) {
       if (verbose) {

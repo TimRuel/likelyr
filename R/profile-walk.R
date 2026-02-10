@@ -2,119 +2,162 @@
 # One-Sided Profile Log-Likelihood Sweep (Internal)
 # ======================================================================
 
-#' One-Sided Profile Log-Likelihood Sweep
+#' One-Sided Profile Log-Likelihood Sweep Along the ψ-Grid
 #'
 #' @description
-#' Performs a one-sided sweep of the profile log-likelihood by moving
-#' outward from ψ̂ along increments of size \code{increment}. At each ψ_k,
-#' the solver is warm-started from the previous θ̂, enforcing a
-#' continuation method along the constrained manifold
-#' \eqn{ψ(θ) = ψ_k}.
+#' Performs a one-sided continuation sweep of the **profile
+#' log-likelihood** by moving outward from the MLE ψ̂ along a fixed
+#' ψ-grid. At each grid location ψ_k, the constrained optimization
+#' problem is solved using the previous solution as a warm start,
+#' enforcing continuity along the manifold \eqn{ψ(θ) = ψ_k}.
 #'
-#' Monotonicity of the profile curve is enforced via limited jittering.
-#' In addition, large downward jumps are guarded against using an
-#' *adaptive drop-consistency rule*: each new log-likelihood decrease
-#' must be commensurate with the previous decrease. If a proposed step
-#' exhibits an unusually large drop relative to recent history, the
-#' evaluation is rejected and retried with jittered initial conditions.
+#' Monotonicity of the profile log-likelihood is enforced via limited
+#' jittering of the initial conditions. If a proposed step increases
+#' the log-likelihood relative to the previous value, the evaluation
+#' is retried up to \code{max_retries} times using increasingly large
+#' perturbations.
 #'
-#' This adaptive rule stabilizes the continuation path while preserving
-#' the fixed ψ-grid structure required for downstream inference.
+#' ψ-bound geometry is handled explicitly via \code{stop_at_bounds}
+#' and \code{eval_at_bounds}, mirroring the behavior of
+#' \code{walk_branch_side()}.
 #'
-#' @param psi_mle
-#'   Numeric scalar giving the MLE of ψ (ψ̂).
+#' @param grid
+#'   Grid specification list containing at least:
+#'   \itemize{
+#'     \item \code{psi_mle} — numeric scalar ψ̂,
+#'     \item \code{increment} — grid spacing Δψ,
+#'     \item \code{psi_lower} — optional lower ψ bound,
+#'     \item \code{psi_upper} — optional upper ψ bound.
+#'   }
 #'
-#' @param increment
-#'   Numeric scalar giving the ψ-grid spacing (Δψ).
-#'
-#' @param k_direction
-#'   Integer scalar equal to \code{+1} (right sweep) or \code{-1}
-#'   (left sweep).
+#' @param k_start
+#'   Integer grid index at which to start the sweep (typically
+#'   \code{+1} or \code{-1}).
 #'
 #' @param cutoff
-#'   Numeric scalar giving the stopping threshold for the
-#'   log-likelihood value.
+#'   Numeric scalar giving the stopping threshold for the profile
+#'   log-likelihood. The sweep terminates once the log-likelihood
+#'   falls below this value.
 #'
 #' @param init_guess
-#'   Numeric vector giving the initial θ̂ at ψ̂, used as the warm-start.
+#'   Numeric vector giving the initial constrained optimizer solution
+#'   at ψ̂, used as the warm start for continuation.
 #'
-#' @param eval_psi_fun
+#' @param branch_fn
 #'   Function with signature
-#'   \code{function(psi, param_init)} returning a list with elements
-#'   \code{param_hat} (optimizer solution) and
-#'   \code{branch_val} (profile log-likelihood at ψ).
+#'   \code{function(psi, param_init)} returning a list with elements:
+#'   \itemize{
+#'     \item \code{param_hat} — constrained optimizer solution θ̂,
+#'     \item \code{branch_val} — profile log-likelihood at ψ.
+#'   }
 #'
 #' @param max_retries
 #'   Non-negative integer giving the maximum number of jitter retries
-#'   allowed when monotonicity or drop-consistency is violated.
+#'   allowed when monotonicity is violated.
 #'
-#' @param drop_mult
-#'   Numeric scalar greater than 1 controlling how large a log-likelihood
-#'   drop is allowed relative to the previous drop. Larger values make
-#'   the continuation more permissive; smaller values enforce stricter
-#'   smoothness of the profile curve.
+#' @param stop_at_bounds
+#'   Logical scalar. If TRUE (default), the sweep stops when a ψ bound
+#'   is reached.
+#'
+#' @param eval_at_bounds
+#'   Logical scalar. If TRUE (default), the profile log-likelihood is
+#'   evaluated once at the ψ bound before stopping. Requires
+#'   \code{stop_at_bounds = TRUE}.
 #'
 #' @return
-#' A tibble with columns \code{k} and \code{loglik}, sorted by \code{k},
-#' representing the one-sided profile log-likelihood path.
+#' A tibble with columns:
+#' \itemize{
+#'   \item \code{k} — integer ψ-grid index,
+#'   \item \code{loglik} — profile log-likelihood at ψ_k.
+#' }
+#'
+#' Rows are sorted by \code{k}. Duplicate grid indices (if any) are
+#' removed.
 #'
 #' @keywords internal
 walk_profile_side <- function(
-  psi_mle,
-  increment,
-  k_direction,
+  grid,
+  k_start,
   cutoff,
   init_guess,
-  eval_psi_fun,
+  branch_fn,
   max_retries,
-  drop_mult
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE
 ) {
-  k_curr <- k_direction
+  k_direction <- sign(k_start)
+  k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
 
-  prev_drop <- NULL
+  psi_lower <- grid$psi_lower
+  psi_upper <- grid$psi_upper
 
   df <- tibble::tibble(k = integer(), loglik = numeric())
 
   repeat {
-    psi_k <- psi_mle + k_curr * increment
-
     retry <- 0L
-    eval <- NULL
 
-    while (retry <= max_retries) {
-      eval <- eval_psi_fun(psi_k, current_par)
+    # --------------------------------------------------------------
+    # Convert k → ψ
+    # --------------------------------------------------------------
+    psi_k <- grid$psi_mle + k_curr * grid$increment
 
-      # ----------------------------------
-      # Adaptive drop consistency check
-      # ----------------------------------
-      delta <- eval$branch_val - current_val
-      drop <- -delta # positive = downward
+    # --------------------------------------------------------------
+    # Geometry: ψ bounds
+    # --------------------------------------------------------------
+    hit_lower <- !is.null(psi_lower) && psi_k < psi_lower
+    hit_upper <- !is.null(psi_upper) && psi_k > psi_upper
 
-      ok_monotone <- delta <= 1e-6
-
-      ok_drop <- TRUE
-      if (!is.null(prev_drop)) {
-        ok_drop <- drop <= drop_mult * prev_drop
+    if (hit_lower || hit_upper) {
+      if (!stop_at_bounds) {
+        # ignore geometry
+      } else {
+        if (eval_at_bounds) {
+          psi_k <- if (hit_lower) psi_lower else psi_upper
+        } else {
+          break
+        }
       }
+    }
 
-      if ((ok_monotone && ok_drop) || retry == max_retries) {
+    # --------------------------------------------------------------
+    # Evaluate with monotonicity enforcement
+    # --------------------------------------------------------------
+    repeat {
+      eval <- branch_fn(psi_k, current_par)
+
+      if (eval$branch_val <= current_val || retry >= max_retries) {
         break
       }
 
       retry <- retry + 1L
-      jitter <- stats::rnorm(length(current_par), sd = 0.1 * retry)
-      current_par <- current_par + jitter
+      scale <- 0.1 * retry
+
+      current_par <- current_par +
+        stats::rnorm(
+          n = length(current_par),
+          sd = scale
+        )
     }
 
-    if (is.null(eval)) {
-      stop("walk_profile_side(): eval_psi_fun yielded NULL.", call. = FALSE)
+    # Final fallback if monotonicity still violated
+    if (eval$branch_val > current_val && max_retries > 0L) {
+      warning(
+        sprintf(
+          "Profile monotonicity violation at k=%d after %d retries; using fallback.",
+          k_curr,
+          retry
+        ),
+        call. = FALSE
+      )
+      eval <- branch_fn(psi_k, current_par)
     }
 
+    # --------------------------------------------------------------
+    # Update
+    # --------------------------------------------------------------
     current_val <- eval$branch_val
-
-    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
 
     if (!is.finite(current_val)) {
       stop(
@@ -127,22 +170,29 @@ walk_profile_side <- function(
       )
     }
 
-    if (current_val < cutoff) {
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
+
+    # --------------------------------------------------------------
+    # Likelihood cutoff
+    # --------------------------------------------------------------
+    if (!is.null(cutoff) && current_val < cutoff) {
       break
     }
 
-    # ----------------------------------
-    # Update reference drop
-    # ----------------------------------
-    if (!is.null(prev_drop)) {
-      prev_drop <- drop
-    } else if (is.finite(current_val)) {
-      prev_drop <- abs(delta)
+    # --------------------------------------------------------------
+    # Stop after evaluating exactly at a bound
+    # --------------------------------------------------------------
+    if (stop_at_bounds && (hit_lower || hit_upper)) {
+      break
     }
 
+    # --------------------------------------------------------------
+    # Prepare next step
+    # --------------------------------------------------------------
     current_par <- eval$param_hat
     k_curr <- k_curr + k_direction
   }
 
-  dplyr::arrange(df, k)
+  dplyr::distinct(df) |>
+    dplyr::arrange(.data$k)
 }

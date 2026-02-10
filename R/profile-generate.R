@@ -5,32 +5,74 @@
 #' Generate a Profile Log-Likelihood Curve
 #'
 #' @description
-#' Internal helper used by [profile()] to construct the *profile
-#' log-likelihood branch* by sweeping left and right from ψ̂ using a fixed
-#' increment. Nuisance parameters remain fixed at θ̂ throughout.
+#' Internal helper used by [profile()] to construct the **profile
+#' log-likelihood curve** by sweeping left and right from the MLE ψ̂
+#' along a fixed ψ-grid.
 #'
-#' The function performs:
-#'   • Left sweep:  ψ = ψ̂ - k·increment
-#'   • Right sweep: ψ = ψ̂ + k·increment
-#'   • Termination when loglik < cutoff
+#' At each ψ-grid location, the nuisance parameters are optimized
+#' subject to the constraint \eqn{ψ(θ) = ψ_k}, using continuation
+#' (warm starts) to stabilize the path.
 #'
-#' @param psi_mle Numeric scalar. The ψ-value at θ̂.
-#' @param param_mle Numeric vector. MLE θ̂.
-#' @param loglik_at_mle Numeric scalar. log-likelihood at θ̂.
-#' @param increment Numeric scalar. ψ-grid spacing.
-#' @param cutoff Numeric scalar. loglik cutoff (loglik_at_mle − χ²/2).
-#' @param eval_psi_fun Function ψ → loglik(ψ) constructed by
-#'   `build_eval_psi_fun(cal)(param_mle)`.
-#' @param max_retries Integer. Max retries for monotonicity enforcement
-#'   inside `walk_profile_side()`.
+#' The sweep terminates when the profile log-likelihood drops below
+#' the supplied cutoff or when ψ-bounds are reached.
 #'
-#' @return A tibble with:
-#'   * k               – integer grid index
-#'   * psi             – ψ-values
-#'   * loglik           – log-likelihood at ψ
-#'   * loglik_centered  – loglik − max(loglik)
+#' @param psi_mle
+#'   Numeric scalar giving the MLE of ψ (ψ̂).
 #'
-#' The tibble is sorted in increasing order of ψ.
+#' @param param_mle
+#'   Numeric vector giving the constrained optimizer solution θ̂ at ψ̂.
+#'
+#' @param loglik_at_mle
+#'   Numeric scalar giving the profile log-likelihood value at ψ̂.
+#'
+#' @param increment
+#'   Numeric scalar giving the ψ-grid spacing (Δψ).
+#'
+#' @param cutoff
+#'   Numeric scalar giving the stopping threshold for the profile
+#'   log-likelihood.
+#'
+#' @param branch_fn
+#'   Function with signature
+#'   \code{function(psi, param_init)} returning a list with elements:
+#'   \itemize{
+#'     \item \code{param_hat} — constrained optimizer solution θ̂,
+#'     \item \code{branch_val} — profile log-likelihood at ψ.
+#'   }
+#'
+#' @param max_retries
+#'   Non-negative integer giving the maximum number of jitter retries
+#'   allowed when enforcing monotonicity.
+#'
+#' @param stop_at_bounds
+#'   Logical scalar. If TRUE, the sweep stops when a ψ bound is reached.
+#'
+#' @param eval_at_bounds
+#'   Logical scalar. If TRUE, the profile log-likelihood is evaluated
+#'   once at the ψ bound before stopping. Requires
+#'   \code{stop_at_bounds = TRUE}.
+#'
+#' @param psi_lower
+#'   Optional numeric scalar giving the lower ψ bound.
+#'
+#' @param psi_upper
+#'   Optional numeric scalar giving the upper ψ bound.
+#'
+#' @return
+#' A tibble with columns:
+#' \itemize{
+#'   \item \code{k} — integer ψ-grid index,
+#'   \item \code{psi} — ψ-grid value,
+#'   \item \code{loglik} — profile log-likelihood at ψ,
+#'   \item \code{loglik_centered} — centered log-likelihood
+#' }
+#'
+#' with attributes:
+#' \itemize{
+#'   \item \code{n_points} — number of grid points,
+#'   \item \code{psi_MLE} — ψ̂,
+#'   \item \code{type} — \code{"profile"}
+#' }
 #'
 #' @keywords internal
 generate_profile <- function(
@@ -39,40 +81,43 @@ generate_profile <- function(
   loglik_at_mle,
   increment,
   cutoff,
-  eval_psi_fun,
+  branch_fn,
   max_retries,
-  drop_mult
+  stop_at_bounds = TRUE,
+  eval_at_bounds = TRUE,
+  psi_lower = NULL,
+  psi_upper = NULL
 ) {
   # ------------------------------------------------------------
-  # 1. Left sweep
+  # Left sweep
   # ------------------------------------------------------------
   left <- walk_profile_side(
-    psi_mle = psi_mle,
-    increment = increment,
-    k_direction = -1L,
+    grid = grid,
+    k_start = -1L,
     cutoff = cutoff,
     init_guess = param_mle,
-    eval_psi_fun = eval_psi_fun,
+    branch_fn = branch_fn,
     max_retries = max_retries,
-    drop_mult = drop_mult
+    stop_at_bounds = stop_at_bounds,
+    eval_at_bounds = eval_at_bounds
   )
 
   # ------------------------------------------------------------
-  # 2. Right sweep
+  # Right sweep
   # ------------------------------------------------------------
   right <- walk_profile_side(
-    psi_mle = psi_mle,
-    increment = increment,
-    k_direction = +1L,
+    grid = grid,
+    k_start = +1L,
     cutoff = cutoff,
     init_guess = param_mle,
-    eval_psi_fun = eval_psi_fun,
+    branch_fn = branch_fn,
     max_retries = max_retries,
-    drop_mult = drop_mult
+    stop_at_bounds = stop_at_bounds,
+    eval_at_bounds = eval_at_bounds
   )
 
   # ------------------------------------------------------------
-  # 3. Combine all points including center
+  # Combine center + sweeps
   # ------------------------------------------------------------
   psi_ll_df <- dplyr::bind_rows(
     left,
@@ -80,14 +125,19 @@ generate_profile <- function(
     right
   ) |>
     dplyr::mutate(
-      psi = psi_mle + k * increment,
-      loglik_centered = loglik - max(loglik, na.rm = TRUE)
+      psi = psi_mle + k * increment
     ) |>
-    dplyr::arrange(psi)
+    dplyr::arrange(.data$psi) |>
+    dplyr::mutate(
+      loglik_centered = .data$loglik - max(.data$loglik, na.rm = TRUE)
+    )
 
+  # ------------------------------------------------------------
   # Metadata
+  # ------------------------------------------------------------
   attr(psi_ll_df, "n_points") <- nrow(psi_ll_df)
-  attr(psi_ll_df, "type") <- "Profile"
+  attr(psi_ll_df, "psi_MLE") <- psi_mle
+  attr(psi_ll_df, "type") <- "profile"
 
-  return(psi_ll_df)
+  psi_ll_df
 }

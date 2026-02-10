@@ -66,11 +66,18 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 1. Extract calibrated quantities
   # ------------------------------------------------------------------
+  parameter <- cal$parameter
+  likelihood <- cal$likelihood
   estimand <- cal$estimand
+  nuisance <- cal$nuisance
+  optimizer <- cal$optimizer
+  execution <- cal$execution
+  data <- cal$data
+
   psi_mle <- estimand$psi_mle
   psi_fn <- estimand$psi_fn
-  param_mle <- cal$parameter$param_mle
-  loglik_fn <- cal$likelihood$loglik
+  param_mle <- parameter$param_mle
+  loglik_fn <- likelihood$loglik
 
   # ------------------------------------------------------------------
   # 2. Execution summary
@@ -93,14 +100,23 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   cutoff <- loglik_at_mle - effective_crit
 
   # Build ψ → loglik evaluator at θ̂
-  eval_psi_fun <- build_eval_psi_fun(cal)(param_mle)
+  branch_fn_factory <- build_branch_fn_factory(
+    parameter = parameter,
+    likelihood = likelihood,
+    estimand = estimand,
+    nuisance = nuisance,
+    optimizer = optimizer,
+    data = data
+  )
+  branch_fn <- branch_fn_factory(param_mle)
 
   # ------------------------------------------------------------------
   # 4. Construct branch grid and walk it
   # ------------------------------------------------------------------
   increment <- estimand$increment %||% 0.05
-  max_retries <- cal$optimizer$max_retries %||% 4
-  drop_mult <- cal$optimizer$drop_mult %||% 5
+  max_retries <- optimizer$max_retries %||% 4
+  stop_at_bounds <- optimizer$stop_at_bounds %||% TRUE
+  eval_at_bounds <- optimizer$eval_at_bounds %||% TRUE
 
   psi_ll_df <- tryCatch(
     generate_profile(
@@ -109,9 +125,10 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
       loglik_at_mle = loglik_at_mle,
       increment = increment,
       cutoff = cutoff,
-      eval_psi_fun = eval_psi_fun,
+      branch_fn = branch_fn,
       max_retries = max_retries,
-      drop_mult = drop_mult
+      stop_at_bounds = stop_at_bounds,
+      eval_at_bounds = eval_at_bounds
     ),
     error = function(e) {
       if (verbose) {

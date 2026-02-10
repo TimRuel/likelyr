@@ -37,7 +37,7 @@ branch_mode_locator_brent <- function() {
     # ---------------------------------------------------------------
     # Retrieve calibrated components from calling environment
     # ---------------------------------------------------------------
-    eval_psi_fun <- get("eval_psi_fun", inherits = TRUE)
+    branch_fn <- get("branch_fn", inherits = TRUE)
     psi_init <- get("psi_init", inherits = TRUE)
     search_interval <- get("search_interval", inherits = TRUE)
     param_init <- get("param_init", inherits = TRUE)
@@ -52,7 +52,7 @@ branch_mode_locator_brent <- function() {
             safe_eval_branch(
               psi = psi,
               param_init = param_init,
-              eval_psi_fun = eval_psi_fun
+              branch_fn = branch_fn
             )
           },
           interval = search_interval,
@@ -77,7 +77,7 @@ branch_mode_locator_brent <- function() {
     # Final evaluation at ψ̂
     # ---------------------------------------------------------------
     psi_hat <- opt$maximum
-    out <- eval_psi_fun(psi_hat, param_init)
+    out <- branch_fn(psi_hat, param_init)
 
     make_branch_mode_result(
       psi_hat = psi_hat,

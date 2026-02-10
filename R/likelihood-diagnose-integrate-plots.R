@@ -189,7 +189,8 @@ build_integrate_omega_branch_plot <- function(branch_mat, psi_vals) {
       title = "Integrated Log-Likelihood Branches",
       x = "\u03C8",
       y = expression("log L(" * psi * ")")
-    )
+    ) +
+    ggplot2::theme(legend.position = "none")
 }
 
 # ================================================================================

@@ -109,9 +109,18 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   integrate_result <- tryCatch(
     {
       branches <- branch_result$branches
-      omega_draws <- branch_result$omega_draws
+      branch_agg_args <- cal$optimizer$agg_args
 
-      branch_agg <- aggregate_branches(branches)
+      branch_agg <- aggregate_branches(
+        branches,
+        min_points = branch_agg_args$min_points,
+        q_delta = branch_agg_args$q_delta,
+        delta_min = branch_agg_args$delta_min,
+        delta_max = branch_agg_args$delta_max,
+        min_support = branch_agg_args$min_support
+      )
+
+      omega_draws <- branch_result$omega_draws
 
       new_integrate_result(list(
         psi_ll_df = branch_agg$psi_ll_df,

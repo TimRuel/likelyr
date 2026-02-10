@@ -25,20 +25,135 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
   for (name in which) {
     res <- cal$workspace[[name]]
 
-    synthesis <- synthesize_inference(
-      psi_ll_df = res$psi_ll_df,
+    res <- infer_result(
+      res,
+      cal = cal,
       alpha_levels = alpha_levels,
       psi_0 = psi_0,
       expand_factor = expand_factor
     )
 
-    # Attach inference data only
-    res$inference <- new_inference_result(synthesis)
-    res$psi_ll_df <- NULL
     cal$workspace[[name]] <- mark_inferred(res)
   }
 
   cal
+}
+
+# ---------------------------------------------------------------------
+# Result dispatch
+# ---------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+infer_result <- function(res, ...) {
+  if (is.null(res$psi_ll_df)) {
+    stop(
+      "infer(): Result is missing psi_ll_df.",
+      call. = FALSE
+    )
+  }
+
+  type <- attr(res$psi_ll_df, "type")
+
+  if (identical(type, "integrate")) {
+    infer_result.integrated(res, ...)
+  } else if (identical(type, "profile")) {
+    infer_result.profile(res, ...)
+  } else {
+    infer_result.default(res, ...)
+  }
+}
+
+# ---------------------------------------------------------------------
+# Integrated likelihood inference (uses aggregate_branches)
+# ---------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+infer_result.integrated <- function(
+  res,
+  cal,
+  alpha_levels,
+  psi_0,
+  expand_factor,
+  ...
+) {
+  # NOTE:
+  # Integrated likelihood curves are re-aggregated at inference time
+  # using the current optimizer specification.
+  branch_agg_args <- cal$optimizer$branch_agg_args
+
+  if (is.null(branch_agg_args)) {
+    stop(
+      "infer(): Missing aggregation arguments in optimizer_spec().",
+      call. = FALSE
+    )
+  }
+
+  branch_agg <- aggregate_branches(
+    branches = res$branches,
+    min_points = branch_agg_args$min_points,
+    q_delta = branch_agg_args$q_delta,
+    delta_min = branch_agg_args$delta_min,
+    delta_max = branch_agg_args$delta_max,
+    min_support = branch_agg_args$min_support
+  )
+
+  synthesis <- synthesize_inference(
+    psi_ll_df = branch_agg$psi_ll_df,
+    alpha_levels = alpha_levels,
+    psi_0 = psi_0,
+    expand_factor = expand_factor
+  )
+
+  res$inference <- new_inference_result(synthesis)
+
+  res$R_eff <- branch_agg$R_eff
+  res$branch_mat <- branch_agg$branch_mat
+  res$psi_ll_df <- branch_agg$psi_ll_df
+
+  res
+}
+
+# ---------------------------------------------------------------------
+# Profile likelihood inference (no aggregation)
+# ---------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+infer_result.profile <- function(
+  res,
+  cal,
+  alpha_levels,
+  psi_0,
+  expand_factor,
+  ...
+) {
+  synthesis <- synthesize_inference(
+    psi_ll_df = res$psi_ll_df,
+    alpha_levels = alpha_levels,
+    psi_0 = psi_0,
+    expand_factor = expand_factor
+  )
+
+  res$inference <- new_inference_result(synthesis)
+
+  res
+}
+
+# ---------------------------------------------------------------------
+# Default (unsupported result type)
+# ---------------------------------------------------------------------
+
+#' @keywords internal
+#' @noRd
+infer_result.default <- function(res, ...) {
+  stop(
+    "infer(): Unsupported result type '",
+    attr(res$psi_ll_df, "type"),
+    "'.",
+    call. = FALSE
+  )
 }
 
 # ---------------------------------------------------------------------

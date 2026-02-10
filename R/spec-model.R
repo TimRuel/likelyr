@@ -51,7 +51,14 @@
 #' you may initialize with \code{NULL} components and add them incrementally
 #' via [add()].
 #'
-#' Once calibrated, **no specification component may be modified**.
+#' After calibration:
+#' \itemize{
+#'   \item Structural specifications (parameter, likelihood, estimand,
+#'         nuisance) are frozen.
+#'   \item Numerical and procedural specifications (optimizer, execution)
+#'         may be updated to support alternative inference or execution
+#'         behavior without recalibration.
+#' }
 #'
 #' @export
 model_spec <- function(
@@ -95,18 +102,40 @@ add <- function(model, spec, ...) {
 add.model_spec <- function(model, spec, ...) {
   slot <- .identify_model_slot(spec)
 
-  # No specs can change after calibration
-  if (is_calibrated(model) && .slot_is_spec(slot)) {
+  # Structural specs are frozen after calibration
+  if (is_calibrated(model) && .slot_is_structural(slot)) {
     stop(
-      sprintf("Cannot modify slot '%s' after calibration.", slot),
+      sprintf(
+        "Cannot modify structural slot '%s' after calibration.",
+        slot
+      ),
       call. = FALSE
     )
   }
 
-  # Overwrite allowed pre-calibration
   model[[slot]] <- spec
+  .validate_model_specs(model)
 
-  # Validate any provided components (NULL allowed)
+  model
+}
+
+#' @export
+add.calibrated <- function(model, spec, ...) {
+  slot <- .identify_model_slot(spec)
+
+  # Structural specs remain frozen after calibration
+  if (.slot_is_structural(slot)) {
+    stop(
+      sprintf(
+        "Cannot modify structural slot '%s' after calibration.",
+        slot
+      ),
+      call. = FALSE
+    )
+  }
+
+  # Allow updating optimizer / execution specs post-calibration
+  model[[slot]] <- spec
   .validate_model_specs(model)
 
   model
@@ -114,7 +143,10 @@ add.model_spec <- function(model, spec, ...) {
 
 #' @export
 add.default <- function(model, spec, ...) {
-  stop("add() must be applied to a model_spec object.", call. = FALSE)
+  stop(
+    "add() must be applied to a model_spec or calibrated model.",
+    call. = FALSE
+  )
 }
 
 # ======================================================================
@@ -149,62 +181,30 @@ add.default <- function(model, spec, ...) {
 # INTERNAL: Validation (validate only what is supplied)
 # ======================================================================
 
-#' Validate model specification components
-#'
-#' @description
-#' Internal validator that checks whether any components attached to a
-#' model object (if present) inherit from the correct specification classes.
-#'
-#' This function is intentionally permissive: each component is only
-#' validated *if it exists*. Missing components are allowed at construction
-#' time and are enforced prior to calibration by calibration-stage validators.
-#'
-#' @param x A list representing a model specification object.
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
-#'
 #' @keywords internal
 #' @noRd
 .validate_model_specs <- function(x) {
-  if (
-    !is.null(x$parameter) &&
-      !inherits(x$parameter, "parameter_spec")
-  ) {
+  if (!is.null(x$parameter) && !inherits(x$parameter, "parameter_spec")) {
     stop("parameter must be a parameter_spec().", call. = FALSE)
   }
 
-  if (
-    !is.null(x$likelihood) &&
-      !inherits(x$likelihood, "likelihood_spec")
-  ) {
+  if (!is.null(x$likelihood) && !inherits(x$likelihood, "likelihood_spec")) {
     stop("likelihood must be a likelihood_spec().", call. = FALSE)
   }
 
-  if (
-    !is.null(x$estimand) &&
-      !inherits(x$estimand, "estimand_spec")
-  ) {
+  if (!is.null(x$estimand) && !inherits(x$estimand, "estimand_spec")) {
     stop("estimand must be an estimand_spec().", call. = FALSE)
   }
 
-  if (
-    !is.null(x$nuisance) &&
-      !inherits(x$nuisance, "nuisance_spec")
-  ) {
+  if (!is.null(x$nuisance) && !inherits(x$nuisance, "nuisance_spec")) {
     stop("nuisance must be a nuisance_spec().", call. = FALSE)
   }
 
-  if (
-    !is.null(x$optimizer) &&
-      !inherits(x$optimizer, "optimizer_spec")
-  ) {
+  if (!is.null(x$optimizer) && !inherits(x$optimizer, "optimizer_spec")) {
     stop("optimizer must be an optimizer_spec().", call. = FALSE)
   }
 
-  if (
-    !is.null(x$execution) &&
-      !inherits(x$execution, "execution_spec")
-  ) {
+  if (!is.null(x$execution) && !inherits(x$execution, "execution_spec")) {
     stop("execution must be an execution_spec().", call. = FALSE)
   }
 

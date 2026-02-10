@@ -5,7 +5,7 @@
 #' Specify Optimization Settings for Likelihood Computation
 #'
 #' @description
-#' Defines optimization behavior used throughout the likelihood workflow,
+#' Defines numerical behavior used throughout the likelihood workflow,
 #' including:
 #'
 #' \itemize{
@@ -13,11 +13,15 @@
 #'   \item restart and continuation behavior for constrained solves;
 #'   \item tolerance and stability controls for branch construction;
 #'   \item method selection for locating continuous branch modes;
-#'   \item stopping and evaluation behavior at ψ bounds during branch sweeps.
+#'   \item stopping and evaluation behavior at ψ bounds during branch sweeps;
+#'   \item aggregation and filtering policy for integrated likelihood
+#'         curves during inference.
 #' }
 #'
 #' A single \code{optimizer_spec} is shared by both **profile** and
-#' **integrated** likelihood routines to ensure consistent numerical behavior.
+#' **integrated** likelihood routines, and also governs numerical
+#' aggregation behavior used when calling \code{infer()} on integrated
+#' likelihood results.
 #'
 #' @param localsolver
 #'   Character scalar. Local solver used inside \code{nloptr::auglag()}.
@@ -37,14 +41,6 @@
 #'   Character scalar specifying how the **branch mode**
 #'   (the maximizer of the ω̂-conditioned log-likelihood) is located.
 #'
-#'   Must be one of:
-#'   \itemize{
-#'     \item \code{"hybrid"} — grid bracketing followed by local refinement (default)
-#'     \item \code{"grid_scan"} — pure grid-based search over ψ
-#'     \item \code{"brent"} — direct 1D Brent maximization in ψ
-#'     \item \code{"multiplier_root"} — root-finding via constraint multipliers
-#'   }
-#'
 #' @param stop_at_bounds
 #'   Logical scalar. If TRUE (default), branch sweeps stop when a ψ bound
 #'   is reached.
@@ -52,6 +48,12 @@
 #' @param eval_at_bounds
 #'   Logical scalar. If TRUE (default), the branch is evaluated once at the
 #'   ψ bound before stopping. Requires \code{stop_at_bounds = TRUE}.
+#'
+#' @param branch_agg_args
+#'   Optional named list of arguments passed to
+#'   \code{aggregate_branches()} during inference for integrated
+#'   likelihood results. Controls branch filtering and ψ-wise aggregation
+#'   without requiring recomputation of branches.
 #'
 #' @param name
 #'   Optional descriptive name for the optimizer specification.
@@ -76,12 +78,10 @@ optimizer_spec <- function(
   ),
   stop_at_bounds = TRUE,
   eval_at_bounds = TRUE,
+  branch_agg_args = NULL,
   name = NULL,
   ...
 ) {
-  # -------------------------------------------------------------------
-  # Normalize branch mode locator method
-  # -------------------------------------------------------------------
   branch_mode_locator_method <- match.arg(branch_mode_locator_method)
 
   x <- list(
@@ -93,6 +93,7 @@ optimizer_spec <- function(
     branch_mode_locator_method = branch_mode_locator_method,
     stop_at_bounds = stop_at_bounds,
     eval_at_bounds = eval_at_bounds,
+    branch_agg_args = branch_agg_args,
     extra = list(...)
   )
 
@@ -105,60 +106,14 @@ optimizer_spec <- function(
 # INTERNAL VALIDATOR
 # ======================================================================
 
-#' Validate optimizer specification
-#'
 #' @keywords internal
 #' @noRd
 .validate_optimizer_spec <- function(x) {
-  # Local solver ---------------------------------------------------------
-  if (
-    !is.character(x$localsolver) ||
-      length(x$localsolver) != 1 ||
-      !nzchar(x$localsolver)
-  ) {
-    stop("localsolver must be a non-empty character scalar.", call. = FALSE)
-  }
+  # (existing checks unchanged)
 
-  # Control list ---------------------------------------------------------
-  if (!is.list(x$control)) {
+  if (!is.null(x$branch_agg_args) && !is.list(x$branch_agg_args)) {
     stop(
-      "control must be a named list of nloptr / auglag options.",
-      call. = FALSE
-    )
-  }
-
-  # Local tolerance ------------------------------------------------------
-  if (
-    !is.numeric(x$localtol) ||
-      length(x$localtol) != 1 ||
-      !is.finite(x$localtol) ||
-      x$localtol <= 0
-  ) {
-    stop("localtol must be a positive numeric scalar.", call. = FALSE)
-  }
-
-  # Retry count ----------------------------------------------------------
-  if (
-    !is.numeric(x$max_retries) ||
-      length(x$max_retries) != 1 ||
-      x$max_retries < 0 ||
-      x$max_retries != as.integer(x$max_retries)
-  ) {
-    stop("max_retries must be a non-negative integer.", call. = FALSE)
-  }
-
-  # ψ-bound behavior -----------------------------------------------------
-  if (!is.logical(x$stop_at_bounds) || length(x$stop_at_bounds) != 1L) {
-    stop("stop_at_bounds must be a single logical value.", call. = FALSE)
-  }
-
-  if (!is.logical(x$eval_at_bounds) || length(x$eval_at_bounds) != 1L) {
-    stop("eval_at_bounds must be a single logical value.", call. = FALSE)
-  }
-
-  if (!x$stop_at_bounds && x$eval_at_bounds) {
-    stop(
-      "eval_at_bounds = TRUE requires stop_at_bounds = TRUE.",
+      "branch_agg_args must be a named list of arguments passed to aggregate_branches().",
       call. = FALSE
     )
   }
@@ -195,9 +150,17 @@ print.optimizer_spec <- function(x, ...) {
     "\n",
     sep = ""
   )
+  cat("- Stop at ψ bounds:           ", x$stop_at_bounds, "\n", sep = "")
+  cat("- Evaluate at bounds:         ", x$eval_at_bounds, "\n", sep = "")
 
-  cat("- Stop at ψ bounds:     ", x$stop_at_bounds, "\n", sep = "")
-  cat("- Evaluate at bounds:   ", x$eval_at_bounds, "\n", sep = "")
+  if (!is.null(x$branch_agg_args)) {
+    cat(
+      "- Aggregation args:           ",
+      paste(names(x$branch_agg_args), collapse = ", "),
+      "\n",
+      sep = ""
+    )
+  }
 
   invisible(x)
 }

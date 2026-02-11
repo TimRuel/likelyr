@@ -25,10 +25,6 @@
 #'   \item{\code{interval_estimates_df}}{
 #'     Data frame of interval estimates and diagnostics.
 #'   }
-#'   \item{\code{estimates_df}}{
-#'     Unified data frame combining point and interval information,
-#'     suitable for downstream table/plot materialization.
-#'   }
 #' }
 #'
 #' @keywords internal

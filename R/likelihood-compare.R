@@ -115,8 +115,7 @@ print.summary_comparison <- function(x, ...) {
 view.comparison <- function(x, ...) {
   required <- c(
     "point_estimates_df",
-    "interval_estimates_df",
-    "estimates_df"
+    "interval_estimates_df"
   )
 
   missing <- setdiff(required, names(x))

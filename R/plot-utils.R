@@ -236,7 +236,7 @@ loglik_reference_line <- function() {
 #' @noRd
 extract_ci_long <- function(interval_estimate_df) {
   raw <- attr(interval_estimate_df, "interval_estimate_raw")
-  raw$level <- interval_estimate_df$Level
+  raw$level <- interval_estimate_df$level
 
   tidyr::pivot_longer(
     raw,
@@ -270,6 +270,9 @@ compute_y_limits <- function(psi_ll_df) {
 #' @keywords internal
 #' @noRd
 make_ci_vline_layer <- function(ci_long) {
+  ci_long <- ci_long |>
+    dplyr::filter(!is.na(endpoint))
+
   ggplot2::geom_vline(
     data = ci_long,
     ggplot2::aes(xintercept = endpoint, color = level),

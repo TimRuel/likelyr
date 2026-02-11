@@ -17,32 +17,6 @@
 #'
 #' @keywords internal
 #' @noRd
-plot_pseudolikelihood_points <- function(psi_ll_df) {
-  .assert_local_plotting()
-
-  type <- attr(psi_ll_df, "type")
-  pseudolikelihood <- tolower(type)
-
-  plot_base(plot = "points") +
-    ggplot2::geom_point(
-      data = psi_ll_df,
-      ggplot2::aes(x = psi, y = loglik),
-      color = plot_curve_color(pseudolikelihood),
-      size = plot_point_cloud_size(),
-      alpha = plot_point_cloud_alpha()
-    ) +
-    ggplot2::labs(title = likelihood_title(type)) +
-    likelihood_axes()
-}
-
-# ---------------------------------------------------------------------
-# Single-curve likelihood + inference visualization
-# ---------------------------------------------------------------------
-
-#' Plot single pseudolikelihood curve with inference overlays
-#'
-#' @keywords internal
-#' @noRd
 plot_pseudolikelihood_curve <- function(
   psi_ll_df,
   zero_max_psi_ll_fn,
@@ -55,12 +29,71 @@ plot_pseudolikelihood_curve <- function(
   pseudolikelihood <- tolower(type)
 
   # --------------------------------------------------
-  # Axis limits
+  # Extract MLE
   # --------------------------------------------------
-  psi_limits <- range(psi_ll_df$psi) +
-    c(-1, 1) * 3 * head(diff(psi_ll_df$psi), 1)
+  psi_mle <- point_estimate_df$psi_hat
 
-  y_limits <- compute_y_limits(psi_ll_df)
+  # --------------------------------------------------
+  # Confidence intervals (long format)
+  # --------------------------------------------------
+  ci_long <- extract_ci_long(interval_estimate_df)
+
+  ci_raw <- ci_long |>
+    dplyr::filter(!is.na(endpoint))
+
+  # --------------------------------------------------
+  # PSI limits — symmetric about MLE
+  # --------------------------------------------------
+  if (nrow(ci_raw) > 0) {
+    alpha_widest <- min(ci_raw$alpha)
+
+    ci_widest <- ci_raw |>
+      dplyr::filter(alpha == alpha_widest)
+
+    lower_val <- ci_widest |>
+      dplyr::filter(position == "lower") |>
+      dplyr::pull(endpoint)
+
+    upper_val <- ci_widest |>
+      dplyr::filter(position == "upper") |>
+      dplyr::pull(endpoint)
+
+    dist_left <- if (length(lower_val) == 1) psi_mle - lower_val else NA_real_
+    dist_right <- if (length(upper_val) == 1) upper_val - psi_mle else NA_real_
+
+    # Mirror missing side
+    if (is.na(dist_left) && !is.na(dist_right)) {
+      dist_left <- dist_right
+    }
+    if (is.na(dist_right) && !is.na(dist_left)) {
+      dist_right <- dist_left
+    }
+
+    if (is.na(dist_left) && is.na(dist_right)) {
+      half_width <- diff(range(psi_ll_df$psi)) / 2
+    } else {
+      half_width <- max(dist_left, dist_right)
+    }
+  } else {
+    half_width <- diff(range(psi_ll_df$psi)) / 2
+  }
+
+  padding_factor <- 1.05
+  half_width <- half_width * padding_factor
+
+  psi_limits <- psi_mle + c(-1, 1) * half_width
+
+  # --------------------------------------------------
+  # Y limits — based on widest alpha
+  # --------------------------------------------------
+  if (nrow(ci_raw) > 0) {
+    alpha_min <- min(ci_raw$alpha)
+  } else {
+    alpha_min <- 0.05
+  }
+
+  y_lower <- -0.5 * qchisq(1 - alpha_min, df = 1)
+  y_limits <- c(y_lower * 1.05, 0)
 
   # --------------------------------------------------
   # Curve layer
@@ -71,11 +104,6 @@ plot_pseudolikelihood_curve <- function(
     pseudolikelihood = pseudolikelihood,
     comparison = FALSE
   )
-
-  # --------------------------------------------------
-  # Confidence intervals
-  # --------------------------------------------------
-  ci_long <- extract_ci_long(interval_estimate_df)
 
   # --------------------------------------------------
   # Labels
@@ -133,12 +161,7 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::labs(title = likelihood_title(type)) +
     likelihood_axes() +
 
-    # ---- X domain restriction ----
-    ggplot2::scale_x_continuous(
-      expand = c(0, 0)
-    ) +
-
-    # ---- Y zoom ONLY ----
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
     ggplot2::coord_cartesian(xlim = psi_limits, ylim = y_limits) +
 
     ggplot2::theme(
@@ -160,17 +183,94 @@ plot_pseudolikelihood_curves <- function(res_list) {
   .assert_local_plotting()
 
   # --------------------------------------------------
-  # Curve layers
+  # Extract all MLEs
+  # --------------------------------------------------
+  psi_mles <- purrr::map_dbl(
+    res_list,
+    \(x) x$inference$point_estimate_df$psi_hat
+  )
+
+  psi_center <- mean(range(psi_mles))
+
+  # --------------------------------------------------
+  # Extract ALL CI endpoints from both results
+  # --------------------------------------------------
+  ci_all <- purrr::map_dfr(
+    res_list,
+    \(x) {
+      extract_ci_long(x$inference$interval_estimate_df)
+    }
+  ) |>
+    dplyr::filter(!is.na(endpoint))
+
+  # --------------------------------------------------
+  # Determine symmetric psi limits
+  # --------------------------------------------------
+  if (nrow(ci_all) > 0) {
+    alpha_widest <- min(ci_all$alpha)
+
+    ci_widest <- ci_all |>
+      dplyr::filter(alpha == alpha_widest)
+
+    lower_vals <- ci_widest |>
+      dplyr::filter(position == "lower") |>
+      dplyr::pull(endpoint)
+
+    upper_vals <- ci_widest |>
+      dplyr::filter(position == "upper") |>
+      dplyr::pull(endpoint)
+
+    dist_left <- if (length(lower_vals) > 0) {
+      psi_center - min(lower_vals)
+    } else {
+      NA_real_
+    }
+
+    dist_right <- if (length(upper_vals) > 0) {
+      max(upper_vals) - psi_center
+    } else {
+      NA_real_
+    }
+
+    if (is.na(dist_left) && !is.na(dist_right)) {
+      dist_left <- dist_right
+    }
+    if (is.na(dist_right) && !is.na(dist_left)) {
+      dist_right <- dist_left
+    }
+
+    if (is.na(dist_left) && is.na(dist_right)) {
+      half_width <- max(abs(psi_mles - psi_center))
+    } else {
+      half_width <- max(dist_left, dist_right)
+    }
+  } else {
+    half_width <- max(abs(psi_mles - psi_center))
+  }
+
+  padding_factor <- 1.05
+  half_width <- half_width * padding_factor
+
+  psi_limits <- psi_center + c(-1, 1) * half_width
+
+  # --------------------------------------------------
+  # Y limits — based on smallest alpha across both
+  # --------------------------------------------------
+  alpha_min <- if (nrow(ci_all) > 0) min(ci_all$alpha) else 0.05
+
+  y_lower <- -0.5 * qchisq(1 - alpha_min, df = 1)
+  y_limits <- c(y_lower * 1.05, 0)
+
+  # --------------------------------------------------
+  # Curve layers (NOW using shared psi_limits)
   # --------------------------------------------------
   curve_layers <- purrr::map(
     res_list,
     \(x) {
-      psi_ll_df <- x$psi_ll_df
-
       make_stat_fn(
-        psi_endpoints = range(psi_ll_df$psi),
+        psi_endpoints = psi_limits,
         zero_max_psi_ll_fn = x$inference$zero_max_psi_ll_fn,
-        pseudolikelihood = tolower(attr(psi_ll_df, "type")),
+        pseudolikelihood = tolower(attr(x$psi_ll_df, "type")),
         comparison = TRUE
       )
     }
@@ -205,7 +305,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
     dplyr::arrange(label)
 
   # --------------------------------------------------
-  # Confidence cutoffs
+  # Confidence cutoffs (horizontal lines)
   # --------------------------------------------------
   crit_df <- purrr::map_dfr(
     res_list,
@@ -227,29 +327,12 @@ plot_pseudolikelihood_curves <- function(res_list) {
   )
 
   # --------------------------------------------------
-  # Axis limits
-  # --------------------------------------------------
-  psi_limits <- range(
-    unlist(purrr::map(res_list, \(x) x$psi_ll_df$psi))
-  )
-
-  y_limits <- range(
-    unlist(
-      purrr::map(
-        res_list,
-        \(x) compute_y_limits(x$psi_ll_df)
-      )
-    )
-  )
-
-  # --------------------------------------------------
   # Assemble plot
   # --------------------------------------------------
   plot_base(plot = "comparison") +
     curve_layers +
     loglik_reference_line() +
 
-    # ---- CI cutoffs ----
     make_ci_hline_layer(crit_df) +
     ggplot2::scale_color_manual(
       name = "Confidence",
@@ -258,7 +341,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
     ) +
     ggnewscale::new_scale_color() +
 
-    # ---- Labels ----
     make_label_vlines(label_data, comparison = TRUE) +
     make_label_repel(label_data, y = y_limits[1] / 2) +
     ggplot2::scale_color_manual(
@@ -266,18 +348,12 @@ plot_pseudolikelihood_curves <- function(res_list) {
       guide = "none"
     ) +
 
-    # ---- Decorations ----
     ggplot2::labs(
       title = "Pseudo Log-Likelihood Comparison Plot"
     ) +
     likelihood_axes() +
 
-    # ---- X domain restriction ----
-    ggplot2::scale_x_continuous(
-      expand = c(0, 0)
-    ) +
-
-    # ---- Y zoom ONLY ----
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
     ggplot2::coord_cartesian(xlim = psi_limits, ylim = y_limits) +
 
     ggplot2::theme(

@@ -17,6 +17,32 @@
 #'
 #' @keywords internal
 #' @noRd
+plot_pseudolikelihood_points <- function(psi_ll_df) {
+  .assert_local_plotting()
+
+  type <- attr(psi_ll_df, "type")
+  pseudolikelihood <- tolower(type)
+
+  plot_base(plot = "points") +
+    ggplot2::geom_point(
+      data = psi_ll_df,
+      ggplot2::aes(x = psi, y = loglik),
+      color = plot_curve_color(pseudolikelihood),
+      size = plot_point_cloud_size(),
+      alpha = plot_point_cloud_alpha()
+    ) +
+    ggplot2::labs(title = likelihood_title(type)) +
+    likelihood_axes()
+}
+
+# ---------------------------------------------------------------------
+# Single-curve likelihood + inference visualization
+# ---------------------------------------------------------------------
+
+#' Plot single pseudolikelihood curve with inference overlays
+#'
+#' @keywords internal
+#' @noRd
 plot_pseudolikelihood_curve <- function(
   psi_ll_df,
   zero_max_psi_ll_fn,

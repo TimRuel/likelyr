@@ -61,6 +61,9 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 
   model$nuisance <- calibrate_nuisance(
     nuisance = model$nuisance,
+    parameter = model$parameter,
+    estimand = model$estimand,
+    optimizer = model$optimizer,
     data = data
   )
 

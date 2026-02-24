@@ -15,8 +15,7 @@ build_branch_fn_factory <- function(
   likelihood,
   estimand,
   nuisance,
-  optimizer,
-  data
+  optimizer
 ) {
   stopifnot(
     inherits(parameter, "parameter_spec"),
@@ -122,7 +121,7 @@ build_branch_fn_factory <- function(
   # Stage 1: bind ω̂
   # -------------------------------------------------------------------
   function(omega_hat) {
-    eval_env$omega_hat <- omega_hat
+    eval_env$omega_hat <- as.numeric(omega_hat)
 
     # ---------------------------------------------------------------
     # Stage 2: solve θ*(ψ, ω̂)

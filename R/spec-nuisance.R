@@ -1,5 +1,5 @@
 # ======================================================================
-# Nuisance Specification (v5.1)
+# Nuisance Specification (v5.2)
 # ======================================================================
 
 #' Specify Nuisance Components for Integrated Log-Likelihood
@@ -9,15 +9,14 @@
 #' used in Monte Carlo Integrated Log-Likelihood:
 #'
 #' \deqn{
-#'   E_{\omegâ}[ \log p(Y \mid \param) ].
+#'   E_{\hat\omega}[ \log p(Y \mid \theta) ].
 #' }
 #'
 #' The nuisance specification provides:
 #'
 #' • `E_loglik(param, omega_hat, data)` — expected log-likelihood
 #' • `E_loglik_grad(param, omega_hat, data)` — optional gradient wrt θ
-#'
-#' These functions are used *only* for integrated log-likelihood calculations.
+#' • Optional `omega_hat` sampling components
 #'
 #' @param E_loglik
 #'   Required. Function `(param, omega_hat, data) -> numeric`
@@ -25,6 +24,13 @@
 #'
 #' @param E_loglik_grad
 #'   Optional gradient function `(param, omega_hat, data) -> numeric vector`.
+#'
+#' @param omega_hat
+#'   Optional list specifying omega-hat sampling behavior. Supported fields:
+#'   \itemize{
+#'     \item `initgen` — function generating initial guesses for ω̂
+#'     \item `sampler` — function mapping initial guesses to feasible ω̂
+#'   }
 #'
 #' @param name Optional descriptive name for the nuisance component.
 #' @param ... Additional fields stored but unused.
@@ -34,11 +40,18 @@
 #' `c("nuisance_spec", "likelyr")`.
 #'
 #' @export
-nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
+nuisance_spec <- function(
+  E_loglik,
+  E_loglik_grad = NULL,
+  omega_hat = NULL,
+  name = NULL,
+  ...
+) {
   x <- list(
     name = name %||% "<nuisance>",
     E_loglik = E_loglik,
     E_loglik_grad = E_loglik_grad,
+    omega_hat = omega_hat,
     extra = list(...)
   )
 
@@ -58,16 +71,6 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
 #' required nuisance-related functions are present and correctly typed
 #' before downstream likelihood procedures are run.
 #'
-#' @details
-#' The following checks are performed:
-#'
-#' \itemize{
-#'   \item `E_loglik` must be a function with signature
-#'         `(param, omega_hat, data)`.
-#'   \item `E_loglik_grad`, if supplied, must also be a function with
-#'         the same signature.
-#' }
-#'
 #' @param x A list representing a `nuisance_spec` object.
 #'
 #' @return Invisibly returns `x` if validation succeeds.
@@ -75,7 +78,9 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
 #' @keywords internal
 #' @noRd
 .validate_nuisance_spec <- function(x) {
-  # ---- E_loglik ----
+  # --------------------------------------------------
+  # Expected log-likelihood
+  # --------------------------------------------------
   if (!is.function(x$E_loglik)) {
     stop(
       "E_loglik must be a function(param, omega_hat, data).",
@@ -84,7 +89,6 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
   }
 
   fmls <- names(formals(x$E_loglik))
-
   if (!"data" %in% fmls) {
     stop(
       "E_loglik must include a `data` argument. ",
@@ -93,7 +97,9 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
     )
   }
 
-  # ---- Gradient ----
+  # --------------------------------------------------
+  # Gradient (optional)
+  # --------------------------------------------------
   if (!is.null(x$E_loglik_grad)) {
     if (!is.function(x$E_loglik_grad)) {
       stop(
@@ -103,10 +109,52 @@ nuisance_spec <- function(E_loglik, E_loglik_grad = NULL, name = NULL, ...) {
     }
 
     fmls_g <- names(formals(x$E_loglik_grad))
-
     if (!"data" %in% fmls_g) {
       stop(
         "E_loglik_grad must include a `data` argument.",
+        call. = FALSE
+      )
+    }
+  }
+
+  # --------------------------------------------------
+  # Omega-hat specification (optional)
+  # --------------------------------------------------
+  if (!is.null(x$omega_hat)) {
+    if (!is.list(x$omega_hat)) {
+      stop(
+        "omega_hat must be a list containing initgen and/or sampler.",
+        call. = FALSE
+      )
+    }
+
+    allowed <- c("initgen", "sampler")
+    bad <- setdiff(names(x$omega_hat), allowed)
+
+    if (length(bad) > 0) {
+      stop(
+        "Unknown omega_hat fields: ",
+        paste(bad, collapse = ", "),
+        call. = FALSE
+      )
+    }
+
+    if (
+      !is.null(x$omega_hat$initgen) &&
+        !is.function(x$omega_hat$initgen)
+    ) {
+      stop(
+        "omega_hat$initgen must be a function.",
+        call. = FALSE
+      )
+    }
+
+    if (
+      !is.null(x$omega_hat$sampler) &&
+        !is.function(x$omega_hat$sampler)
+    ) {
+      stop(
+        "omega_hat$sampler must be a function.",
         call. = FALSE
       )
     }
@@ -140,5 +188,23 @@ print.nuisance_spec <- function(x, ...) {
     "\n",
     sep = ""
   )
+
+  if (is.null(x$omega_hat)) {
+    cat("- Omega-hat sampling:       default\n")
+  } else {
+    cat(
+      "- Omega-hat init generator: ",
+      if (!is.null(x$omega_hat$initgen)) "custom" else "default",
+      "\n",
+      sep = ""
+    )
+    cat(
+      "- Omega-hat sampler:        ",
+      if (!is.null(x$omega_hat$sampler)) "custom" else "default",
+      "\n",
+      sep = ""
+    )
+  }
+
   invisible(x)
 }

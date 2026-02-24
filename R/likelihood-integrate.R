@@ -62,8 +62,19 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 1. Create `integrate` working area inside workspace$integrate
   # ------------------------------------------------------------------
-  generate_init <- make_omega_hat_initgen(cal)
-  sample_omega_hat <- make_omega_hat_sampler(cal)
+
+  # Prefer calibrated nuisance omega-hat components
+  if (
+    !is.null(cal$nuisance$omega_hat_initgen) &&
+      !is.null(cal$nuisance$omega_hat_sampler)
+  ) {
+    generate_init <- cal$nuisance$omega_hat_initgen
+    sample_omega_hat <- cal$nuisance$omega_hat_sampler
+  } else {
+    # Fallback: legacy behavior (no omega_hat info in nuisance_spec)
+    generate_init <- make_omega_hat_initgen(cal)
+    sample_omega_hat <- make_omega_hat_sampler(cal)
+  }
 
   if (is.null(cal$workspace)) {
     cal$workspace <- list()

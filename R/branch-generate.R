@@ -122,7 +122,6 @@ generate_branches <- function(cal, verbose = TRUE) {
   nuisance <- cal$nuisance
   optimizer <- cal$optimizer
   execution <- cal$execution
-  data <- cal$data
 
   integrate_result <- cal$workspace$integrate
   if (
@@ -193,8 +192,7 @@ generate_branches <- function(cal, verbose = TRUE) {
     likelihood = likelihood,
     estimand = estimand,
     nuisance = nuisance,
-    optimizer = optimizer,
-    data = data
+    optimizer = optimizer
   )
 
   if (verbose) {

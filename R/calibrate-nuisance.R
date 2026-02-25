@@ -61,39 +61,39 @@ calibrate_nuisance <- function(
   # ---- Initial-guess generator ----
   initgen_fn <- spec$initgen %||% make_omega_hat_initgen
 
-  nuisance$omega_hat_initgen <- do.call(
-    initgen_fn,
-    .match_formals(
-      initgen_fn,
-      list(
-        param_mle = parameter$param_mle,
-        param_dim = parameter$param_dim,
-        param_lower = parameter$param_lower,
-        param_upper = parameter$param_upper,
-        psi_jac = estimand$psi_jac
-      )
-    )
+  initgen_args <- list(
+    param_mle = parameter$param_mle,
+    param_dim = parameter$param_dim,
+    param_lower = parameter$param_lower,
+    param_upper = parameter$param_upper,
+    psi_jac = estimand$psi_jac
   )
+
+  initgen_args <- initgen_args[
+    names(initgen_args) %in% names(formals(initgen_fn))
+  ]
+
+  nuisance$omega_hat_initgen <- do.call(initgen_fn, initgen_args)
 
   # ---- Omega-hat sampler ----
   sampler_fn <- spec$sampler %||% make_omega_hat_sampler
 
-  nuisance$omega_hat_sampler <- do.call(
-    sampler_fn,
-    .match_formals(
-      sampler_fn,
-      list(
-        psi_fn = estimand$psi_fn,
-        psi_jac = estimand$psi_jac,
-        psi_mle = estimand$psi_mle,
-        eq_fn = parameter$eq,
-        eq_jac = parameter$eq_jac,
-        ineq_fn = parameter$ineq,
-        ineq_jac = parameter$ineq_jac,
-        optimizer = optimizer
-      )
-    )
+  sampler_args <- list(
+    psi_fn = estimand$psi_fn,
+    psi_jac = estimand$psi_jac,
+    psi_mle = estimand$psi_mle,
+    eq_fn = parameter$eq,
+    eq_jac = parameter$eq_jac,
+    ineq_fn = parameter$ineq,
+    ineq_jac = parameter$ineq_jac,
+    optimizer = optimizer
   )
+
+  sampler_args <- sampler_args[
+    names(sampler_args) %in% names(formals(sampler_fn))
+  ]
+
+  nuisance$omega_hat_sampler <- do.call(sampler_fn, sampler_args)
 
   nuisance
 }

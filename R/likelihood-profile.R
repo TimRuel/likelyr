@@ -105,8 +105,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
     likelihood = likelihood,
     estimand = estimand,
     nuisance = nuisance,
-    optimizer = optimizer,
-    data = data
+    optimizer = optimizer
   )
   branch_fn <- branch_fn_factory(param_mle)
 

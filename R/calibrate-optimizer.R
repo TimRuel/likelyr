@@ -67,8 +67,7 @@ calibrate_optimizer <- function(
     likelihood = likelihood,
     estimand = estimand,
     nuisance = nuisance,
-    optimizer = optimizer,
-    data = data
+    optimizer = optimizer
   )
 
   # -------------------------------------------------------------------

@@ -4,13 +4,25 @@
 \alias{nuisance_spec}
 \title{Specify Nuisance Components for Integrated Log-Likelihood}
 \usage{
-nuisance_spec(E_loglik, E_loglik_grad = NULL, name = NULL, ...)
+nuisance_spec(
+  E_loglik,
+  E_loglik_grad = NULL,
+  omega_hat = NULL,
+  name = NULL,
+  ...
+)
 }
 \arguments{
 \item{E_loglik}{Required. Function \verb{(param, omega_hat, data) -> numeric}
 giving the expected log-likelihood.}
 
 \item{E_loglik_grad}{Optional gradient function \verb{(param, omega_hat, data) -> numeric vector}.}
+
+\item{omega_hat}{Optional list specifying omega-hat sampling behavior. Supported fields:
+\itemize{
+\item \code{initgen} — function generating initial guesses for ω̂
+\item \code{sampler} — function mapping initial guesses to feasible ω̂
+}}
 
 \item{name}{Optional descriptive name for the nuisance component.}
 
@@ -25,13 +37,12 @@ Defines the nuisance contribution to the \emph{expected} log-likelihood
 used in Monte Carlo Integrated Log-Likelihood:
 
 \deqn{
-  E_{\omegâ}[ \log p(Y \mid \param) ].
+  E_{\hat\omega}[ \log p(Y \mid \theta) ].
 }
 
 The nuisance specification provides:
 
 • \code{E_loglik(param, omega_hat, data)} — expected log-likelihood
 • \code{E_loglik_grad(param, omega_hat, data)} — optional gradient wrt θ
-
-These functions are used \emph{only} for integrated log-likelihood calculations.
+• Optional \code{omega_hat} sampling components
 }

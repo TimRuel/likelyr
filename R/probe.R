@@ -44,7 +44,6 @@ probe <- function(
   optimizer <- cal$optimizer
   parameter <- cal$parameter
   likelihood <- cal$likelihood
-  data <- cal$data
 
   # ------------------------------------------------------------
   # Preconditions
@@ -95,8 +94,7 @@ probe <- function(
     likelihood = likelihood,
     estimand = estimand,
     nuisance = nuisance,
-    optimizer = optimizer,
-    data = data
+    optimizer = optimizer
   )
 
   # ------------------------------------------------------------

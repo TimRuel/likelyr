@@ -4,8 +4,7 @@
 
 # Depends on constructor functions from class-system.R:
 #   new_model_spec(), new_likelihood_spec(), new_estimand_spec(),
-#   new_parameter_spec(), new_nuisance_spec(),
-#   new_optimizer_spec(), new_execution_spec()
+#   new_parameter_spec(), new_optimizer_spec(), new_execution_spec()
 
 # ======================================================================
 # INTERNAL: Calibration Lock Helpers
@@ -13,7 +12,7 @@
 
 #' @keywords internal
 .slot_is_structural <- function(slot) {
-  slot %in% c("parameter", "likelihood", "estimand", "nuisance")
+  slot %in% c("parameter", "likelihood", "estimand")
 }
 
 #' @keywords internal
@@ -23,8 +22,8 @@
       "parameter",
       "likelihood",
       "estimand",
-      "nuisance",
-      "optimizer",
+      "pipeline",
+      "solver",
       "execution"
     )
 }
@@ -43,8 +42,8 @@
 #'   • parameter_spec()
 #'   • likelihood_spec()
 #'   • estimand_spec()
-#'   • nuisance_spec()
-#'   • optimizer_spec()
+#'   • pipeline_spec()
+#'   • solver_spec()
 #'   • execution_spec()
 #'
 #' However, \code{model_spec()} is intentionally permissive at construction:
@@ -53,9 +52,8 @@
 #'
 #' After calibration:
 #' \itemize{
-#'   \item Structural specifications (parameter, likelihood, estimand,
-#'         nuisance) are frozen.
-#'   \item Numerical and procedural specifications (optimizer, execution)
+#'   \item Structural specifications (parameter, likelihood, estimand) are frozen.
+#'   \item Numerical and procedural specifications (pipeline, solver, execution)
 #'         may be updated to support alternative inference or execution
 #'         behavior without recalibration.
 #' }
@@ -65,8 +63,8 @@ model_spec <- function(
   parameter = NULL,
   likelihood = NULL,
   estimand = NULL,
-  nuisance = NULL,
-  optimizer = NULL,
+  pipeline = NULL,
+  solver = NULL,
   execution = NULL,
   name = NULL,
   ...
@@ -76,8 +74,8 @@ model_spec <- function(
     parameter = parameter,
     likelihood = likelihood,
     estimand = estimand,
-    nuisance = nuisance,
-    optimizer = optimizer,
+    pipeline = pipeline,
+    solver = solver,
     execution = execution,
     extra = list(...)
   ) |>
@@ -164,11 +162,11 @@ add.default <- function(model, spec, ...) {
   if (inherits(x, "estimand_spec")) {
     return("estimand")
   }
-  if (inherits(x, "nuisance_spec")) {
-    return("nuisance")
+  if (inherits(x, "pipeline_spec")) {
+    return("pipeline")
   }
-  if (inherits(x, "optimizer_spec")) {
-    return("optimizer")
+  if (inherits(x, "solver_spec")) {
+    return("solver")
   }
   if (inherits(x, "execution_spec")) {
     return("execution")
@@ -196,12 +194,12 @@ add.default <- function(model, spec, ...) {
     stop("estimand must be an estimand_spec().", call. = FALSE)
   }
 
-  if (!is.null(x$nuisance) && !inherits(x$nuisance, "nuisance_spec")) {
-    stop("nuisance must be a nuisance_spec().", call. = FALSE)
+  if (!is.null(x$pipeline) && !inherits(x$pipeline, "pipeline_spec")) {
+    stop("pipeline must be a pipeline_spec().", call. = FALSE)
   }
 
-  if (!is.null(x$optimizer) && !inherits(x$optimizer, "optimizer_spec")) {
-    stop("optimizer must be an optimizer_spec().", call. = FALSE)
+  if (!is.null(x$solver) && !inherits(x$solver, "solver_spec")) {
+    stop("solver must be a solver_spec().", call. = FALSE)
   }
 
   if (!is.null(x$execution) && !inherits(x$execution, "execution_spec")) {
@@ -221,8 +219,8 @@ add.default <- function(model, spec, ...) {
     "parameter",
     "likelihood",
     "estimand",
-    "nuisance",
-    "optimizer",
+    "pipeline",
+    "solver",
     "execution"
   )
 
@@ -258,14 +256,14 @@ print.model_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "Nuisance:       ",
-    if (!is.null(x$nuisance)) x$nuisance$name else "(missing)",
+    "Pipeline:       ",
+    if (!is.null(x$pipeline)) x$pipeline$name else "(missing)",
     "\n",
     sep = ""
   )
   cat(
-    "Optimizer:      ",
-    if (!is.null(x$optimizer)) x$optimizer$name else "(missing)",
+    "Solver:         ",
+    if (!is.null(x$solver)) x$solver$name else "(missing)",
     "\n",
     sep = ""
   )

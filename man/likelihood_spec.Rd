@@ -4,27 +4,47 @@
 \alias{likelihood_spec}
 \title{Specify a Parametric Likelihood Model}
 \usage{
-likelihood_spec(loglik, param_mle_fn, name = NULL, ...)
+likelihood_spec(
+  loglik,
+  E_loglik = NULL,
+  E_loglik_grad = NULL,
+  name = NULL,
+  ...
+)
 }
 \arguments{
-\item{loglik}{Function(param, data) → log-likelihood.}
+\item{loglik}{Required. Function \code{(param, data) -> numeric}
+giving the observed data log-likelihood.}
 
-\item{param_mle_fn}{Function(data) → initial mle.}
+\item{E_loglik}{Optional. Function
+\code{(param, omega_hat, data) -> numeric} giving the expected
+log-likelihood objective maximized by the inner solver during
+branch evaluation:
+\deqn{E_{\hat\omega}[ \log p(Y \mid \theta) ]}
+The \code{data} argument must be present in the signature; it is
+bound at calibration time. Required for \code{integrate()}.}
+
+\item{E_loglik_grad}{Optional. Function
+\code{(param, omega_hat, data) -> numeric vector} giving the
+gradient of \code{E_loglik} with respect to \code{param}. When
+supplied, the inner solver uses analytic gradients rather than
+finite differences. Must include a \code{data} argument.}
 
 \item{name}{Optional descriptive name.}
 
-\item{...}{Additional stored metadata (unused internally).}
+\item{...}{Additional metadata stored but unused internally.}
 }
 \value{
 A \code{likelihood_spec} object.
 }
 \description{
-Defines the \emph{likelihood component} of the model:
+Defines the likelihood component of the model, including the
+observed data log-likelihood and optionally the expected
+log-likelihood objective used by the integrated likelihood method.
 
-• loglik(param, data)  — the log-likelihood function
-• param_mle_fn(data)   — analytic initializer for mle of model parameter
+\code{loglik} is required for all analyses (profile and integrated).
 
-All parameter–space structure (dimension, bounds, true value,
-inequality constraints) must now be supplied via \code{parameter_spec()}.
-\code{likelihood_spec()} is intentionally lightweight.
+\code{E_loglik} and \code{E_loglik_grad} are optional at
+construction time but required when calling \code{integrate()}.
+A clear error is raised at that point if they are absent.
 }

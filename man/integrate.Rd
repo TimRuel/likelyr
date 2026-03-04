@@ -16,17 +16,12 @@ integrate(cal, ...)
 \value{
 The SAME \code{calibrated} model object, augmented with:
 • class \code{integrated}
-• \verb{$workspace$integrate} — an \code{integrate} object
+• \verb{$workspace$integrate} — integrated likelihood result
 }
 \description{
-Computes the integrated log-likelihood and attaches it to the input
-\code{calibrated} model object under \verb{$workspace$integrate}. The updated object
-is returned.
+Computes the integrated log-likelihood using \emph{pre-screened} omega-hat
+values stored in the calibrated model object.
 
-This function performs \strong{no plotting or table rendering}. Visualization
-is deferred to \code{plot()} / \code{view()} methods, which materialize plots/tables
-locally from stored data frames.
-
-This function is \strong{silent by default} for pipe-friendly workflows.
-Set \code{verbose = TRUE} to display diagnostic messages.
+This function assumes \code{\link[=screen]{screen()}} has already been run and will error
+otherwise. No omega-hat sampling occurs inside integrate().
 }

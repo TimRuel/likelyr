@@ -4,22 +4,26 @@
 \alias{calibrate_parameter}
 \title{Calibrate Parameter Component}
 \usage{
-calibrate_parameter(parameter, likelihood, data)
+calibrate_parameter(parameter, data)
 }
 \arguments{
 \item{parameter}{A \code{parameter_spec} object.}
 
-\item{likelihood}{A \code{likelihood_spec} object (provides param_mle_fn).}
-
 \item{data}{The user data passed to calibrate().}
 }
 \value{
-The SAME parameter_spec object with added field:
+The SAME parameter_spec object with added/updated fields:
 • \verb{$param_mle}
+• \verb{$param_lower}  (resolved from "auto" if requested)
+• \verb{$param_upper}  (resolved from "auto" if requested)
 }
 \description{
-Computes the analytic MLE for θ using the likelihood's
-\code{param_mle_fn(data)} and stores it inside the parameter_spec.
+Computes the analytic MLE for θ using \code{parameter$param_mle_fn(data)}
+and stores it inside the parameter_spec.
+
+If \code{param_lower} or \code{param_upper} on the spec is the string
+\code{"auto"}, bounds are computed from \code{param_mle} after
+the MLE is known and stored back onto the spec.
 
 This function is called internally by \code{calibrate()}.
 }

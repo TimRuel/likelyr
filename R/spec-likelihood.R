@@ -1,31 +1,55 @@
 # ======================================================================
-# Likelihood Specification (v6.0)
+# Likelihood Specification (v7.0)
+#
+# Combines the former likelihood_spec and objective_spec into a single
+# spec. loglik is required for all analyses. E_loglik and E_loglik_grad
+# are optional at construction time but required by integrate().
 # ======================================================================
 
 #' Specify a Parametric Likelihood Model
 #'
 #' @description
-#' Defines the *likelihood component* of the model:
+#' Defines the likelihood component of the model, including the
+#' observed data log-likelihood and optionally the expected
+#' log-likelihood objective used by the integrated likelihood method.
 #'
-#'   • loglik(param, data)  — the log-likelihood function
-#'   • param_mle_fn(data)   — analytic initializer for mle of model parameter
+#' \code{loglik} is required for all analyses (profile and integrated).
 #'
-#' All parameter–space structure (dimension, bounds, true value,
-#' inequality constraints) must now be supplied via `parameter_spec()`.
-#' `likelihood_spec()` is intentionally lightweight.
+#' \code{E_loglik} and \code{E_loglik_grad} are optional at
+#' construction time but required when calling \code{integrate()}.
+#' A clear error is raised at that point if they are absent.
 #'
-#' @param loglik       Function(param, data) → log-likelihood.
-#' @param param_mle_fn Function(data) → initial mle.
-#' @param name         Optional descriptive name.
-#' @param ...          Additional stored metadata (unused internally).
+#' @param loglik Required. Function \code{(param, data) -> numeric}
+#'   giving the observed data log-likelihood.
+#' @param E_loglik Optional. Function
+#'   \code{(param, omega_hat, data) -> numeric} giving the expected
+#'   log-likelihood objective maximized by the inner solver during
+#'   branch evaluation:
+#'   \deqn{E_{\hat\omega}[ \log p(Y \mid \theta) ]}
+#'   The \code{data} argument must be present in the signature; it is
+#'   bound at calibration time. Required for \code{integrate()}.
+#' @param E_loglik_grad Optional. Function
+#'   \code{(param, omega_hat, data) -> numeric vector} giving the
+#'   gradient of \code{E_loglik} with respect to \code{param}. When
+#'   supplied, the inner solver uses analytic gradients rather than
+#'   finite differences. Must include a \code{data} argument.
+#' @param name Optional descriptive name.
+#' @param ... Additional metadata stored but unused internally.
 #'
-#' @return A `likelihood_spec` object.
+#' @return A \code{likelihood_spec} object.
 #' @export
-likelihood_spec <- function(loglik, param_mle_fn, name = NULL, ...) {
+likelihood_spec <- function(
+  loglik,
+  E_loglik = NULL,
+  E_loglik_grad = NULL,
+  name = NULL,
+  ...
+) {
   x <- list(
     name = name %||% "<likelihood>",
     loglik = loglik,
-    param_mle_fn = param_mle_fn,
+    E_loglik = E_loglik,
+    E_loglik_grad = E_loglik_grad,
     extra = list(...)
   )
 
@@ -38,38 +62,47 @@ likelihood_spec <- function(loglik, param_mle_fn, name = NULL, ...) {
 # INTERNAL VALIDATOR
 # ======================================================================
 
-#' Validate likelihood specification
-#'
-#' @description
-#' Internal validator for \code{likelihood_spec} objects. Ensures that
-#' all required components needed for likelihood evaluation and
-#' initialization are present and correctly specified.
-#'
-#' @param x A list representing a \code{likelihood_spec} object.
-#'
-#' @details
-#' The following components are validated:
-#'
-#' \itemize{
-#'   \item \code{loglik}: function with signature
-#'         \code{function(param, data)} returning the log-likelihood.
-#'   \item \code{param_mle_fn}: analytic initializer function with
-#'         signature \code{function(data)} returning an MLE guess.
-#' }
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
-#'
 #' @keywords internal
 #' @noRd
 .validate_likelihood_spec <- function(x) {
-  # Log-likelihood
+  # loglik — required -----------------------------------------------
   if (!is.function(x$loglik)) {
     stop("loglik must be a function(param, data).", call. = FALSE)
   }
 
-  # Analytic initializer required
-  if (!is.function(x$param_mle_fn)) {
-    stop("param_mle_fn must be a function(data).", call. = FALSE)
+  # E_loglik — optional at construction, required for integrate() ---
+  if (!is.null(x$E_loglik)) {
+    if (!is.function(x$E_loglik)) {
+      stop(
+        "E_loglik must be a function(param, omega_hat, data).",
+        call. = FALSE
+      )
+    }
+
+    if (!"data" %in% names(formals(x$E_loglik))) {
+      stop(
+        "E_loglik must include a `data` argument. ",
+        "Signature must be: (param, omega_hat, data).",
+        call. = FALSE
+      )
+    }
+  }
+
+  # E_loglik_grad — optional ----------------------------------------
+  if (!is.null(x$E_loglik_grad)) {
+    if (!is.function(x$E_loglik_grad)) {
+      stop(
+        "E_loglik_grad must be NULL or a function(param, omega_hat, data).",
+        call. = FALSE
+      )
+    }
+
+    if (!"data" %in% names(formals(x$E_loglik_grad))) {
+      stop(
+        "E_loglik_grad must include a `data` argument.",
+        call. = FALSE
+      )
+    }
   }
 
   invisible(x)
@@ -82,8 +115,23 @@ likelihood_spec <- function(loglik, param_mle_fn, name = NULL, ...) {
 #' @export
 print.likelihood_spec <- function(x, ...) {
   cat("# Likelihood Specification\n")
-  cat("- Name:           ", x$name, "\n", sep = "")
-  cat("- loglik():        ✔ function\n")
-  cat("- param_mle_fn():  ✔ function\n")
+  cat("- Name:             ", x$name, "\n", sep = "")
+  cat("- loglik():         ✔ function\n")
+  cat(
+    "- E_loglik():       ",
+    if (!is.null(x$E_loglik)) "✔ function" else "absent (profile only)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "- E_loglik_grad():  ",
+    if (!is.null(x$E_loglik_grad)) {
+      "✔ function"
+    } else {
+      "absent (finite differences)"
+    },
+    "\n",
+    sep = ""
+  )
   invisible(x)
 }

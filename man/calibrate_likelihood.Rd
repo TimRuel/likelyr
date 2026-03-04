@@ -7,15 +7,23 @@
 calibrate_likelihood(likelihood, data)
 }
 \arguments{
-\item{likelihood}{A likelihood_spec object.}
+\item{likelihood}{A \code{likelihood_spec} object.}
 
 \item{data}{User data.}
 }
 \value{
-The SAME likelihood_spec object, enriched with:
-• $loglik — a closure(param) that captures \code{data}
+The SAME \code{likelihood_spec} object, enriched with:
+\itemize{
+\item \code{$loglik}        — \code{function(param)}
+\item \code{$E_loglik}      — \code{function(param, omega_hat)},
+if supplied
+\item \code{$E_loglik_grad} — \code{function(param, omega_hat)},
+if supplied
+}
 }
 \description{
-Binds data to the likelihood's log-likelihood closure.
+Binds data to all likelihood closures. \code{loglik} is always
+bound. \code{E_loglik} and \code{E_loglik_grad} are bound only
+when present.
 }
 \keyword{internal}

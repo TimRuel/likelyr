@@ -1,5 +1,5 @@
 # ======================================================================
-# Parameter Specification (v3.3) — equality + inequality constraints
+# Parameter Specification (v3.5) — equality + inequality constraints
 # ======================================================================
 
 #' Specify the Parameter Space for a Likelihood Model
@@ -12,14 +12,26 @@
 #'   • box constraints (lower, upper)
 #'   • equality constraints h(param) = 0 and Jacobian
 #'   • inequality constraints h(param) ≤ 0 and Jacobian
+#'   • analytic MLE initializer
 #'
 #' Exactly one of `param_0` or `param_dim` must be supplied.
 #'
+#' @param param_mle_fn Function(data) → numeric vector giving the
+#'   maximum likelihood estimate of the full unconstrained parameter
+#'   vector. Called once during calibration to compute `param_mle`,
+#'   which is then used to resolve "auto" bounds, evaluate `psi_mle`,
+#'   and initialize branch evaluation. Must return a finite numeric
+#'   vector of length `param_dim`.
 #' @param param_0 Optional numeric vector, 1-column matrix,
-#'   OR list of such objects giving true / initial parameters.
+#'   OR list of such objects giving value of true model parameter.
 #' @param param_dim Optional integer giving the parameter dimension.
-#' @param param_lower Optional numeric scalar or vector of lower bounds.
-#' @param param_upper Optional numeric scalar or vector of upper bounds.
+#' @param param_lower Optional numeric scalar or vector of lower bounds,
+#'   or the string \code{"auto"} to request bounds computed from
+#'   \code{param_mle} during calibration. When \code{"auto"}, bounds
+#'   are set to \code{param_mle - radius} where
+#'   \code{radius = max(abs(param_mle)) * 3 + 5}.
+#' @param param_upper Optional numeric scalar or vector of upper bounds,
+#'   or \code{"auto"} (see \code{param_lower}).
 #' @param eq Optional function(param) → numeric vector = 0.
 #' @param eq_jac Optional Jacobian function(param) → matrix.
 #' @param ineq Optional function(param) → numeric vector ≤ 0.
@@ -30,6 +42,7 @@
 #' @return A `parameter_spec` object.
 #' @export
 parameter_spec <- function(
+  param_mle_fn,
   param_0 = NULL,
   param_dim = NULL,
   param_lower = NULL,
@@ -43,6 +56,7 @@ parameter_spec <- function(
 ) {
   x <- list(
     name = name %||% "<parameters>",
+    param_mle_fn = param_mle_fn,
     param_0 = param_0,
     param_dim = param_dim,
     param_lower = param_lower,
@@ -64,6 +78,7 @@ parameter_spec <- function(
 # ======================================================================
 
 .validate_parameter_spec <- function(x) {
+  param_mle_fn <- x$param_mle_fn
   param_0 <- x$param_0
   param_dim <- x$param_dim
   param_lower <- x$param_lower
@@ -74,7 +89,20 @@ parameter_spec <- function(
   ineq_jac <- x$ineq_jac
 
   # --------------------------------------------------------------
-  # 1. Mutually exclusive param_0 / param_dim
+  # 0. Analytic MLE initializer — required, validated first
+  # --------------------------------------------------------------
+  if (!is.function(param_mle_fn)) {
+    stop("param_mle_fn must be a function(data).", call. = FALSE)
+  }
+
+  # --------------------------------------------------------------
+  # 1. Classify bounds — "auto" is valid; resolved at calibration
+  # --------------------------------------------------------------
+  lower_is_auto <- identical(param_lower, "auto")
+  upper_is_auto <- identical(param_upper, "auto")
+
+  # --------------------------------------------------------------
+  # 2. Mutually exclusive param_0 / param_dim
   # --------------------------------------------------------------
   has_param0 <- !is.null(param_0)
   has_paramdim <- !is.null(param_dim)
@@ -94,7 +122,7 @@ parameter_spec <- function(
   }
 
   # --------------------------------------------------------------
-  # 2. Determine dimension
+  # 3. Determine dimension
   # --------------------------------------------------------------
   if (has_param0) {
     if (is.list(param_0)) {
@@ -129,7 +157,7 @@ parameter_spec <- function(
         integer(1)
       )
 
-      J <- sum(lens)
+      param_dim <- sum(lens)
     } else if (is.matrix(param_0)) {
       if (ncol(param_0) != 1) {
         stop("param_0 matrix must have exactly one column.", call. = FALSE)
@@ -139,13 +167,13 @@ parameter_spec <- function(
         stop("param_0 matrix must be finite numeric.", call. = FALSE)
       }
 
-      J <- nrow(param_0)
+      param_dim <- nrow(param_0)
     } else {
       if (!is.numeric(param_0) || any(!is.finite(param_0))) {
         stop("param_0 must be a finite numeric vector.", call. = FALSE)
       }
 
-      J <- length(param_0)
+      param_dim <- length(param_0)
     }
   } else {
     if (
@@ -157,49 +185,64 @@ parameter_spec <- function(
       stop("param_dim must be a positive integer.", call. = FALSE)
     }
 
-    J <- as.integer(param_dim)
+    param_dim <- as.integer(param_dim)
     param_0 <- NULL
   }
 
   # --------------------------------------------------------------
-  # 3. Normalize box constraints
+  # 4. Normalize box constraints
+  #    "auto" sentinels are left as-is; resolved in calibrate_parameter
+  #    once param_mle is known.
   # --------------------------------------------------------------
-  if (!is.null(param_lower)) {
+  if (!is.null(param_lower) && !lower_is_auto) {
     if (!is.numeric(param_lower)) {
-      stop("param_lower must be numeric.", call. = FALSE)
+      stop('param_lower must be numeric or "auto".', call. = FALSE)
     }
 
-    if (length(param_lower) == 1) {
-      param_lower <- rep(param_lower, J)
+    if (length(param_lower) == 1L) {
+      param_lower <- rep(param_lower, param_dim)
     }
 
-    if (length(param_lower) != J) {
-      stop("param_lower must be scalar or length J.", call. = FALSE)
+    if (length(param_lower) != param_dim) {
+      stop(
+        "param_lower must be scalar or length param_dim.",
+        call. = FALSE
+      )
     }
   }
 
-  if (!is.null(param_upper)) {
+  if (!is.null(param_upper) && !upper_is_auto) {
     if (!is.numeric(param_upper)) {
-      stop("param_upper must be numeric.", call. = FALSE)
+      stop('param_upper must be numeric or "auto".', call. = FALSE)
     }
 
-    if (length(param_upper) == 1) {
-      param_upper <- rep(param_upper, J)
+    if (length(param_upper) == 1L) {
+      param_upper <- rep(param_upper, param_dim)
     }
 
-    if (length(param_upper) != J) {
-      stop("param_upper must be scalar or length J.", call. = FALSE)
+    if (length(param_upper) != param_dim) {
+      stop(
+        "param_upper must be scalar or length param_dim.",
+        call. = FALSE
+      )
     }
   }
 
-  if (!is.null(param_lower) && !is.null(param_upper)) {
+  # Cross-check only when both bounds are resolved numeric values
+  if (
+    !is.null(param_lower) &&
+      !lower_is_auto &&
+      !is.null(param_upper) &&
+      !upper_is_auto
+  ) {
     if (any(param_lower > param_upper)) {
       stop("param_lower[i] must be <= param_upper[i].", call. = FALSE)
     }
   }
 
   # --------------------------------------------------------------
-  # 4. Validate param_0 vs constraints
+  # 5. Validate param_0 vs constraints
+  #    Skip bound checks when either bound is "auto".
   # --------------------------------------------------------------
   if (!is.null(param_0)) {
     param_list <- if (is.list(param_0)) param_0 else list(param_0)
@@ -207,18 +250,22 @@ parameter_spec <- function(
     for (p in param_list) {
       param_vec <- if (is.matrix(p)) as.numeric(p) else p
 
-      if (!is.null(param_lower) && any(param_vec < param_lower)) {
+      if (
+        !lower_is_auto && !is.null(param_lower) && any(param_vec < param_lower)
+      ) {
         stop("param_0 violates param_lower constraints.", call. = FALSE)
       }
 
-      if (!is.null(param_upper) && any(param_vec > param_upper)) {
+      if (
+        !upper_is_auto && !is.null(param_upper) && any(param_vec > param_upper)
+      ) {
         stop("param_0 violates param_upper constraints.", call. = FALSE)
       }
     }
   }
 
   # --------------------------------------------------------------
-  # 5a. Validate equality constraints
+  # 6a. Validate equality constraints
   # --------------------------------------------------------------
   if (!is.null(eq) && !is.function(eq)) {
     stop("eq must be NULL or a function(param).", call. = FALSE)
@@ -229,15 +276,14 @@ parameter_spec <- function(
   }
 
   if (!is.null(eq) && !is.null(eq_jac)) {
-    test_param <-
-      if (!is.null(param_0)) {
-        p0 <- if (is.list(param_0)) param_0[[1]] else param_0
-        if (is.matrix(p0)) as.numeric(p0) else p0
-      } else if (!is.null(param_lower) && !is.null(param_upper)) {
-        (param_lower + param_upper) / 2
-      } else {
-        rep(0, J)
-      }
+    test_param <- .make_test_param(
+      param_0,
+      param_dim,
+      param_lower,
+      param_upper,
+      lower_is_auto,
+      upper_is_auto
+    )
 
     h <- eq(test_param)
     if (!is.numeric(h)) {
@@ -249,16 +295,16 @@ parameter_spec <- function(
       stop("eq_jac(param) must return a matrix.", call. = FALSE)
     }
 
-    if (nrow(jac) != length(h) || ncol(jac) != J) {
+    if (nrow(jac) != length(h) || ncol(jac) != param_dim) {
       stop(
-        "eq_jac(param) must be a matrix of size n_constraints × param_dim.",
+        "eq_jac(param) must be a matrix of size n_constraints x param_dim.",
         call. = FALSE
       )
     }
   }
 
   # --------------------------------------------------------------
-  # 5b. Validate inequality constraints
+  # 6b. Validate inequality constraints
   # --------------------------------------------------------------
   if (!is.null(ineq) && !is.function(ineq)) {
     stop("ineq must be NULL or a function(param).", call. = FALSE)
@@ -269,15 +315,14 @@ parameter_spec <- function(
   }
 
   if (!is.null(ineq) && !is.null(ineq_jac)) {
-    test_param <-
-      if (!is.null(param_0)) {
-        p0 <- if (is.list(param_0)) param_0[[1]] else param_0
-        if (is.matrix(p0)) as.numeric(p0) else p0
-      } else if (!is.null(param_lower) && !is.null(param_upper)) {
-        (param_lower + param_upper) / 2
-      } else {
-        rep(0, J)
-      }
+    test_param <- .make_test_param(
+      param_0,
+      param_dim,
+      param_lower,
+      param_upper,
+      lower_is_auto,
+      upper_is_auto
+    )
 
     g <- ineq(test_param)
     if (!is.numeric(g)) {
@@ -289,25 +334,56 @@ parameter_spec <- function(
       stop("ineq_jac(param) must return a matrix.", call. = FALSE)
     }
 
-    if (nrow(jac) != length(g) || ncol(jac) != J) {
+    if (nrow(jac) != length(g) || ncol(jac) != param_dim) {
       stop(
-        "ineq_jac(param) must be a matrix of size n_constraints × param_dim.",
+        "ineq_jac(param) must be a matrix of size n_constraints x param_dim.",
         call. = FALSE
       )
     }
   }
 
   # --------------------------------------------------------------
-  # 6. Write back normalized fields
+  # 7. Write back all normalized fields
   # --------------------------------------------------------------
-  x$param_dim <- J
+  x$param_mle_fn <- param_mle_fn # explicit write-back for consistency
+  x$param_dim <- param_dim
   x$param_0 <- param_0
   x$param_lower <- param_lower
   x$param_upper <- param_upper
   x$eq <- eq
   x$eq_jac <- eq_jac
+  x$ineq <- ineq
+  x$ineq_jac <- ineq_jac
 
   x
+}
+
+# ----------------------------------------------------------------------
+# Internal helper: construct a test parameter for constraint validation
+# Extracted to avoid duplicating the same logic for eq and ineq checks.
+# ----------------------------------------------------------------------
+
+.make_test_param <- function(
+  param_0,
+  param_dim,
+  param_lower,
+  param_upper,
+  lower_is_auto,
+  upper_is_auto
+) {
+  if (!is.null(param_0)) {
+    p0 <- if (is.list(param_0)) param_0[[1]] else param_0
+    if (is.matrix(p0)) as.numeric(p0) else p0
+  } else if (
+    !lower_is_auto &&
+      !is.null(param_lower) &&
+      !upper_is_auto &&
+      !is.null(param_upper)
+  ) {
+    (param_lower + param_upper) / 2
+  } else {
+    rep(0, param_dim)
+  }
 }
 
 # ======================================================================
@@ -317,8 +393,9 @@ parameter_spec <- function(
 #' @export
 print.parameter_spec <- function(x, ...) {
   cat("# Parameter Specification\n")
-  cat("- Name:        ", x$name, "\n", sep = "")
-  cat("- Dimension:   ", x$param_dim, "\n", sep = "")
+  cat("- Name:            ", x$name, "\n", sep = "")
+  cat("- Dimension:       ", x$param_dim, "\n", sep = "")
+  cat("- param_mle_fn():  ✔ function\n")
 
   if (!is.null(x$param_0)) {
     cat("- True value(s):\n")
@@ -326,7 +403,6 @@ print.parameter_spec <- function(x, ...) {
     fmt_vec <- function(v) {
       nms <- names(v)
       vals <- format(v)
-
       if (!is.null(nms)) {
         paste0(nms, " = ", vals, collapse = ", ")
       } else {
@@ -336,20 +412,16 @@ print.parameter_spec <- function(x, ...) {
 
     if (is.list(x$param_0)) {
       list_names <- names(x$param_0)
-
       for (i in seq_along(x$param_0)) {
         label <- if (!is.null(list_names) && nzchar(list_names[i])) {
-          paste0(list_names[i])
+          list_names[i]
         } else {
           i
         }
-
         cat("  [", label, "]: ", sep = "")
-
         p <- x$param_0[[i]]
         v <- if (is.matrix(p)) as.numeric(p) else p
         names(v) <- if (!is.null(names(p))) names(p) else names(v)
-
         cat("(", fmt_vec(v), ")\n", sep = "")
       }
     } else if (is.matrix(x$param_0)) {
@@ -361,26 +433,24 @@ print.parameter_spec <- function(x, ...) {
     }
   }
 
+  fmt_bounds <- function(b) {
+    if (identical(b, "auto")) {
+      "(auto — resolved at calibration)"
+    } else {
+      paste0("(", paste(format(b), collapse = ", "), ")")
+    }
+  }
+
   if (!is.null(x$param_lower)) {
-    cat(
-      "- Lower bounds: (",
-      paste(format(x$param_lower), collapse = ", "),
-      ")\n",
-      sep = ""
-    )
+    cat("- Lower bounds:    ", fmt_bounds(x$param_lower), "\n", sep = "")
   }
 
   if (!is.null(x$param_upper)) {
-    cat(
-      "- Upper bounds: (",
-      paste(format(x$param_upper), collapse = ", "),
-      ")\n",
-      sep = ""
-    )
+    cat("- Upper bounds:    ", fmt_bounds(x$param_upper), "\n", sep = "")
   }
 
   if (!is.null(x$eq)) {
-    cat("- Equality constraints: present\n")
+    cat("- Equality constraints:   present\n")
   }
 
   if (!is.null(x$ineq)) {

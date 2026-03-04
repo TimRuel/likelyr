@@ -25,8 +25,8 @@
 new_parameter_spec <- function(x) .new_spec(x, "parameter_spec")
 new_likelihood_spec <- function(x) .new_spec(x, "likelihood_spec")
 new_estimand_spec <- function(x) .new_spec(x, "estimand_spec")
-new_nuisance_spec <- function(x) .new_spec(x, "nuisance_spec")
-new_optimizer_spec <- function(x) .new_spec(x, "optimizer_spec")
+new_pipeline_spec <- function(x) .new_spec(x, "pipeline_spec")
+new_solver_spec <- function(x) .new_spec(x, "solver_spec")
 new_execution_spec <- function(x) .new_spec(x, "execution_spec")
 
 new_serial_spec <- function(x) {

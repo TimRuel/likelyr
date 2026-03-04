@@ -1,0 +1,395 @@
+# ======================================================================
+# likelyr — Package Map
+# Based on actual R/ directory contents (uploaded 2026-03-03)
+#
+# Organised by responsibility layer. Each entry shows the file,
+# the key public/internal functions it provides, and what it
+# depends on or feeds into.
+# ======================================================================
+
+
+# ----------------------------------------------------------------------
+# LAYER 1 — SPECIFICATIONS
+# Plain data containers. No computation. Built once by the user
+# via make_*() functions in the application spec files.
+# ----------------------------------------------------------------------
+
+class-system.R
+  # Low-level S3 constructors used by all spec files.
+  # new_parameter_spec(), new_likelihood_spec(), new_estimand_spec(),
+  # new_nuisance_spec(), new_optimizer_spec(), new_execution_spec(),
+  # new_model_spec()
+  # .prepend_class(), .new_spec()
+
+spec-parameter.R        parameter_spec()
+  # Holds: param_0, param_dim, param_lower, param_upper,
+  #        eq, eq_jac, ineq, ineq_jac
+  # "auto" sentinel: param_lower/upper = "auto" deferred to calibration
+  # print method included
+
+spec-likelihood.R       likelihood_spec()
+  # Holds: loglik(param, data), param_mle_fn(data), name
+
+spec-estimand.R         estimand_spec()
+  # Holds: psi_fn, psi_jac, search_interval_fn, increment,
+  #        confidence_levels, gamma, cutoff_buffer,
+  #        uniroot_expand_factor, psi_lower, psi_upper, psi_0
+  # print method included
+
+spec-nuisance.R         nuisance_spec()
+  # Holds: E_loglik(param, omega_hat, data),
+  #        E_loglik_grad (optional),
+  #        omega_hat: list(initgen, initgen_args,
+  #                        sampler, sampler_args,
+  #                        permuter, permuter_args)
+  # print method included
+
+spec-optimizer.R        optimizer_spec()
+  # Holds: localsolver, control, localtol, max_retries,
+  #        stop_at_bounds, eval_at_bounds,
+  #        branch_mode_locator_method,   # "hybrid", "brent", etc.
+  #        branch_mode_locator_args,
+  #        branch_agg_args
+  # print method included
+
+spec-execution.R        serial_spec(), parallel_spec()
+  # serial_spec: R, seed, packages
+  # parallel_spec: num_workers, chunk_size, seed, packages
+
+spec-model.R            model_spec(), add()
+  # Container holding all specs.
+  # add(model, spec) attaches a spec to its slot.
+  # calibrate() is the S3 generic dispatched from here.
+  # Slot lock: structural slots (parameter, likelihood, estimand,
+  #   nuisance) cannot be replaced after calibration.
+
+
+# ----------------------------------------------------------------------
+# LAYER 2 — CALIBRATION
+# Runs once at startup. Each function takes its spec + dependencies,
+# does one-time computation, returns the augmented spec.
+# All called internally by calibrate.model_spec().
+# ----------------------------------------------------------------------
+
+calibrate-model.R       calibrate(), calibrate.model_spec()
+  # Orchestrates the full calibration sequence:
+  #   calibrate_likelihood → calibrate_parameter →
+  #   calibrate_estimand → calibrate_nuisance →
+  #   calibrate_optimizer → calibrate_execution
+  # Returns a "calibrated" model object.
+
+calibrate-parameter.R   calibrate_parameter(parameter, likelihood, data)
+  # Computes param_mle via likelihood$param_mle_fn(data)
+  # Resolves "auto" bounds: radius = max(|param_mle|)*3 + 5
+  # Validates MLE against constraints and bounds
+  # Adds: parameter$param_mle, resolves param_lower/param_upper
+
+calibrate-likelihood.R  calibrate_likelihood(likelihood, data)
+  # Binds data into loglik closure: loglik(param) = orig(param, data)
+  # Adds: likelihood$loglik (data-bound)
+
+calibrate-estimand.R    calibrate_estimand(estimand, data, param_mle)
+  # Binds data into psi_fn
+  # Computes psi_mle = psi_fn(param_mle)
+  # Computes search_interval clipped to [psi_lower, psi_upper]
+  # Computes psi_0 if param_0 is available
+  # Adds: estimand$psi_mle, estimand$search_interval, estimand$psi_0
+
+calibrate-nuisance.R    calibrate_nuisance(nuisance, parameter, estimand,
+                                            optimizer, data)
+  # Binds data into E_loglik / E_loglik_grad
+  # If omega_hat spec provided: calls initgen/sampler/permuter
+  #   factory functions with base_args to produce closures
+  # Adds: nuisance$omega_hat_initgen (closure)
+  #        nuisance$omega_hat_sampler (closure)
+  #        nuisance$omega_hat_permuter (closure)
+  # Falls back to legacy make_omega_hat_initgen() /
+  #   make_omega_hat_sampler() (from eval-omega-hat.R) if no
+  #   custom constructors supplied
+
+calibrate-optimizer.R   calibrate_optimizer(optimizer, estimand, parameter,
+                                             likelihood, nuisance)
+  # Calls build_branch_fn_factory() (branch-factory.R)
+  # Resolves locator method via get_branch_mode_locator() (dispatch)
+  # Builds branch_mode_locator closure with signature:
+  #   function(omega_hat, psi_hint = NULL, n_adjacent = 3L)
+  # Adds: optimizer$branch_mode_locator (closure)
+
+calibrate-execution.R   calibrate_execution(exec)
+  # Computes total_branches from execution mode
+  # Adds: exec$total_branches
+
+
+# ----------------------------------------------------------------------
+# LAYER 3 — OMEGA-HAT GENERATION
+# Two paths: legacy (eval-omega-hat.R) and new spec-based
+# (nuisance.R application file). Both produce the same interface.
+# ----------------------------------------------------------------------
+
+eval-omega-hat.R        make_omega_hat_initgen(cal)
+                        make_omega_hat_sampler(cal)
+  # LEGACY path. Used when nuisance spec has no custom constructors.
+  # initgen: multi-scale Gaussian perturbation of param_mle,
+  #   tangent-space dispersion via psi_jac null space,
+  #   optional recentering on history
+  # sampler: auglag feasibility projection onto psi(omega) = psi_mle
+  # Note: being superseded by spec-based path in nuisance.R
+
+
+# ----------------------------------------------------------------------
+# LAYER 4 — BRANCH CONSTRUCTION
+# The core numerical pipeline. Called during integration.
+# ----------------------------------------------------------------------
+
+branch-factory.R        build_branch_fn_factory(parameter, likelihood,
+                                                 estimand, nuisance, optimizer)
+  # Returns: factory(omega_hat) -> branch_fn(psi_target, param_init)
+  # branch_fn solves: max_theta E_loglik(theta, omega_hat)
+  #   subject to psi(theta) = psi_target [+ optional eq/ineq]
+  # Permutation correction (v3.5): evaluates all J "bring-k-to-front"
+  #   permutations of theta_hat and returns best loglik as branch_val
+  # Returns: param_hat (best perm), branch_val, param_hat_orig,
+  #   ll_orig, E_loglik_at_hat, E_loglik_gap, psi_residual,
+  #   eq_resid_inf, ineq_max, bound_min_slack, solver_*
+
+branch-mode-dispatch.R  get_branch_mode_locator(method)
+  # Maps method name -> factory function
+  # Methods: "hybrid", "brent", "grid_scan", "multiplier_root"
+
+branch-mode-hybrid.R    branch_mode_locator_hybrid(...)
+  # Phase 1 — Bracket: step outward from psi_hint until unimodal
+  #   triplet found; fallback to coarse grid scan
+  # Phase 2 — Refine: golden section search within bracket
+  # Phase 3 — Snap: recheck ±n_adjacent grid points, return
+  #   grid-aligned psi_hat
+  # n_adjacent MUST match screen()'s n_adjacent
+
+branch-mode-brent.R     branch_mode_locator_brent(...)
+  # Direct Brent maximization over search_interval
+  # Faster but assumes unimodality; less robust than hybrid
+
+branch-mode-grid_scan.R branch_mode_locator_grid_scan(...)
+  # Evaluates on coarse grid, takes maximizer
+  # Most robust; intended for debugging and validation
+
+branch-mode-multiplier_root.R  branch_mode_locator_multiplier_root(...)
+  # Root-finding on numerical derivative of branch log-likelihood
+  # Requires smooth interior mode; anchored FD for stability
+
+branch-mode-utils.R
+  # Shared internal helpers for all locators:
+  # safe_eval_branch() — returns -Inf on failure
+
+branch-adjacent.R       get_adjacent_psi_points(psi_hat_branch, grid)
+  # Snaps psi_hat to nearest grid points on each side
+  # Returns: left, right, k_left, k_right
+
+branch-walk.R           walk_branch_side(grid, k_direction, k_start,
+                                          branch_cutoff, init_guess,
+                                          branch_fn, max_retries, ...)
+  # One-sided sweep along psi-grid with warm-start chaining
+  # Handles stop_at_bounds / eval_at_bounds
+  # Returns tibble of (k, loglik) pairs
+
+branch-generate.R       build_one_branch(psi_hat_branch, param_hat_branch,
+                                          branch_cutoff, grid, branch_fn)
+                        generate_branches(cal, verbose)
+  # build_one_branch: full left+right sweep from branch mode
+  # generate_branches: Monte Carlo loop over omega_hats,
+  #   calls screen() to get accepted omega_hats, then
+  #   build_one_branch() for each
+
+branch-aggregate.R      aggregate_branches(...)
+  # Combines branch matrix into integrated log-likelihood curve
+  # Stage 1: structural filtering (malformed / too-short branches)
+  # Stage 2: statistical filtering (delta-cutoff below global peak)
+  # Stage 3: psi-wise log-mean-exp aggregation
+
+branch-utils.R          compute_num_branches(execution)
+                        psi_grid_anchor(...)
+  # compute_num_branches: R from serial or num_workers*chunk_size
+  # psi_grid_anchor: builds grid object with psi_mle, increment,
+  #   psi_lower, psi_upper
+
+
+# ----------------------------------------------------------------------
+# LAYER 5 — SCREENING & DIAGNOSTICS
+# Quality control before integration.
+# ----------------------------------------------------------------------
+
+screen.R                screen(cal, R, n_adjacent, ...)
+  # Draws omega_hats, locates branch mode for each, evaluates
+  # local geometry grid (2*n_adjacent+1 points), runs 4 checks:
+  #   .check_side_curvature  — second differences negative on both sides
+  #   .check_side_balance    — drop_left / drop_right ratio < max_ratio
+  #   + monotonicity + mode dominance (inline)
+  # Accepts or rejects each candidate; logs specific failure reason
+  # Mode shift loop: if grid maximum ≠ declared mode, shifts and retries
+  # Permutation enqueue: accepted omega_hats spawn permuted variants
+  # Stores accepted omega_hats in cal$workspace$omega_hats
+
+probe.R                 probe(cal, R, psi_step, ...)
+  # Fast preflight: draws R omega_hats, locates modes, probes
+  # local shape at psi_hat ± psi_step
+  # Returns "probe" object with $summary, $diagnostics, $omega_hats
+  # print.probe() and plot.probe() methods included
+
+
+# ----------------------------------------------------------------------
+# LAYER 6 — LIKELIHOOD COMPUTATION (PUBLIC API)
+# ----------------------------------------------------------------------
+
+likelihood-profile.R    profile(cal, verbose)
+  # Computes profile log-likelihood: single branch with omega = param_mle
+  # Calls generate_profile() (profile-generate.R)
+  # Stores result in cal$workspace$profile
+
+likelihood-integrate.R  integrate(cal, verbose, ...)
+  # Requires screen() to have been run first
+  # Calls generate_branches() (branch-generate.R)
+  # Calls aggregate_branches() (branch-aggregate.R)
+  # Stores result in cal$workspace$integrate
+
+likelihood-infer.R      infer(cal, which, alpha_levels)
+  # Point estimate via fit_psi_ll_fn() + spline maximization
+  # Confidence intervals via log-likelihood inversion
+  # Stores in cal$workspace[[name]]$inference
+
+likelihood-diagnose.R   diagnose(cal, verbose)
+  # Attaches diagnostics data to each result (HPC-safe, no plots)
+  # Dispatches to diagnose_integrate() or diagnose_profile()
+
+likelihood-compare.R    compare(cal)
+  # Synthesizes comparison between profile and integrated results
+  # Stores in cal$workspace$comparison
+
+likelihood-workspace.R
+  # print.workspace() — shows which results are present
+
+
+# ----------------------------------------------------------------------
+# LAYER 7 — PROFILE LIKELIHOOD INTERNALS
+# ----------------------------------------------------------------------
+
+profile-generate.R      generate_profile(psi_mle, param_mle, ...)
+  # Sweeps left and right from MLE along psi-grid
+  # Calls walk_profile_side() (profile-walk.R)
+
+profile-walk.R          walk_profile_side(grid, k_direction, ...)
+  # One-sided profile sweep with warm-start chaining
+  # Mirrors walk_branch_side but for profile (no omega_hat)
+
+
+# ----------------------------------------------------------------------
+# LAYER 8 — DIAGNOSTICS INTERNALS (HPC-safe compute / local plot)
+# ----------------------------------------------------------------------
+
+likelihood-diagnose-integrate.R     diagnose_integrate(res)
+likelihood-diagnose-integrate-metrics.R  compute_integrate_likelihood_stats()
+likelihood-diagnose-integrate-plots.R    build_integrate_ess_plot(), ...
+
+likelihood-diagnose-profile.R       diagnose_profile(res)  # skeleton
+likelihood-diagnose-profile-metrics.R   compute_profile_warnings()  # stub
+likelihood-diagnose-profile-plots.R     build_diagnostics_plots_profile()  # stub
+
+
+# ----------------------------------------------------------------------
+# LAYER 9 — INFERENCE & COMPARISON INTERNALS
+# ----------------------------------------------------------------------
+
+infer-synthesize.R      synthesize_inference(psi_ll_df, alpha_levels, ...)
+infer-point_estimate.R  fit_psi_ll_fn(psi_ll_df)
+infer-interval_estimate.R  find_ci_root(...)
+infer-render.R          render_point_estimate_table(...)   # local-only
+infer-render.R          render_interval_estimate_table(...)
+
+compare-synthesize.R    synthesize_comparison(workspace)
+compare-point_estimates.R   get_point_estimates_df(res)
+compare-interval_estimates.R  get_interval_estimates_df(res)
+compare-render.R        render_point_estimates_comparison_table(...)  # local-only
+
+
+# ----------------------------------------------------------------------
+# LAYER 10 — PRESENTATION (local-only — never run on HPC)
+# ----------------------------------------------------------------------
+
+view.R                  view(x, ...)   # S3 generic
+plot-likelihood.R       plot_pseudolikelihood_points(), plot_pseudolikelihood_curve()
+plot-style.R            plot_curve_color(), plot_diagnostics_style(), ...
+plot-utils.R            plot_base(), plot_theme_base(), make_diagnostics_line()
+table-palette.R         semantic color accessors for kableExtra tables
+table-utils.R           .table_caption()
+
+
+# ----------------------------------------------------------------------
+# UTILITIES
+# ----------------------------------------------------------------------
+
+utils.R
+  # %||%  — null-coalescing operator (used everywhere)
+  # bundle_fn() — injects function dependencies for parallel workers
+
+validators-results.R
+  # validate_integrate_result(), validate_infer_input(),
+  # validate_compare_input(), .is_df()
+
+imports.R
+  # @importFrom declarations for NAMESPACE
+
+
+# ----------------------------------------------------------------------
+# KEY INTERFACES (what calls what)
+# ----------------------------------------------------------------------
+
+# User-facing pipeline:
+#   model |> calibrate(data)
+#     -> screen(cal)          # fills cal$workspace$omega_hats
+#     -> profile(cal)         # fills cal$workspace$profile
+#     -> integrate(cal)       # fills cal$workspace$integrate
+#     -> infer(cal)           # fills cal$workspace$*/inference
+#     -> diagnose(cal)        # fills cal$workspace$*/diagnostics
+#     -> compare(cal)         # fills cal$workspace$comparison
+#     -> view(cal) / plot(cal)
+
+# Internal branch pipeline:
+#   calibrate_optimizer()
+#     -> build_branch_fn_factory()     [branch-factory.R]
+#     -> get_branch_mode_locator()     [branch-mode-dispatch.R]
+#     -> branch_mode_locator_*()       [branch-mode-*.R]
+#
+#   screen() / generate_branches()
+#     -> optimizer$branch_mode_locator(omega_hat)
+#     -> branch_fn_factory(omega_hat)(psi_target, param_init)
+#     -> walk_branch_side()            [branch-walk.R]
+#     -> aggregate_branches()          [branch-aggregate.R]
+
+# ----------------------------------------------------------------------
+# WHAT IS CURRENTLY IN FLUX
+# ----------------------------------------------------------------------
+
+# eval-omega-hat.R (LEGACY)
+#   make_omega_hat_initgen() and make_omega_hat_sampler() are the old
+#   path. Being superseded by the spec-based constructors in the
+#   application nuisance.R. Both paths coexist; calibrate-nuisance.R
+#   falls back to legacy if no custom constructors are supplied.
+
+# branch-factory.R (v3.5 — RECENTLY UPDATED)
+#   Added permutation correction. param_hat_orig and ll_orig now
+#   returned alongside best-permutation result. Not yet integrated
+#   into branch-walk.R's warm-start logic.
+
+# screen.R (NEEDS REDESIGN)
+#   Currently a binary accept/reject filter with mode-shift loop.
+#   Mode shift is frequently triggered (>80% rejection rate).
+#   Redesign goal: return branch quality diagnostics rather than
+#   binary pass/fail; let integrate() use all branches weighted
+#   by quality rather than hard-rejecting.
+
+# tests/testthat/ (EMPTY)
+#   No tests exist yet. Highest priority targets:
+#     - softmax_from_eta / theta_to_eta round-trip
+#     - .solve_shape_family (k, J, psi_target)
+#     - psi_fn(param) in [1/J, 1]
+#     - psi_fn(param_mle) == psi_mle
+#     - calibrate_parameter "auto" bounds: param_mle strictly interior
+#     - branch_fn constraint satisfaction: |psi_residual| < tol

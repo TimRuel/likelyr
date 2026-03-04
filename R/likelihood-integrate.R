@@ -1,28 +1,24 @@
 # ======================================================================
-# likelihood-integrate.R  — Unified likelyr API version (HPC-safe)
+# likelihood-integrate.R — Integrated Likelihood (post-screening)
 # ======================================================================
 
 #' Integrated Log-Likelihood
 #'
 #' @description
-#' Computes the integrated log-likelihood and attaches it to the input
-#' `calibrated` model object under `$workspace$integrate`. The updated object
-#' is returned.
+#' Computes the integrated log-likelihood using *pre-screened* omega-hat
+#' values stored in the calibrated model object.
 #'
-#' This function performs **no plotting or table rendering**. Visualization
-#' is deferred to `plot()` / `view()` methods, which materialize plots/tables
-#' locally from stored data frames.
-#'
-#' This function is **silent by default** for pipe-friendly workflows.
-#' Set `verbose = TRUE` to display diagnostic messages.
+#' This function assumes [screen()] has already been run and will error
+#' otherwise. No omega-hat sampling occurs inside integrate().
 #'
 #' @param cal A `calibrated` model object.
 #' @param verbose Logical; print diagnostics. Default: FALSE.
 #' @param ... Additional arguments passed to `generate_branches()`.
 #'
 #' @return The SAME `calibrated` model object, augmented with:
-#'         • class `integrated`
-#'         • `$workspace$integrate` — an `integrate` object
+#'   • class `integrated`
+#'   • `$workspace$integrate` — integrated likelihood result
+#'
 #' @export
 integrate <- function(cal, ...) {
   UseMethod("integrate")
@@ -40,7 +36,7 @@ integrate.default <- function(cal, ...) {
 #' @export
 integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
-  # 0A. Ensure object has been calibrated properly
+  # 0A. Ensure object has been calibrated
   # ------------------------------------------------------------------
   if (!is_calibrated(cal)) {
     stop(
@@ -50,71 +46,71 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 0B. Ensure model_spec is complete for likelihood integration
+  # 0B. Ensure structural completeness
   # ------------------------------------------------------------------
   validate_integrate_input(cal)
 
-  # Pull calibrated quantities
-  psi_fn <- cal$estimand$psi_fn
-  psi_mle <- cal$estimand$psi_mle
-  param_mle <- cal$parameter$param_mle
-
   # ------------------------------------------------------------------
-  # 1. Create `integrate` working area inside workspace$integrate
+  # 0C. Require pre-screened omega-hats
   # ------------------------------------------------------------------
+  ws <- cal$workspace
+  omega_hats <- ws$integrate$omega_hats %||% NULL
 
-  # Prefer calibrated nuisance omega-hat components
-  if (
-    !is.null(cal$nuisance$omega_hat_initgen) &&
-      !is.null(cal$nuisance$omega_hat_sampler)
-  ) {
-    generate_init <- cal$nuisance$omega_hat_initgen
-    sample_omega_hat <- cal$nuisance$omega_hat_sampler
-  } else {
-    # Fallback: legacy behavior (no omega_hat info in nuisance_spec)
-    generate_init <- make_omega_hat_initgen(cal)
-    sample_omega_hat <- make_omega_hat_sampler(cal)
+  if (is.null(omega_hats) || length(omega_hats) == 0L) {
+    stop(
+      "integrate() requires pre-screened omega-hats.\n",
+      "Run screen(cal) before integrate().",
+      call. = FALSE
+    )
   }
 
+  R <- length(omega_hats)
+
+  # Pull calibrated quantities
+  param_mle <- cal$parameter$param_mle
+  psi_mle <- cal$estimand$psi_mle
+  exec <- cal$execution
+
+  # ------------------------------------------------------------------
+  # 1. Initialize integrate workspace (omega-hats already present)
+  # ------------------------------------------------------------------
   if (is.null(cal$workspace)) {
     cal$workspace <- list()
   }
 
   cal$workspace$integrate <- list(
-    generate_init = generate_init,
-    sample_omega_hat = sample_omega_hat
+    omega_hats = omega_hats
   )
 
-  # Mark object
+  # Mark lifecycle state
   cal <- mark_integrated(cal)
 
   # ------------------------------------------------------------------
-  # 2. Display execution summary (only if verbose)
+  # 2. Execution summary
   # ------------------------------------------------------------------
-  exec <- cal$execution
-
   if (verbose) {
-    cat("[integrate] Monte Carlo Integrated Log-Likelihood\n")
+    cat("[integrate] Integrated Log-Likelihood\n")
     cat(
-      "[integrate] Execution:",
+      "[integrate] Execution: ",
       if (inherits(exec, "parallel_spec")) "PARALLEL" else "SERIAL",
-      "| Branches:",
-      exec$total_branches,
-      "\n"
+      " | Branches: ",
+      R,
+      "\n",
+      sep = ""
     )
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch computation (HPC-safe; may rely on nloptr, parallel, etc.)
+  # 3. Branch computation (uses fixed omega-hats)
   # ------------------------------------------------------------------
   branch_result <- generate_branches(
     cal = cal,
-    verbose = verbose
+    verbose = verbose,
+    ...
   )
 
   # ------------------------------------------------------------------
   # 4. Final aggregation (log-sum-exp)
-  #    NOTE: No plotting or rendering here; only store data frames.
   # ------------------------------------------------------------------
   integrate_result <- tryCatch(
     {
@@ -130,14 +126,12 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
         min_support = branch_agg_args$min_support
       )
 
-      omega_draws <- branch_result$omega_draws
-
       new_integrate_result(list(
         psi_ll_df = branch_agg$psi_ll_df,
         branch_mat = branch_agg$branch_mat,
         R_eff = branch_agg$R_eff,
         branches = branches,
-        omega_draws = omega_draws,
+        omega_draws = omega_hats,
         param_mle = param_mle,
         psi_mle = psi_mle,
         status = "success"
@@ -145,20 +139,20 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
     },
     error = function(e) {
       if (verbose) {
-        cat("[integrate] WARNING: Final averaging failed.\n")
+        cat("[integrate] WARNING: Final aggregation failed.\n")
       }
 
       new_integrate_result(list(
         status = "failed",
         error_msg = conditionMessage(e),
         branches = branch_result$branches,
-        omega_draws = branch_result$omega_draws
+        omega_draws = omega_hats
       ))
     }
   )
 
   # ------------------------------------------------------------------
-  # 5. Replace `integrate` working area with final result
+  # 5. Store final integrate result
   # ------------------------------------------------------------------
   cal$workspace$integrate <- integrate_result
 

@@ -7,7 +7,7 @@
 #' @description
 #' Prepares a model for computing profile or integrated likelihoods.
 #' Calibration is modular: each structural component (parameter,
-#' likelihood, estimand, nuisance, optimizer, execution) is processed
+#' likelihood, estimand, pipeline, execution) is processed
 #' by its own calibration helper.
 #'
 #' @param model   A `model_spec` object.
@@ -34,16 +34,21 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # -------------------------------------------------------------------
   validate_calibrate_input(model)
 
-  # Attach data
   model$data <- data
 
   # -------------------------------------------------------------------
   # 2. Modular calibration of structural components
+  #
+  # Order matters:
+  #   parameter  — computes param_mle; needed by estimand and pipeline
+  #   likelihood — binds data into loglik / E_loglik closures
+  #   estimand   — binds data into psi_fn; computes psi_mle
+  #   pipeline   — uses param_mle, psi_mle, and calibrated closures
+  #                to build search interval, omega-hat closures, and
+  #                branch mode locator
   # -------------------------------------------------------------------
-
   model$parameter <- calibrate_parameter(
     parameter = model$parameter,
-    likelihood = model$likelihood,
     data = data
   )
 
@@ -59,26 +64,18 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
     param_0 = model$parameter$param_0
   )
 
-  model$nuisance <- calibrate_nuisance(
-    nuisance = model$nuisance,
-    parameter = model$parameter,
-    estimand = model$estimand,
-    optimizer = model$optimizer,
-    data = data
-  )
-
-  model$optimizer <- calibrate_optimizer(
-    optimizer = model$optimizer,
-    estimand = model$estimand,
+  model$pipeline <- calibrate_pipeline(
+    pipeline = model$pipeline,
     parameter = model$parameter,
     likelihood = model$likelihood,
-    nuisance = model$nuisance
+    estimand = model$estimand,
+    solver = model$solver,
+    data = data
   )
 
   # -------------------------------------------------------------------
   # 3. Optional execution calibration
   # -------------------------------------------------------------------
-
   if (!is.null(model$execution)) {
     model$execution <- calibrate_execution(model$execution)
   }
@@ -89,7 +86,7 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   cal <- new_calibrated_model(model)
 
   # -------------------------------------------------------------------
-  # 5. Initialize results workspace (ALWAYS present)
+  # 5. Initialize results workspace
   # -------------------------------------------------------------------
   cal$workspace <- new_workspace()
 
@@ -108,23 +105,6 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 # ======================================================================
 
 #' Validate structural components prior to calibration
-#'
-#' @description
-#' Ensures that a model object contains all required structural
-#' components before calibration is attempted.
-#'
-#' Required components:
-#' \itemize{
-#'   \item \code{parameter_spec()}
-#'   \item \code{likelihood_spec()}
-#'   \item \code{estimand_spec()}
-#'   \item \code{nuisance_spec()}
-#'   \item \code{optimizer_spec()}
-#' }
-#'
-#' @param model A model specification object to validate.
-#'
-#' @return Invisibly returns the validated \code{model} object.
 #'
 #' @keywords internal
 #' @noRd
@@ -150,16 +130,16 @@ validate_calibrate_input <- function(model) {
     )
   }
 
-  if (!inherits(model$nuisance, "nuisance_spec")) {
+  if (!inherits(model$pipeline, "pipeline_spec")) {
     stop(
-      "model$nuisance must be a nuisance_spec() before calibration.",
+      "model$pipeline must be a pipeline_spec() before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$optimizer, "optimizer_spec")) {
+  if (!inherits(model$solver, "solver_spec")) {
     stop(
-      "model$optimizer must be an optimizer_spec() before calibration.",
+      "model$solver must be a solver_spec() before calibration.",
       call. = FALSE
     )
   }
@@ -178,13 +158,9 @@ print.calibrated <- function(x, ...) {
 
   cat("# Calibrated Model (likelyr)\n\n")
 
-  # --------------------------------------------------
-  # Full parameter MLE
-  # --------------------------------------------------
   if (!is.null(param_mle)) {
     if (is.matrix(param_mle)) {
       cat("- Full Model Parameter MLE:\n")
-
       mat <- param_mle
       if (is.null(rownames(mat))) {
         rownames(mat) <- seq_len(nrow(mat))
@@ -192,11 +168,7 @@ print.calibrated <- function(x, ...) {
       if (is.null(colnames(mat))) {
         colnames(mat) <- seq_len(ncol(mat))
       }
-
-      pretty <- capture.output(
-        print(format(mat), quote = FALSE)
-      )
-
+      pretty <- capture.output(print(format(mat), quote = FALSE))
       cat(paste0("    ", pretty), sep = "\n")
       cat("\n")
     } else {
@@ -211,19 +183,7 @@ print.calibrated <- function(x, ...) {
     cat("- Full Model Parameter MLE:   <not available>\n")
   }
 
-  # --------------------------------------------------
-  # Psi MLE
-  # --------------------------------------------------
-  cat(
-    "- Parameter of Interest MLE: ",
-    format(psi_mle),
-    "\n",
-    sep = ""
-  )
-
-  # --------------------------------------------------
-  # State markers
-  # --------------------------------------------------
+  cat("- Parameter of Interest MLE: ", format(psi_mle), "\n", sep = "")
   cat("- integrated:   ", if (is_integrated(x)) "✓" else "×", "\n", sep = "")
   cat("- profiled:     ", if (is_profiled(x)) "✓" else "×", "\n", sep = "")
 

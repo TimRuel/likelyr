@@ -5,15 +5,12 @@
 #' Probe Integrated Likelihood Geometry
 #'
 #' @description
-#' Performs a fast preflight check of the omega-hat sampling scheme and
-#' branch-mode detection logic. This function draws omega-hat values,
-#' detects branch modes, and probes local curvature around each mode.
+#' Fast preflight check of omega-hat sampling + branch-mode behavior.
+#' Draws omega-hat values, locates branch modes, and probes local shape
+#' at psi_hat ± psi_step.
 #'
-#' The probe is application-agnostic and relies only on structural
+#' This function is application-agnostic and relies only on structural
 #' interfaces provided by the calibrated model.
-#'
-#' Intended to be run *before* [integrate()] to assess whether the current
-#' model specification is likely to produce well-behaved branches.
 #'
 #' @param cal A calibrated model object.
 #' @param R Integer. Number of omega-hat draws to probe. Default: 50.
@@ -21,20 +18,21 @@
 #'   Defaults to `cal$estimand$increment`.
 #' @param curvature_tol Numeric. Threshold for acceptable quadratic curvature
 #'   (should be negative). Default: -1e-3.
+#' @param mode_tol Numeric. Tolerance for comparing adjacent values to the
+#'   alleged mode. Default: 1e-8.
+#' @param flat_tol Numeric. Tolerance for treating curvature as "flat".
+#'   Default: 1e-10.
 #' @param verbose Logical. Print summary output. Default: TRUE.
 #'
-#' @return
-#' An object of class `"probe"` with components:
-#'   • `$summary` — aggregate probe statistics
-#'   • `$diagnostics` — per-omega-hat diagnostics (data.frame)
-#'   • `$omega_hats` — list of sampled omega-hat values
-#'
+#' @return A `"probe"` object with $summary, $diagnostics, $omega_hats.
 #' @export
 probe <- function(
   cal,
   R = 50L,
   psi_step = NULL,
   curvature_tol = -1e-3,
+  mode_tol = 1e-8,
+  flat_tol = 1e-10,
   verbose = TRUE
 ) {
   stopifnot(inherits(cal, "calibrated"))
@@ -48,17 +46,6 @@ probe <- function(
   # ------------------------------------------------------------
   # Preconditions
   # ------------------------------------------------------------
-  if (
-    is.null(nuisance$omega_hat_initgen) ||
-      is.null(nuisance$omega_hat_sampler)
-  ) {
-    stop(
-      "probe(): omega-hat functions not found. ",
-      "Did you run calibrate()?",
-      call. = FALSE
-    )
-  }
-
   if (is.null(optimizer$branch_mode_locator)) {
     stop(
       "probe(): optimizer must provide branch_mode_locator().",
@@ -73,8 +60,16 @@ probe <- function(
   # ------------------------------------------------------------
   # Draw omega-hats
   # ------------------------------------------------------------
-  initgen <- nuisance$omega_hat_initgen
-  sampler <- nuisance$omega_hat_sampler
+  # new — legacy fallback
+  if (
+    !is.null(nuisance$omega_hat_initgen) && !is.null(nuisance$omega_hat_sampler)
+  ) {
+    initgen <- nuisance$omega_hat_initgen
+    sampler <- nuisance$omega_hat_sampler
+  } else {
+    initgen <- make_omega_hat_initgen(cal)
+    sampler <- make_omega_hat_sampler(cal)
+  }
 
   omega_hats <- vector("list", R)
   history <- list()
@@ -98,6 +93,13 @@ probe <- function(
   )
 
   # ------------------------------------------------------------
+  # Helper: safe extraction of optional diagnostics
+  # ------------------------------------------------------------
+  .get <- function(x, nm) {
+    if (is.list(x) && !is.null(x[[nm]])) x[[nm]] else NA
+  }
+
+  # ------------------------------------------------------------
   # Diagnostics per omega-hat
   # ------------------------------------------------------------
   diag_list <- vector("list", R)
@@ -106,10 +108,7 @@ probe <- function(
     omega <- omega_hats[[r]]
 
     # ---- branch mode detection ----
-    mode_obj <- try(
-      optimizer$branch_mode_locator(omega),
-      silent = TRUE
-    )
+    mode_obj <- try(optimizer$branch_mode_locator(omega), silent = TRUE)
 
     if (
       inherits(mode_obj, "try-error") ||
@@ -121,7 +120,11 @@ probe <- function(
         r = r,
         ok = FALSE,
         reason = "mode_not_found",
+        ll_minus = NA_real_,
+        ll0 = NA_real_,
+        ll_plus = NA_real_,
         curvature = NA_real_,
+        mode_violation = NA_real_,
         stringsAsFactors = FALSE
       )
       next
@@ -134,24 +137,19 @@ probe <- function(
     # ---- local probing around branch mode ----
     branch_fn <- branch_fn_factory(omega)
 
-    left <- try(
-      branch_fn(psi_hat - psi_step, param_hat),
-      silent = TRUE
-    )
-    right <- try(
-      branch_fn(psi_hat + psi_step, param_hat),
-      silent = TRUE
-    )
+    left <- try(branch_fn(psi_hat - psi_step, param_hat), silent = TRUE)
+    right <- try(branch_fn(psi_hat + psi_step, param_hat), silent = TRUE)
 
-    if (
-      inherits(left, "try-error") ||
-        inherits(right, "try-error")
-    ) {
+    if (inherits(left, "try-error") || inherits(right, "try-error")) {
       diag_list[[r]] <- data.frame(
         r = r,
         ok = FALSE,
         reason = "local_eval_failed",
+        ll_minus = NA_real_,
+        ll0 = ll0,
+        ll_plus = NA_real_,
         curvature = NA_real_,
+        mode_violation = NA_real_,
         stringsAsFactors = FALSE
       )
       next
@@ -160,19 +158,114 @@ probe <- function(
     ll_minus <- left$branch_val
     ll_plus <- right$branch_val
 
-    # ---- curvature proxy ----
+    # ---- primary geometry diagnostics (always available) ----
     curvature <- ll_minus - 2 * ll0 + ll_plus
+    is_mode <- (ll0 + mode_tol >= ll_minus) && (ll0 + mode_tol >= ll_plus)
 
-    is_mode <- (ll0 >= ll_minus && ll0 >= ll_plus)
-    curv_ok <- is.finite(curvature) && curvature < curvature_tol
+    # Maximum amount by which neighbors exceed the alleged mode
+    mode_violation <- max(ll_minus - ll0, ll_plus - ll0, na.rm = TRUE)
+
+    curv_finite <- is.finite(curvature)
+    curv_ok <- curv_finite && curvature < curvature_tol
 
     ok <- is_mode && curv_ok
+
+    # --------------------------------------------------------
+    # Tier-1 classification (always possible)
+    # --------------------------------------------------------
+    # 1) If neighbor exceeds the mode -> mode inconsistency
+    # 2) Else if curvature >= 0 or ~0 -> flat/no interior mode
+    # 3) Else -> poor_geometry (e.g., curvature negative but too small)
+    reason <- "ok"
+    if (!is_mode) {
+      reason <- "mode_inconsistent"
+    } else if (!curv_finite) {
+      reason <- "nonfinite_curvature"
+    } else if (curvature >= -flat_tol) {
+      reason <- "flat_or_no_mode"
+    } else if (!curv_ok) {
+      reason <- "weak_curvature"
+    }
+
+    # --------------------------------------------------------
+    # Tier-2 refinement (if branch_fn returns diagnostics)
+    # --------------------------------------------------------
+    # These fields will be NA unless your branch factory provides them.
+    # If present, they can explain *why* geometry is poor.
+    left_bnd <- .get(left, "bound_min_slack")
+    right_bnd <- .get(right, "bound_min_slack")
+    left_hin <- .get(left, "ineq_max")
+    right_hin <- .get(right, "ineq_max")
+    left_eq <- .get(left, "eq_resid_inf")
+    right_eq <- .get(right, "eq_resid_inf")
+
+    left_stat <- .get(left, "solver_status")
+    right_stat <- .get(right, "solver_status")
+
+    # Heuristic flags (agnostic):
+    # - constraint kink: one side hits a bound / violates inequality much more
+    # - solver instability: status differs or residuals spike
+    constraint_kink <- FALSE
+    solver_instability <- FALSE
+
+    if (is.finite(left_bnd) && is.finite(right_bnd)) {
+      # one side much closer to a bound than the other
+      if (min(left_bnd, right_bnd) < 1e-8 && abs(left_bnd - right_bnd) > 1e-6) {
+        constraint_kink <- TRUE
+      }
+    }
+
+    if (is.finite(left_hin) && is.finite(right_hin)) {
+      # one side substantially more infeasible than the other
+      if (max(left_hin, right_hin) > 1e-6 && abs(left_hin - right_hin) > 1e-6) {
+        constraint_kink <- TRUE
+      }
+    }
+
+    if (!is.na(left_stat) && !is.na(right_stat) && left_stat != right_stat) {
+      solver_instability <- TRUE
+    }
+
+    if (is.finite(left_eq) && is.finite(right_eq)) {
+      if (max(left_eq, right_eq) > 1e-6 && abs(left_eq - right_eq) > 1e-6) {
+        solver_instability <- TRUE
+      }
+    }
+
+    # Refine reason only if we already have a failure
+    if (!ok) {
+      if (
+        reason %in% c("mode_inconsistent", "weak_curvature", "flat_or_no_mode")
+      ) {
+        if (constraint_kink) {
+          reason <- paste0(reason, "|constraint_kink")
+        }
+        if (solver_instability) {
+          reason <- paste0(reason, "|solver_instability")
+        }
+      }
+    }
 
     diag_list[[r]] <- data.frame(
       r = r,
       ok = ok,
-      reason = if (ok) "ok" else "poor_geometry",
+      reason = reason,
+      ll_minus = ll_minus,
+      ll0 = ll0,
+      ll_plus = ll_plus,
       curvature = curvature,
+      mode_violation = mode_violation,
+
+      # optional diagnostics (NA if unavailable)
+      left_bound_min_slack = left_bnd,
+      right_bound_min_slack = right_bnd,
+      left_ineq_max = left_hin,
+      right_ineq_max = right_hin,
+      left_eq_resid_inf = left_eq,
+      right_eq_resid_inf = right_eq,
+      left_solver_status = left_stat,
+      right_solver_status = right_stat,
+
       stringsAsFactors = FALSE
     )
   }
@@ -188,6 +281,14 @@ probe <- function(
     frac_curvature_ok = mean(
       diagnostics$curvature < curvature_tol,
       na.rm = TRUE
+    ),
+    frac_mode_inconsistent = mean(
+      diagnostics$reason == "mode_inconsistent",
+      na.rm = TRUE
+    ),
+    frac_flat_or_no_mode = mean(
+      grepl("^flat_or_no_mode", diagnostics$reason),
+      na.rm = TRUE
     )
   )
 
@@ -198,6 +299,16 @@ probe <- function(
     cat(
       "Curvature OK fraction:  ",
       sprintf("%.2f", summary$frac_curvature_ok),
+      "\n"
+    )
+    cat(
+      "Mode inconsistent frac: ",
+      sprintf("%.2f", summary$frac_mode_inconsistent),
+      "\n"
+    )
+    cat(
+      "Flat/no-mode frac:      ",
+      sprintf("%.2f", summary$frac_flat_or_no_mode),
       "\n"
     )
   }
@@ -213,7 +324,7 @@ probe <- function(
 }
 
 # ======================================================================
-# Print method for probe
+# Print method for probe (enhanced diagnostics)
 # ======================================================================
 
 #' @export
@@ -239,13 +350,31 @@ print.probe <- function(x, ...) {
     sep = ""
   )
 
+  if (!is.null(summary$frac_mode_inconsistent)) {
+    cat(
+      "Mode inconsistent:   ",
+      sprintf("%.2f", summary$frac_mode_inconsistent),
+      "\n",
+      sep = ""
+    )
+  }
+
+  if (!is.null(summary$frac_flat_or_no_mode)) {
+    cat(
+      "Flat / no mode:      ",
+      sprintf("%.2f", summary$frac_flat_or_no_mode),
+      "\n",
+      sep = ""
+    )
+  }
+
   # --------------------------------------------------
   # Failure breakdown
   # --------------------------------------------------
   if (!all(diag$ok)) {
     cat("\nFailure breakdown:\n")
 
-    tab <- table(diag$reason)
+    tab <- sort(table(diag$reason), decreasing = TRUE)
     for (nm in names(tab)) {
       cat(
         "  - ",
@@ -259,23 +388,47 @@ print.probe <- function(x, ...) {
   }
 
   # --------------------------------------------------
+  # Severity diagnostics (if available)
+  # --------------------------------------------------
+  if ("mode_violation" %in% names(diag)) {
+    bad <- diag$mode_violation[!diag$ok & is.finite(diag$mode_violation)]
+    if (length(bad) > 0) {
+      cat(
+        "\nMode violation (max adjacent excess):\n",
+        "  median = ",
+        signif(stats::median(bad), 3),
+        ", max = ",
+        signif(max(bad), 3),
+        "\n",
+        sep = ""
+      )
+    }
+  }
+
+  # --------------------------------------------------
   # Heuristic guidance
   # --------------------------------------------------
-  if (summary$frac_ok < 0.7) {
+  if (summary$frac_ok < 0.5) {
+    cat(
+      "\n❌ Omega-hat sampling frequently induces ill-defined branches.\n",
+      "   Many omega-hats may not admit an interior branch mode.\n",
+      sep = ""
+    )
+  } else if (summary$frac_ok < 0.7) {
     cat(
       "\n⚠️  Warning: Low fraction of well-behaved branch modes.\n",
-      "   Consider tightening omega-hat sampling or adding barriers.\n",
+      "   Expect many branches to be discarded during aggregation.\n",
       sep = ""
     )
   } else if (summary$frac_ok < 0.9) {
     cat(
       "\nℹ️  Moderate branch quality.\n",
-      "   integrate() may work, but expect some discarded branches.\n",
+      "   integrate() may work, but diagnostics are recommended.\n",
       sep = ""
     )
   } else {
     cat(
-      "\n✓ Omega-hat sampling appears healthy.\n",
+      "\n✓ Omega-hat sampling appears geometrically stable.\n",
       sep = ""
     )
   }
@@ -284,7 +437,7 @@ print.probe <- function(x, ...) {
 }
 
 # ======================================================================
-# Plot method for probe
+# Plot method for probe (enhanced geometry diagnostics)
 # ======================================================================
 
 #' @export
@@ -314,28 +467,42 @@ plot.probe <- function(x, ...) {
   abline(v = 0, col = "red", lty = 2)
 
   # --------------------------------------------------
-  # 2. Curvature vs draw index
+  # 2. Mode violation vs curvature
   # --------------------------------------------------
-  plot(
-    diag$r,
-    diag$curvature,
-    pch = 19,
-    col = ifelse(diag$ok, "black", "red"),
-    main = "Curvature by ω̂ draw",
-    xlab = "Draw index",
-    ylab = "Curvature"
-  )
-  abline(h = 0, col = "red", lty = 2)
+  if ("mode_violation" %in% names(diag)) {
+    mv <- diag$mode_violation
+    plot(
+      mv,
+      diag$curvature,
+      pch = 19,
+      col = ifelse(diag$ok, "black", "red"),
+      main = "Mode violation vs curvature",
+      xlab = "Max(ℓ_adj − ℓ_mode)",
+      ylab = "Curvature"
+    )
+    abline(v = 0, col = "grey60", lty = 2)
+    abline(h = 0, col = "grey60", lty = 2)
+  } else {
+    plot.new()
+    text(0.5, 0.5, "mode_violation\nnot available")
+  }
 
   # --------------------------------------------------
-  # 3. OK vs not OK
+  # 3. Geometry by outcome class
   # --------------------------------------------------
+  cls <- factor(
+    ifelse(
+      diag$ok,
+      "OK",
+      sub("\\|.*$", "", diag$reason)
+    )
+  )
+
   boxplot(
-    curvature ~ ok,
-    data = diag,
-    names = c("Fail", "OK"),
-    col = c("grey85", "grey60"),
-    main = "Curvature by branch quality",
+    diag$curvature ~ cls,
+    las = 2,
+    col = "grey80",
+    main = "Curvature by branch outcome",
     ylab = "Curvature"
   )
   abline(h = 0, col = "red", lty = 2)

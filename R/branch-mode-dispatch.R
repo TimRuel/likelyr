@@ -42,7 +42,7 @@
 #' @keywords internal
 #' @noRd
 get_branch_mode_locator <- function(method) {
-  switch(
+  locator_factory <- switch(
     method,
     hybrid = branch_mode_locator_hybrid,
     grid_scan = branch_mode_locator_grid_scan,
@@ -54,4 +54,15 @@ get_branch_mode_locator <- function(method) {
       call. = FALSE
     )
   )
+
+  if (!is.function(locator_factory)) {
+    stop(
+      "Branch mode locator '",
+      method,
+      "' did not resolve to a function.",
+      call. = FALSE
+    )
+  }
+
+  locator_factory
 }

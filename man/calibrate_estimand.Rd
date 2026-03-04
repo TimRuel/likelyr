@@ -7,7 +7,7 @@
 calibrate_estimand(estimand, data, param_mle, param_0 = NULL)
 }
 \arguments{
-\item{estimand}{An estimand_spec object.}
+\item{estimand}{An \code{estimand_spec} object.}
 
 \item{data}{User data.}
 
@@ -16,19 +16,19 @@ calibrate_estimand(estimand, data, param_mle, param_0 = NULL)
 \item{param_0}{Optional numeric vector; true parameter value.}
 }
 \value{
-The same estimand_spec object, enriched with:
-• psi_fn (data-bound)
-• psi_jac (data-bound if present)
-• psi_mle
-• psi_0 (if available)
-• search_interval (clipped to ψ bounds)
+The same \code{estimand_spec} object, enriched with:
+\itemize{
+\item \code{$psi_fn}  — data-bound closure
+\item \code{$psi_jac} — data-bound closure (if present)
+\item \code{$psi_mle}
+\item \code{$psi_0}   — if available
+}
 }
 \description{
-Binds data into psi_fn(), computes psi_MLE and (optionally) psi_0,
-evaluates the search interval, and enforces geometric bounds on ψ.
+Binds data into \code{psi_fn()} and \code{psi_jac()}, computes
+\code{psi_mle}, and optionally sets \code{psi_0} from \code{param_0}.
 
-If psi_0 is already present on the estimand_spec (e.g. supplied
-directly by the user or injected earlier), it is respected and
-not recomputed.
+If \code{psi_0} is already present on the \code{estimand_spec}
+(supplied directly by the user), it is respected and not recomputed.
 }
 \keyword{internal}

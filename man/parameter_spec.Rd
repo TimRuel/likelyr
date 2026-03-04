@@ -5,6 +5,7 @@
 \title{Specify the Parameter Space for a Likelihood Model}
 \usage{
 parameter_spec(
+  param_mle_fn,
   param_0 = NULL,
   param_dim = NULL,
   param_lower = NULL,
@@ -18,14 +19,26 @@ parameter_spec(
 )
 }
 \arguments{
+\item{param_mle_fn}{Function(data) → numeric vector giving the
+maximum likelihood estimate of the full unconstrained parameter
+vector. Called once during calibration to compute \code{param_mle},
+which is then used to resolve "auto" bounds, evaluate \code{psi_mle},
+and initialize branch evaluation. Must return a finite numeric
+vector of length \code{param_dim}.}
+
 \item{param_0}{Optional numeric vector, 1-column matrix,
-OR list of such objects giving true / initial parameters.}
+OR list of such objects giving value of true model parameter.}
 
 \item{param_dim}{Optional integer giving the parameter dimension.}
 
-\item{param_lower}{Optional numeric scalar or vector of lower bounds.}
+\item{param_lower}{Optional numeric scalar or vector of lower bounds,
+or the string \code{"auto"} to request bounds computed from
+\code{param_mle} during calibration. When \code{"auto"}, bounds
+are set to \code{param_mle - radius} where
+\code{radius = max(abs(param_mle)) * 3 + 5}.}
 
-\item{param_upper}{Optional numeric scalar or vector of upper bounds.}
+\item{param_upper}{Optional numeric scalar or vector of upper bounds,
+or \code{"auto"} (see \code{param_lower}).}
 
 \item{eq}{Optional function(param) → numeric vector = 0.}
 
@@ -50,6 +63,7 @@ Defines the parameter space, including:
 • box constraints (lower, upper)
 • equality constraints h(param) = 0 and Jacobian
 • inequality constraints h(param) ≤ 0 and Jacobian
+• analytic MLE initializer
 
 Exactly one of \code{param_0} or \code{param_dim} must be supplied.
 }

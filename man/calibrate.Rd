@@ -19,6 +19,6 @@ A \code{calibrated} model object.
 \description{
 Prepares a model for computing profile or integrated likelihoods.
 Calibration is modular: each structural component (parameter,
-likelihood, estimand, nuisance, optimizer, execution) is processed
+likelihood, estimand, pipeline, execution) is processed
 by its own calibration helper.
 }

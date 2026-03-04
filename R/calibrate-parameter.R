@@ -1,54 +1,68 @@
 # ======================================================================
-# Parameter Calibration (v1.2) — equality + inequality constraints
+# Parameter Calibration (v1.4) — equality + inequality constraints
 #
 # This calibration step:
-#   • Computes param_MLE using likelihood$param_mle_fn(data)
+#   • Computes param_MLE using parameter$param_mle_fn(data)
+#   • Resolves "auto" bounds from param_mle when requested
 #   • Ensures the MLE respects parameter dimension & constraints
 #   • Validates equality and inequality constraints at the MLE
 #   • Stores param_MLE inside the parameter_spec object
 #
 # NOTE:
-#   • Requires both parameter_spec AND likelihood_spec, because the
-#     MLE comes from the likelihood's analytic initializer.
+#   • param_mle_fn now lives on parameter_spec, not likelihood_spec.
+#     This function no longer requires a likelihood argument.
 #   • Equality constraints are treated as *structural feasibility*
 #     conditions and must be satisfied (up to tolerance) by param_MLE.
+#
+# AUTO BOUNDS:
+#   Pass param_lower = "auto" and/or param_upper = "auto" in
+#   parameter_spec() to request bounds computed from param_mle.
+#   The radius formula is:
+#
+#     radius <- max(abs(param_mle)) * 3 + 5
+#
+#   which guarantees param_mle is at most 1/4 of the way to the bound
+#   in the largest component, while preventing auglag from diverging
+#   to ±Inf in unbounded spaces like the multinomial logit.
 # ======================================================================
 
 #' Calibrate Parameter Component
 #'
 #' @description
-#' Computes the analytic MLE for θ using the likelihood's
-#' `param_mle_fn(data)` and stores it inside the parameter_spec.
+#' Computes the analytic MLE for θ using `parameter$param_mle_fn(data)`
+#' and stores it inside the parameter_spec.
+#'
+#' If `param_lower` or `param_upper` on the spec is the string
+#' \code{"auto"}, bounds are computed from \code{param_mle} after
+#' the MLE is known and stored back onto the spec.
 #'
 #' This function is called internally by `calibrate()`.
 #'
-#' @param parameter  A `parameter_spec` object.
-#' @param likelihood A `likelihood_spec` object (provides param_mle_fn).
-#' @param data       The user data passed to calibrate().
+#' @param parameter A `parameter_spec` object.
+#' @param data      The user data passed to calibrate().
 #'
-#' @return The SAME parameter_spec object with added field:
+#' @return The SAME parameter_spec object with added/updated fields:
 #'   • `$param_mle`
+#'   • `$param_lower`  (resolved from "auto" if requested)
+#'   • `$param_upper`  (resolved from "auto" if requested)
 #'
 #' @keywords internal
-calibrate_parameter <- function(parameter, likelihood, data) {
-  stopifnot(
-    inherits(parameter, "parameter_spec"),
-    inherits(likelihood, "likelihood_spec")
-  )
+calibrate_parameter <- function(parameter, data) {
+  stopifnot(inherits(parameter, "parameter_spec"))
 
-  J <- parameter$param_dim
+  param_dim <- parameter$param_dim
 
   # -------------------------------------------------------------------
-  # 1. Compute analytic MLE via likelihood's initializer
+  # 1. Compute analytic MLE via parameter's initializer
   # -------------------------------------------------------------------
-  param_mle <- likelihood$param_mle_fn(data)
+  param_mle <- parameter$param_mle_fn(data)
 
-  if (!is.numeric(param_mle) || length(param_mle) != J) {
+  if (!is.numeric(param_mle) || length(param_mle) != param_dim) {
     stop(
       sprintf(
         "param_mle_fn(data) returned a vector of length %d but param_dim = %d.",
         length(param_mle),
-        J
+        param_dim
       ),
       call. = FALSE
     )
@@ -57,7 +71,25 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   param_mle <- as.numeric(param_mle)
 
   # -------------------------------------------------------------------
-  # 2. Check box constraints (if present)
+  # 2. Resolve "auto" bounds now that param_mle is known.
+  #    radius guarantees param_mle is strictly interior with generous
+  #    room for the sampler to explore the constraint surface.
+  # -------------------------------------------------------------------
+  if (
+    identical(parameter$param_lower, "auto") ||
+      identical(parameter$param_upper, "auto")
+  ) {
+    radius <- max(abs(param_mle)) * 3 + 5
+    if (identical(parameter$param_lower, "auto")) {
+      parameter$param_lower <- rep(-radius, param_dim)
+    }
+    if (identical(parameter$param_upper, "auto")) {
+      parameter$param_upper <- rep(radius, param_dim)
+    }
+  }
+
+  # -------------------------------------------------------------------
+  # 3. Check box constraints (if present)
   # -------------------------------------------------------------------
   if (
     !is.null(parameter$param_lower) &&
@@ -74,7 +106,7 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   }
 
   # -------------------------------------------------------------------
-  # 3. Check equality constraints (if present)
+  # 4. Check equality constraints (if present)
   # -------------------------------------------------------------------
   if (!is.null(parameter$eq)) {
     h_val <- parameter$eq(param_mle)
@@ -83,9 +115,7 @@ calibrate_parameter <- function(parameter, likelihood, data) {
       stop("eq(param_mle) must return numeric vector.", call. = FALSE)
     }
 
-    # strict but numerically tolerant feasibility check
-    tol <- 1e-8
-    if (any(abs(h_val) > tol)) {
+    if (any(abs(h_val) > 1e-8)) {
       stop(
         "Computed param_mle violates equality constraints: eq(param) = 0.",
         call. = FALSE
@@ -94,7 +124,7 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   }
 
   # -------------------------------------------------------------------
-  # 4. Check inequality constraints (if present)
+  # 5. Check inequality constraints (if present)
   # -------------------------------------------------------------------
   if (!is.null(parameter$ineq)) {
     g_val <- parameter$ineq(param_mle)
@@ -112,7 +142,7 @@ calibrate_parameter <- function(parameter, likelihood, data) {
   }
 
   # -------------------------------------------------------------------
-  # 5. Store MLE inside the parameter specification
+  # 6. Store MLE inside the parameter specification
   # -------------------------------------------------------------------
   parameter$param_mle <- param_mle
 

@@ -8,8 +8,8 @@ model_spec(
   parameter = NULL,
   likelihood = NULL,
   estimand = NULL,
-  nuisance = NULL,
-  optimizer = NULL,
+  pipeline = NULL,
+  solver = NULL,
   execution = NULL,
   name = NULL,
   ...
@@ -23,8 +23,8 @@ All components are required \emph{prior to calibration}:
 • parameter_spec()
 • likelihood_spec()
 • estimand_spec()
-• nuisance_spec()
-• optimizer_spec()
+• pipeline_spec()
+• solver_spec()
 • execution_spec()
 
 However, \code{model_spec()} is intentionally permissive at construction:
@@ -33,9 +33,8 @@ via \code{\link[=add]{add()}}.
 
 After calibration:
 \itemize{
-\item Structural specifications (parameter, likelihood, estimand,
-nuisance) are frozen.
-\item Numerical and procedural specifications (optimizer, execution)
+\item Structural specifications (parameter, likelihood, estimand) are frozen.
+\item Numerical and procedural specifications (pipeline, solver, execution)
 may be updated to support alternative inference or execution
 behavior without recalibration.
 }

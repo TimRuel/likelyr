@@ -4,7 +4,15 @@
 \alias{probe}
 \title{Probe Integrated Likelihood Geometry}
 \usage{
-probe(cal, R = 50L, psi_step = NULL, curvature_tol = -0.001, verbose = TRUE)
+probe(
+  cal,
+  R = 50L,
+  psi_step = NULL,
+  curvature_tol = -0.001,
+  mode_tol = 1e-08,
+  flat_tol = 1e-10,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{cal}{A calibrated model object.}
@@ -17,22 +25,22 @@ Defaults to \code{cal$estimand$increment}.}
 \item{curvature_tol}{Numeric. Threshold for acceptable quadratic curvature
 (should be negative). Default: -1e-3.}
 
+\item{mode_tol}{Numeric. Tolerance for comparing adjacent values to the
+alleged mode. Default: 1e-8.}
+
+\item{flat_tol}{Numeric. Tolerance for treating curvature as "flat".
+Default: 1e-10.}
+
 \item{verbose}{Logical. Print summary output. Default: TRUE.}
 }
 \value{
-An object of class \code{"probe"} with components:
-• \verb{$summary} — aggregate probe statistics
-• \verb{$diagnostics} — per-omega-hat diagnostics (data.frame)
-• \verb{$omega_hats} — list of sampled omega-hat values
+A \code{"probe"} object with $summary, $diagnostics, $omega_hats.
 }
 \description{
-Performs a fast preflight check of the omega-hat sampling scheme and
-branch-mode detection logic. This function draws omega-hat values,
-detects branch modes, and probes local curvature around each mode.
+Fast preflight check of omega-hat sampling + branch-mode behavior.
+Draws omega-hat values, locates branch modes, and probes local shape
+at psi_hat ± psi_step.
 
-The probe is application-agnostic and relies only on structural
+This function is application-agnostic and relies only on structural
 interfaces provided by the calibrated model.
-
-Intended to be run \emph{before} \code{\link[=integrate]{integrate()}} to assess whether the current
-model specification is likely to produce well-behaved branches.
 }

@@ -2,17 +2,11 @@
 % Please edit documentation in R/spec-estimand.R
 \name{estimand_spec}
 \alias{estimand_spec}
-\title{Specify an Estimand ψ(θ) for Profile / Integrated Log-Likelihood}
+\title{Specify an Estimand ψ(θ)}
 \usage{
 estimand_spec(
   psi_fn,
   psi_jac = NULL,
-  search_interval_fn,
-  increment,
-  confidence_levels,
-  gamma = 0.5,
-  cutoff_buffer = 0.1,
-  uniroot_expand_factor = 0.02,
   psi_lower = NULL,
   psi_upper = NULL,
   psi_0 = NULL,
@@ -21,29 +15,16 @@ estimand_spec(
 )
 }
 \arguments{
-\item{psi_fn}{Function(param) → scalar ψ(θ). Required.}
+\item{psi_fn}{Required. Function(param) → scalar ψ(θ).}
 
-\item{psi_jac}{Optional function(param) → gradient ∇ψ(θ).}
+\item{psi_jac}{Optional. Function(param) → gradient vector ∇ψ(θ).}
 
-\item{search_interval_fn}{Function(param_mle, data) → c(lower, upper). Required.}
+\item{psi_lower}{Optional numeric scalar. Lower bound of ψ domain.}
 
-\item{increment}{Positive scalar giving ψ-grid spacing.}
+\item{psi_upper}{Optional numeric scalar. Upper bound of ψ domain.}
 
-\item{confidence_levels}{Numeric vector strictly inside (0, 1).}
-
-\item{gamma}{Numeric scalar in (0,1] tempering the conservativeness of
-integrated likelihood branch cutoffs.}
-
-\item{cutoff_buffer}{Nonnegative scalar.}
-
-\item{uniroot_expand_factor}{Nonnegative scalar.}
-
-\item{psi_lower}{Optional numeric scalar giving lower bound of ψ.}
-
-\item{psi_upper}{Optional numeric scalar giving upper bound of ψ.}
-
-\item{psi_0}{Optional numeric scalar giving the true value of ψ.
-If supplied, overrides internal ψ₀ computation during calibration.}
+\item{psi_0}{Optional numeric scalar. True value of ψ, used in
+simulation studies. Overrides internal ψ₀ computation if supplied.}
 
 \item{name}{Optional descriptive name.}
 
@@ -53,14 +34,15 @@ If supplied, overrides internal ψ₀ computation during calibration.}
 An \code{estimand_spec} object.
 }
 \description{
-Defines the estimand function ψ(θ) and all metadata needed for
-generating profile or integrated log-likelihood curves.
+Defines the estimand function ψ(θ) and its domain. This is
+intentionally minimal — grid spacing, search intervals, confidence
+levels, and inference tuning parameters belong to other specs.
 
-Optionally, the true value ψ₀ may be supplied directly via \code{psi_0}.
-If provided, this value will override internal computation of ψ₀
-during calibration.
+Optional bounds \code{psi_lower} and \code{psi_upper} describe the geometric
+domain of ψ (e.g. \link{1/J, 1} for Simpson's index). These are hard
+constraints on branch traversal, not likelihood cutoffs.
 
-Optional bounds \code{psi_lower} and \code{psi_upper} may be supplied to
-describe the \emph{geometric domain} of ψ. These bounds are treated as
-hard constraints on branch traversal (not likelihood cutoffs).
+The true value \code{psi_0} may be supplied directly when known (e.g. in
+simulation studies). If provided, it overrides internal computation
+of ψ₀ during calibration.
 }

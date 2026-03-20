@@ -1,18 +1,19 @@
 # ======================================================================
-# Estimand Calibration (v2.0)
+# Estimand Calibration (v2.1)
 #
-# Changes from v1.2:
-#   • search_interval_fn and search_interval computation removed —
-#     these now live in calibrate_pipeline().
-#   • Reduced to three responsibilities: bind data, compute psi_mle,
-#     set psi_0 if available.
+# Changes from v2.0:
+#   • psi_lower, psi_upper, psi_closed converted to a sets::interval
+#     object (psi_domain) during calibration. Downstream code reads
+#     psi_domain rather than the individual bound slots.
 # ======================================================================
 
 #' Calibrate Estimand Component
 #'
 #' @description
 #' Binds data into \code{psi_fn()} and \code{psi_jac()}, computes
-#' \code{psi_mle}, and optionally sets \code{psi_0} from \code{param_0}.
+#' \code{psi_mle}, optionally sets \code{psi_0} from \code{param_0},
+#' and converts bound information into a \code{sets::interval} object
+#' stored as \code{psi_domain}.
 #'
 #' If \code{psi_0} is already present on the \code{estimand_spec}
 #' (supplied directly by the user), it is respected and not recomputed.
@@ -24,10 +25,12 @@
 #'
 #' @return The same \code{estimand_spec} object, enriched with:
 #'   \itemize{
-#'     \item \code{$psi_fn}  — data-bound closure
-#'     \item \code{$psi_jac} — data-bound closure (if present)
+#'     \item \code{$psi_fn}     — data-bound closure
+#'     \item \code{$psi_jac}    — data-bound closure (if present)
 #'     \item \code{$psi_mle}
-#'     \item \code{$psi_0}   — if available
+#'     \item \code{$psi_0}      — if available
+#'     \item \code{$psi_domain} — \code{sets::interval} object, or NULL
+#'       if no bounds specified
 #'   }
 #'
 #' @keywords internal
@@ -36,6 +39,7 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
 
   psi_lower <- estimand$psi_lower
   psi_upper <- estimand$psi_upper
+  psi_closed <- estimand$psi_closed
 
   # -------------------------------------------------------------------
   # 1. Bind data to psi_fn
@@ -91,5 +95,36 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
     estimand$psi_0 <- psi_0
   }
 
+  # -------------------------------------------------------------------
+  # 5. Build psi_interval as a sets::interval object
+  # -------------------------------------------------------------------
+  estimand$psi_interval <- .build_psi_interval(psi_lower, psi_upper, psi_closed)
+
+  estimand$psi_lower <- NULL
+  estimand$psi_upper <- NULL
+  estimand$psi_closed <- NULL
+
   estimand
+}
+
+# ======================================================================
+# INTERNAL: Convert bound slots to sets::interval
+# ======================================================================
+
+#' @keywords internal
+#' @noRd
+.build_psi_interval <- function(psi_lower, psi_upper, psi_closed) {
+  if (is.null(psi_lower) && is.null(psi_upper)) {
+    return(NULL)
+  }
+
+  lower <- psi_lower %||% -Inf
+  upper <- psi_upper %||% Inf
+
+  lower_bracket <- if (isTRUE(psi_closed["lower"])) "[" else "("
+  upper_bracket <- if (isTRUE(psi_closed["upper"])) "]" else ")"
+
+  bounds <- paste0(lower_bracket, upper_bracket)
+
+  sets::interval(l = lower, r = upper, bounds = bounds)
 }

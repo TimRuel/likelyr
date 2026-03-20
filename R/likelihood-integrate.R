@@ -1,37 +1,38 @@
 # ======================================================================
-# likelihood-integrate.R — Integrated Likelihood (post-screening)
+# likelihood-integrate.R — Integrated Likelihood (post-sieving)
 # ======================================================================
 
 #' Integrated Log-Likelihood
 #'
 #' @description
-#' Computes the integrated log-likelihood using *pre-screened* omega-hat
-#' values stored in the calibrated model object.
+#' Computes the integrated log-likelihood using pre-screened branch seeds
+#' stored in the calibrated model object by \code{sieve()}.
 #'
-#' This function assumes [screen()] has already been run and will error
-#' otherwise. No omega-hat sampling occurs inside integrate().
+#' This function assumes \code{sieve()} has already been run and will
+#' error otherwise. No omega-hat sampling or mode location occurs here.
 #'
-#' @param cal A `calibrated` model object.
+#' Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
+#' A clear error is raised if it is absent.
+#'
+#' @param cal     A `calibrated` model object.
 #' @param verbose Logical; print diagnostics. Default: FALSE.
-#' @param ... Additional arguments passed to `generate_branches()`.
+#' @param ...     Additional arguments passed to `compute_branches()`.
 #'
 #' @return The SAME `calibrated` model object, augmented with:
-#'   • class `integrated`
-#'   • `$workspace$integrate` — integrated likelihood result
+#'   \itemize{
+#'     \item class \code{integrated}
+#'     \item \code{$workspace$integrate} — integrated likelihood result
+#'   }
 #'
 #' @export
 integrate <- function(cal, ...) {
   UseMethod("integrate")
 }
 
-# ----------------------------------------------------------------------
-
 #' @export
 integrate.default <- function(cal, ...) {
   stop("integrate() requires a 'calibrated' model object.", call. = FALSE)
 }
-
-# ----------------------------------------------------------------------
 
 #' @export
 integrate.calibrated <- function(cal, verbose = FALSE, ...) {
@@ -46,43 +47,37 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 0B. Ensure structural completeness
+  # 0B. Validate structural completeness
   # ------------------------------------------------------------------
   validate_integrate_input(cal)
 
   # ------------------------------------------------------------------
-  # 0C. Require pre-screened omega-hats
+  # 0C. Require pre-sieved branch seeds
   # ------------------------------------------------------------------
-  ws <- cal$workspace
-  omega_hats <- ws$integrate$omega_hats %||% NULL
+  branch_seeds <- cal$workspace$integrate$branch_seeds %||% NULL
 
-  if (is.null(omega_hats) || length(omega_hats) == 0L) {
+  if (is.null(branch_seeds) || length(branch_seeds) == 0L) {
     stop(
-      "integrate() requires pre-screened omega-hats.\n",
-      "Run screen(cal) before integrate().",
+      "integrate() requires pre-sieved branch seeds.\n",
+      "Pass the model through sieve() before running integrate().",
       call. = FALSE
     )
   }
 
-  R <- length(omega_hats)
-
-  # Pull calibrated quantities
+  R <- length(branch_seeds)
   param_mle <- cal$parameter$param_mle
   psi_mle <- cal$estimand$psi_mle
   exec <- cal$execution
 
   # ------------------------------------------------------------------
-  # 1. Initialize integrate workspace (omega-hats already present)
+  # 1. Re-initialise integrate workspace (preserve branch seeds)
   # ------------------------------------------------------------------
-  if (is.null(cal$workspace)) {
-    cal$workspace <- list()
-  }
-
+  sieve_diag <- cal$workspace$integrate$sieve
   cal$workspace$integrate <- list(
-    omega_hats = omega_hats
+    branch_seeds = branch_seeds,
+    sieve = sieve_diag
   )
 
-  # Mark lifecycle state
   cal <- mark_integrated(cal)
 
   # ------------------------------------------------------------------
@@ -101,21 +96,17 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch computation (uses fixed omega-hats)
+  # 3. Branch computation (uses fixed branch seeds)
   # ------------------------------------------------------------------
-  branch_result <- generate_branches(
-    cal = cal,
-    verbose = verbose,
-    ...
-  )
+  branch_result <- compute_branches(cal = cal, verbose = verbose, ...)
 
   # ------------------------------------------------------------------
-  # 4. Final aggregation (log-sum-exp)
+  # 4. Final aggregation
   # ------------------------------------------------------------------
   integrate_result <- tryCatch(
     {
       branches <- branch_result$branches
-      branch_agg_args <- cal$optimizer$branch_agg_args
+      branch_agg_args <- cal$traversal$branch_agg_args %||% list()
 
       branch_agg <- aggregate_branches(
         branches,
@@ -131,7 +122,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
         branch_mat = branch_agg$branch_mat,
         R_eff = branch_agg$R_eff,
         branches = branches,
-        omega_draws = omega_hats,
+        omega_draws = lapply(branch_seeds, `[[`, "omega_hat"),
         param_mle = param_mle,
         psi_mle = psi_mle,
         status = "success"
@@ -146,13 +137,13 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
         status = "failed",
         error_msg = conditionMessage(e),
         branches = branch_result$branches,
-        omega_draws = omega_hats
+        omega_draws = lapply(branch_seeds, `[[`, "omega_hat")
       ))
     }
   )
 
   # ------------------------------------------------------------------
-  # 5. Store final integrate result
+  # 5. Store result
   # ------------------------------------------------------------------
   cal$workspace$integrate <- integrate_result
 
@@ -164,63 +155,37 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 }
 
 # ======================================================================
-# INTERNAL VALIDATION FOR LIKELIHOOD INTEGRATION WRT NUISANCE PARAMETER
+# INTERNAL VALIDATION
 # ======================================================================
 
-#' Validate inputs prior to integrated likelihood computation
-#'
-#' @description
-#' Checks that a model object is fully specified and ready for
-#' integrated likelihood estimation. This validator ensures that
-#' *all required structural components* are present before
-#' \code{integrate()} is allowed to proceed.
-#'
-#' Specifically, this function verifies the presence of:
-#' \itemize{
-#'   \item \code{parameter_spec()}
-#'   \item \code{likelihood_spec()}
-#'   \item \code{estimand_spec()}
-#'   \item \code{nuisance_spec()}
-#'   \item \code{optimizer_spec()}
-#'   \item \code{execution_spec()}
-#' }
-#'
-#' If any components are missing, a detailed error message is
-#' generated listing the missing specifications and explaining
-#' how to fix the issue.
-#'
-#' @param cal A model object intended for integrated likelihood
-#'   computation.
-#'
-#' @return Invisibly returns \code{cal} if validation succeeds.
-#'
 #' @keywords internal
 #' @noRd
 validate_integrate_input <- function(cal) {
-  model <- cal
+  missing <- character(0)
 
-  if (!.is_model_spec_complete(model)) {
-    missing <- c()
+  if (!inherits(cal$parameter, "parameter_spec")) {
+    missing <- c(missing, "parameter_spec()")
+  }
+  if (!inherits(cal$likelihood, "likelihood_spec")) {
+    missing <- c(missing, "likelihood_spec()")
+  }
+  if (!inherits(cal$estimand, "estimand_spec")) {
+    missing <- c(missing, "estimand_spec()")
+  }
+  if (!inherits(cal$sampler, "sampler_spec")) {
+    missing <- c(missing, "sampler_spec()")
+  }
+  if (!inherits(cal$traversal, "traversal_spec")) {
+    missing <- c(missing, "traversal_spec()")
+  }
+  if (!inherits(cal$solver, "solver_spec")) {
+    missing <- c(missing, "solver_spec()")
+  }
+  if (!inherits(cal$execution, "execution_spec")) {
+    missing <- c(missing, "execution_spec()")
+  }
 
-    if (is.null(model$parameter)) {
-      missing <- c(missing, "parameter_spec()")
-    }
-    if (is.null(model$likelihood)) {
-      missing <- c(missing, "likelihood_spec()")
-    }
-    if (is.null(model$estimand)) {
-      missing <- c(missing, "estimand_spec()")
-    }
-    if (is.null(model$nuisance)) {
-      missing <- c(missing, "nuisance_spec()")
-    }
-    if (is.null(model$optimizer)) {
-      missing <- c(missing, "optimizer_spec()")
-    }
-    if (is.null(model$execution)) {
-      missing <- c(missing, "execution_spec()")
-    }
-
+  if (length(missing) > 0) {
     stop(
       "[integrate] Model is not ready for integrated likelihood.\n",
       "Missing required specifications:\n  - ",
@@ -230,11 +195,19 @@ validate_integrate_input <- function(cal) {
     )
   }
 
+  if (is.null(cal$likelihood$E_loglik)) {
+    stop(
+      "[integrate] E_loglik is required for integrated likelihood.\n",
+      "Supply it via likelihood_spec(E_loglik = ...).",
+      call. = FALSE
+    )
+  }
+
   invisible(cal)
 }
 
 # ======================================================================
-# PRINT AND SUMMARY METHODS
+# PRINT METHOD
 # ======================================================================
 
 #' @method print integrate
@@ -243,19 +216,15 @@ print.integrate <- function(x, ...) {
   cat("<Integrated Log-Likelihood Result>\n")
   cat("Status: ", x$status, "\n", sep = "")
 
-  # -----------------------------------------------------------
-  # Lifecycle flags (slot presence, not helpers)
-  # -----------------------------------------------------------
-  has_inference <- !is.null(x$inference)
-  has_diagnostics <- !is.null(x$diagnostics)
-
   cat("Lifecycle:\n")
-  cat("  inferred:   ", if (has_inference) "✓" else "×", "\n", sep = "")
-  cat("  diagnosed:  ", if (has_diagnostics) "✓" else "×", "\n", sep = "")
+  cat("  inferred:   ", if (!is.null(x$inference)) "✓" else "×", "\n", sep = "")
+  cat(
+    "  diagnosed:  ",
+    if (!is.null(x$diagnostics)) "✓" else "×",
+    "\n",
+    sep = ""
+  )
 
-  # -----------------------------------------------------------
-  # Estimates
-  # -----------------------------------------------------------
   if (!is.null(x$psi_mle)) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
   }
@@ -269,9 +238,6 @@ print.integrate <- function(x, ...) {
     )
   }
 
-  # -----------------------------------------------------------
-  # Grid information
-  # -----------------------------------------------------------
   if (!is.null(x$psi_ll_df)) {
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
   }
@@ -283,9 +249,9 @@ print.integrate <- function(x, ...) {
   invisible(x)
 }
 
-# =====================================================================
-# S3 Plot Method (local-only materialization)
-# =====================================================================
+# ======================================================================
+# PLOT METHOD
+# ======================================================================
 
 #' @method plot integrate
 #' @export

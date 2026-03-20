@@ -8,7 +8,8 @@ model_spec(
   parameter = NULL,
   likelihood = NULL,
   estimand = NULL,
-  pipeline = NULL,
+  sampler = NULL,
+  traversal = NULL,
   solver = NULL,
   execution = NULL,
   name = NULL,
@@ -23,7 +24,8 @@ All components are required \emph{prior to calibration}:
 • parameter_spec()
 • likelihood_spec()
 • estimand_spec()
-• pipeline_spec()
+• sampler_spec()
+• traversal_spec()
 • solver_spec()
 • execution_spec()
 
@@ -33,8 +35,9 @@ via \code{\link[=add]{add()}}.
 
 After calibration:
 \itemize{
-\item Structural specifications (parameter, likelihood, estimand) are frozen.
-\item Numerical and procedural specifications (pipeline, solver, execution)
+\item Structural specifications (parameter, likelihood, estimand, sampler, traversal)
+are frozen.
+\item Numerical and procedural specifications (solver, execution)
 may be updated to support alternative inference or execution
 behavior without recalibration.
 }

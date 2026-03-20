@@ -1,24 +1,19 @@
 # ======================================================================
 # branch-mode-dispatch.R — Branch Mode Locator Dispatcher
-# ======================================================================
 #
-# Provides:
-#   • get_branch_mode_locator() — internal dispatcher mapping method names
-#     to concrete branch mode locator implementations.
+# Resolves a method name to a concrete branch mode locator factory.
 #
-# Design notes:
-#   • Method names are validated upstream in optimizer_spec() via match.arg()
-#   • This dispatcher performs NO validation or calibration
-#   • All returned locators are treated as black boxes downstream
+# To add a new method:
+#   1. Create branch-mode-<name>.R implementing branch_mode_locator_<name>()
+#   2. Add a case to the switch() below
+#   3. Register the method string in pipeline_spec() validation
 # ======================================================================
 
 #' Resolve Branch Mode Locator Method
 #'
 #' @description
-#' Internal dispatcher that resolves a validated branch mode locator
-#' method name to a concrete branch mode locator implementation.
-#'
-#' The returned object is a function with signature:
+#' Maps a validated method name to its branch mode locator factory.
+#' Downstream code treats all locators as a black box with the contract:
 #'
 #' \preformatted{
 #'   function(omega_hat) -> list(
@@ -29,30 +24,17 @@
 #'   )
 #' }
 #'
-#' The internal algorithm used to locate the branch mode depends on the
-#' selected method but is treated as a black box by downstream code.
+#' @param method Character scalar. Currently supported: \code{"bracket_gss"}.
 #'
-#' @param method
-#'   Character scalar specifying the branch mode locator method.
-#'   Must already be validated and normalized by \code{optimizer_spec()}.
-#'
-#' @return
-#' A branch mode locator function.
+#' @return A branch mode locator factory function.
 #'
 #' @keywords internal
 #' @noRd
 get_branch_mode_locator <- function(method) {
   locator_factory <- switch(
     method,
-    hybrid = branch_mode_locator_hybrid,
-    grid_scan = branch_mode_locator_grid_scan,
-    brent = branch_mode_locator_brent,
-    multiplier_root = branch_mode_locator_multiplier_root,
-    stop(
-      "Unknown branch mode locator method: ",
-      method,
-      call. = FALSE
-    )
+    bracket_gss = branch_mode_locator_bracket_gss,
+    stop("Unknown branch mode locator method: '", method, "'.", call. = FALSE)
   )
 
   if (!is.function(locator_factory)) {

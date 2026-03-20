@@ -9,6 +9,7 @@ estimand_spec(
   psi_jac = NULL,
   psi_lower = NULL,
   psi_upper = NULL,
+  psi_closed = NULL,
   psi_0 = NULL,
   name = NULL,
   ...
@@ -22,6 +23,11 @@ estimand_spec(
 \item{psi_lower}{Optional numeric scalar. Lower bound of ψ domain.}
 
 \item{psi_upper}{Optional numeric scalar. Upper bound of ψ domain.}
+
+\item{psi_closed}{Optional named logical vector. Indicates whether
+each present bound is closed (\code{TRUE}) or open (\code{FALSE}).
+Names must be a subset of \code{c("lower", "upper")} matching the
+non-NULL bounds. Omit entirely when no bounds are specified.}
 
 \item{psi_0}{Optional numeric scalar. True value of ψ, used in
 simulation studies. Overrides internal ψ₀ computation if supplied.}
@@ -38,11 +44,37 @@ Defines the estimand function ψ(θ) and its domain. This is
 intentionally minimal — grid spacing, search intervals, confidence
 levels, and inference tuning parameters belong to other specs.
 
-Optional bounds \code{psi_lower} and \code{psi_upper} describe the geometric
-domain of ψ (e.g. \link{1/J, 1} for Simpson's index). These are hard
-constraints on branch traversal, not likelihood cutoffs.
+Optional bounds \code{psi_lower} and \code{psi_upper} describe the
+geometric domain of ψ (e.g. [1/J, 1) for Simpson's index). These
+are hard constraints on branch traversal, not likelihood cutoffs.
 
-The true value \code{psi_0} may be supplied directly when known (e.g. in
-simulation studies). If provided, it overrides internal computation
-of ψ₀ during calibration.
+\code{psi_closed} is a named logical vector indicating whether each
+present bound is closed (reachable) or open (not reachable). Names
+must be a subset of \code{c("lower", "upper")} and must correspond
+to non-NULL bounds. A closed lower bound means the branch mode may
+occur at \code{psi_lower}; an open lower bound means it cannot.
+
+The true value \code{psi_0} may be supplied directly when known
+(e.g. in simulation studies). If provided, it overrides internal
+computation of ψ₀ during calibration.
+}
+\examples{
+# No bounds
+estimand_spec(psi_fn = function(param) sum(param))
+
+# Closed lower, open upper — Simpson's index case
+estimand_spec(
+  psi_fn    = function(param) sum(softmax(param)^2),
+  psi_lower = 1/J,
+  psi_upper = 1,
+  psi_closed = c(lower = TRUE, upper = FALSE)
+)
+
+# Closed lower only
+estimand_spec(
+  psi_fn    = function(param) exp(param),
+  psi_lower = 0,
+  psi_closed = c(lower = TRUE)
+)
+
 }

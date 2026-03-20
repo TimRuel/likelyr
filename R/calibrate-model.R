@@ -7,7 +7,7 @@
 #' @description
 #' Prepares a model for computing profile or integrated likelihoods.
 #' Calibration is modular: each structural component (parameter,
-#' likelihood, estimand, pipeline, execution) is processed
+#' likelihood, estimand, sampler, traversal, execution) is processed
 #' by its own calibration helper.
 #'
 #' @param model   A `model_spec` object.
@@ -40,12 +40,11 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   # 2. Modular calibration of structural components
   #
   # Order matters:
-  #   parameter  — computes param_mle; needed by estimand and pipeline
+  #   parameter  — computes param_mle; needed by all downstream steps
   #   likelihood — binds data into loglik / E_loglik closures
   #   estimand   — binds data into psi_fn; computes psi_mle
-  #   pipeline   — uses param_mle, psi_mle, and calibrated closures
-  #                to build search interval, omega-hat closures, and
-  #                branch mode locator
+  #   sampler    — builds omega-hat closures from calibrated quantities
+  #   traversal  — builds search interval and branch mode locator
   # -------------------------------------------------------------------
   model$parameter <- calibrate_parameter(
     parameter = model$parameter,
@@ -64,8 +63,15 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
     param_0 = model$parameter$param_0
   )
 
-  model$pipeline <- calibrate_pipeline(
-    pipeline = model$pipeline,
+  model$sampler <- calibrate_sampler(
+    sampler = model$sampler,
+    parameter = model$parameter,
+    estimand = model$estimand,
+    solver = model$solver
+  )
+
+  model$traversal <- calibrate_traversal(
+    traversal = model$traversal,
     parameter = model$parameter,
     likelihood = model$likelihood,
     estimand = model$estimand,
@@ -130,9 +136,16 @@ validate_calibrate_input <- function(model) {
     )
   }
 
-  if (!inherits(model$pipeline, "pipeline_spec")) {
+  if (!inherits(model$sampler, "sampler_spec")) {
     stop(
-      "model$pipeline must be a pipeline_spec() before calibration.",
+      "model$sampler must be a sampler_spec() before calibration.",
+      call. = FALSE
+    )
+  }
+
+  if (!inherits(model$traversal, "traversal_spec")) {
+    stop(
+      "model$traversal must be a traversal_spec() before calibration.",
       call. = FALSE
     )
   }

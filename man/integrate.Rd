@@ -9,14 +9,16 @@ integrate(cal, ...)
 \arguments{
 \item{cal}{A \code{calibrated} model object.}
 
-\item{...}{Additional arguments passed to \code{generate_branches()}.}
+\item{...}{Additional arguments passed to \code{compute_branches()}.}
 
 \item{verbose}{Logical; print diagnostics. Default: FALSE.}
 }
 \value{
 The SAME \code{calibrated} model object, augmented with:
-• class \code{integrated}
-• \verb{$workspace$integrate} — integrated likelihood result
+\itemize{
+\item class \code{integrated}
+\item \code{$workspace$integrate} — integrated likelihood result
+}
 }
 \description{
 Computes the integrated log-likelihood using \emph{pre-screened} omega-hat
@@ -24,4 +26,7 @@ values stored in the calibrated model object.
 
 This function assumes \code{\link[=screen]{screen()}} has already been run and will error
 otherwise. No omega-hat sampling occurs inside integrate().
+
+Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
+A clear error is raised if it is absent.
 }

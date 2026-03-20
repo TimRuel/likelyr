@@ -1,141 +1,27 @@
 # ======================================================================
-# Branch Utilities: R Count, Alpha Allocation, and ψ-Grid Helpers
-# File: R/branch-utils.R
+# branch-utils.R — Shared Utilities for Branch Computation
 # ======================================================================
 
-# ======================================================================
-# 1. Compute Number of Monte Carlo Branches
-# ======================================================================
+# ----------------------------------------------------------------------
+# ψ-grid construction
+# ----------------------------------------------------------------------
 
-#' Compute Number of Monte Carlo Branches
+#' Construct a ψ-Grid Anchored at the MLE
 #'
 #' @description
-#' Determines the number of Monte Carlo branches `R` implied by an
-#' execution specification created with [serial_spec()] or [parallel_spec()].
+#' Builds a grid object representing the integer lattice
+#' \code{psi_mle + k * increment} clipped to \code{[psi_lower, psi_upper]}.
+#' The grid object is passed to traversal functions to ensure all
+#' evaluations are aligned to the same anchor.
 #'
-#' * **Serial execution:**
-#'   `R = execution$R`
+#' @param psi_mle   Numeric scalar. MLE of ψ — the anchor point.
+#' @param increment Positive numeric scalar. Grid spacing.
+#' @param psi_lower Optional numeric scalar. Lower bound.
+#' @param psi_upper Optional numeric scalar. Upper bound.
 #'
-#' * **Parallel execution:**
-#'   `R = execution$num_workers * execution$chunk_size`
+#' @return A named list with slots:
+#'   \code{psi_mle}, \code{increment}, \code{psi_lower}, \code{psi_upper}.
 #'
-#' @param execution Execution specification object.
-#'
-#' @return Integer number of branches `R`.
-#' @keywords internal
-compute_num_branches <- function(execution) {
-  if (inherits(execution, "serial_spec")) {
-    R <- execution$R
-  } else if (inherits(execution, "parallel_spec")) {
-    R <- execution$num_workers * execution$chunk_size
-  } else {
-    stop(
-      "`execution` must be created via serial_spec() or parallel_spec().",
-      call. = FALSE
-    )
-  }
-
-  if (!is.numeric(R) || R < 1) {
-    stop(
-      "Computed number of branches R must be a positive integer.",
-      call. = FALSE
-    )
-  }
-
-  as.integer(R)
-}
-
-
-# ======================================================================
-# 2. Compute Required Per-Branch Alpha (Guarantee Global Alpha Cutoff)
-# ======================================================================
-
-#' Compute Branch-Level Tail Probability for Integrated Likelihood Cutoff
-#'
-#' @description
-#' Computes a branch-level tail probability \eqn{\alpha_\text{branch}} such
-#' that, when \eqn{R} Monte Carlo integrated-likelihood branches are averaged
-#' via a log-sum-exp operation, the resulting integrated log-likelihood is
-#' very likely to reach the desired global confidence level
-#' \eqn{1 - \alpha}.
-#'
-#' The calculation is based on a likelihood-ratio cutoff for a scalar
-#' parameter of interest, with a tempered correction for branch averaging.
-#' The tempering parameter \code{gamma} reduces the conservativeness of the
-#' worst-case \eqn{\log(R)} penalty, reflecting the fact that only a subset
-#' of branches typically contribute meaningfully to the integrated likelihood.
-#'
-#' @details
-#' Let \eqn{c_\text{global} = \tfrac{1}{2}\chi^2_{1,\,1-\alpha}} denote the
-#' standard likelihood-ratio cutoff defining a \eqn{1-\alpha} confidence
-#' interval. When averaging \eqn{R} branches, a sufficient condition for the
-#' integrated log-likelihood to fall below this cutoff is that each branch
-#' falls below
-#' \deqn{
-#'   c_\text{branch} = c_\text{global} + \gamma \log(R),
-#' }
-#' where \eqn{\gamma \in (0,1]} controls the degree of conservativeness.
-#'
-#' Setting \code{gamma = 1} recovers a worst-case bound in which all branches
-#' contribute equally. Smaller values of \code{gamma} provide a less
-#' conservative but typically adequate cutoff, reflecting unequal branch
-#' weights in practice.
-#'
-#' @param R Positive integer giving the number of Monte Carlo branches.
-#' @param alpha Numeric scalar in \eqn{(0,1)} giving the desired global
-#'   significance level.
-#' @param gamma Numeric scalar in \eqn{(0,1]} tempering the \eqn{\log(R)}
-#'   correction; smaller values reduce conservativeness. Defaults to \code{0.5}.
-#'
-#' @return
-#' A numeric scalar giving the branch-level tail probability
-#' \eqn{\alpha_\text{branch}} corresponding to the required branch cutoff.
-#'
-#' @seealso
-#' \code{\link{integrate}}, \code{\link{profile}}
-#'
-#' @keywords internal
-compute_required_branch_alpha <- function(R, alpha, gamma = 0.5) {
-  if (!is.numeric(R) || R < 1) {
-    stop("`R` must be a positive integer.", call. = FALSE)
-  }
-  if (!is.numeric(alpha) || alpha <= 0 || alpha >= 1) {
-    stop("`alpha` must be strictly between 0 and 1.", call. = FALSE)
-  }
-  if (!is.numeric(gamma) || gamma <= 0 || gamma > 1) {
-    stop("`gamma` must be in (0, 1].", call. = FALSE)
-  }
-
-  c_global <- 0.5 * stats::qchisq(1 - alpha, df = 1)
-  c_branch <- c_global + gamma * log(R)
-
-  1 - stats::pchisq(2 * c_branch, df = 1)
-}
-
-
-# ======================================================================
-# 3. ψ-Grid Anchor (ψ_k = ψ_MLE + k * increment)
-# ======================================================================
-
-#' Create a ψ-Grid Anchor
-#'
-#' @description
-#' Constructs a lightweight, regular ψ-grid representation:
-#' \deqn{
-#'   \psi_k = \psi_{\text{MLE}} + k \cdot \text{increment}.
-#' }
-#'
-#' Used for branch sweeps where only relative grid indices matter.
-#'
-#' Optional bounds \code{psi_lower} and \code{psi_upper} describe the
-#' geometric domain of ψ and are used to terminate branch traversal.
-#'
-#' @param psi_mle Numeric: ψ_MLE.
-#' @param increment Positive numeric: grid spacing.
-#' @param psi_lower Optional numeric scalar: lower bound of ψ.
-#' @param psi_upper Optional numeric scalar: upper bound of ψ.
-#'
-#' @return An object of class `"psi_grid"`.
 #' @keywords internal
 psi_grid_anchor <- function(
   psi_mle,
@@ -143,82 +29,177 @@ psi_grid_anchor <- function(
   psi_lower = NULL,
   psi_upper = NULL
 ) {
-  if (!is.numeric(psi_mle) || length(psi_mle) != 1L || !is.finite(psi_mle)) {
-    stop("`psi_mle` must be a finite numeric scalar.", call. = FALSE)
+  if (!is.numeric(psi_mle) || length(psi_mle) != 1L) {
+    stop("psi_mle must be a numeric scalar.", call. = FALSE)
   }
-
   if (!is.numeric(increment) || length(increment) != 1L || increment <= 0) {
-    stop("`increment` must be a strictly positive scalar.", call. = FALSE)
+    stop("increment must be a positive numeric scalar.", call. = FALSE)
   }
 
-  if (!is.null(psi_lower)) {
-    if (
-      !is.numeric(psi_lower) || length(psi_lower) != 1L || !is.finite(psi_lower)
-    ) {
-      stop(
-        "`psi_lower` must be NULL or a finite numeric scalar.",
-        call. = FALSE
-      )
-    }
-  }
-
-  if (!is.null(psi_upper)) {
-    if (
-      !is.numeric(psi_upper) || length(psi_upper) != 1L || !is.finite(psi_upper)
-    ) {
-      stop(
-        "`psi_upper` must be NULL or a finite numeric scalar.",
-        call. = FALSE
-      )
-    }
-  }
-
-  if (!is.null(psi_lower) && !is.null(psi_upper)) {
-    if (psi_lower > psi_upper) {
-      stop("`psi_lower` must be <= `psi_upper`.", call. = FALSE)
-    }
-  }
-
-  # Optional sanity check: ψ_MLE must lie inside bounds
-  if (!is.null(psi_lower) && psi_mle < psi_lower) {
-    stop("`psi_mle` lies below `psi_lower`.", call. = FALSE)
-  }
-
-  if (!is.null(psi_upper) && psi_mle > psi_upper) {
-    stop("`psi_mle` lies above `psi_upper`.", call. = FALSE)
-  }
-
-  structure(
-    list(
-      psi_mle = psi_mle,
-      increment = increment,
-      psi_lower = psi_lower,
-      psi_upper = psi_upper
-    ),
-    class = "psi_grid"
+  list(
+    psi_mle = psi_mle,
+    increment = increment,
+    psi_lower = psi_lower,
+    psi_upper = psi_upper
   )
 }
 
-# ======================================================================
-# 4. Snap ψ to Nearest Grid Point (rarely used)
-# ======================================================================
 
-#' Snap ψ to Nearest Grid Point
+# ----------------------------------------------------------------------
+# Safe branch evaluation
+# ----------------------------------------------------------------------
+
+#' Safely Evaluate Branch Log-Likelihood
 #'
 #' @description
-#' Given a ψ value and a ψ-grid created by [psi_grid_anchor()],
-#' return the nearest ψ-grid point.
+#' Evaluates the branch log-likelihood at a given ψ value, returning
+#' \code{-Inf} on failure. Intended for coarse scans and bracketing.
 #'
-#' @param psi Numeric scalar.
-#' @param grid A `"psi_grid"` object.
+#' @param psi            Numeric scalar ψ value.
+#' @param param_init     Numeric vector initial θ guess.
+#' @param branch_evaluator Function(psi, param_init) → list(param_hat, branch_val).
 #'
-#' @return Numeric: nearest ψ-grid point.
+#' @return Numeric scalar (possibly \code{-Inf}).
+#'
 #' @keywords internal
-snap_to_grid <- function(psi, grid) {
-  k_float <- (psi - grid$psi_mle) / grid$increment
+safe_eval_branch <- function(psi, param_init, branch_evaluator) {
+  val <- tryCatch(
+    branch_evaluator(psi, param_init)$branch_val,
+    error = function(e) -Inf
+  )
+  if (!is.numeric(val) || length(val) != 1L || !is.finite(val)) -Inf else val
+}
 
-  # guard against floating point drift
-  k <- round(k_float)
+# ----------------------------------------------------------------------
+# Coarse ψ grid
+# ----------------------------------------------------------------------
 
-  grid$psi_mle + k * grid$increment
+#' Generate Coarse ψ Grid
+#'
+#' @param interval Numeric length-2 vector \code{c(lower, upper)}.
+#' @param n        Integer number of grid points.
+#'
+#' @return Numeric vector of ψ values.
+#'
+#' @keywords internal
+make_coarse_psi_grid <- function(interval, n = 25L) {
+  if (!is.numeric(interval) || length(interval) != 2L) {
+    stop("interval must be a numeric vector of length 2.", call. = FALSE)
+  }
+  if (interval[1] >= interval[2]) {
+    stop("interval[1] must be < interval[2].", call. = FALSE)
+  }
+  if (!is.numeric(n) || n < 3) {
+    stop("n must be an integer >= 3.", call. = FALSE)
+  }
+  seq(interval[1], interval[2], length.out = n)
+}
+
+# ----------------------------------------------------------------------
+# Safe which.max
+# ----------------------------------------------------------------------
+
+#' Locate Maximum Index Safely
+#'
+#' @param x Numeric vector.
+#'
+#' @return Integer index, or \code{NA_integer_} if no finite values exist.
+#'
+#' @keywords internal
+safe_which_max <- function(x) {
+  if (!is.numeric(x)) {
+    return(NA_integer_)
+  }
+  ok <- is.finite(x)
+  if (!any(ok)) {
+    return(NA_integer_)
+  }
+  which.max(x[ok])[1L]
+}
+
+# ----------------------------------------------------------------------
+# Adjacent ψ grid points
+# ----------------------------------------------------------------------
+
+#' Get Adjacent ψ Grid Points Around a Mode
+#'
+#' @description
+#' Returns the nearest grid points immediately left and right of a
+#' located branch mode, using floating-point guards to handle cases
+#' where the mode falls exactly on a grid point.
+#'
+#' @param psi_hat_branch Numeric scalar. Located branch mode.
+#' @param grid           A grid object from \code{psi_grid_anchor()}.
+#'
+#' @return Named list with \code{left}, \code{right}, \code{k_left},
+#'   \code{k_right}.
+#'
+#' @keywords internal
+get_adjacent_psi_points <- function(psi_hat_branch, grid) {
+  k_float <- (psi_hat_branch - grid$psi_mle) / grid$increment
+  k_left <- floor(k_float + 1e-12)
+  k_right <- ceiling(k_float - 1e-12)
+  list(
+    left = grid$psi_mle + k_left * grid$increment,
+    right = grid$psi_mle + k_right * grid$increment,
+    k_left = k_left,
+    k_right = k_right
+  )
+}
+
+# ----------------------------------------------------------------------
+# Standardize branch mode output
+# ----------------------------------------------------------------------
+
+#' Standardize Branch Mode Output
+#'
+#' @param psi_hat        Numeric scalar ψ̂.
+#' @param param_hat      Numeric vector θ̂.
+#' @param loglik_at_mode Numeric scalar.
+#' @param status         Character scalar status label.
+#'
+#' @return Named list with standardized fields.
+#'
+#' @keywords internal
+make_branch_mode_result <- function(
+  psi_hat,
+  param_hat,
+  loglik_at_mode,
+  status = "success"
+) {
+  list(
+    psi_hat = psi_hat,
+    param_hat = param_hat,
+    loglik_at_mode = loglik_at_mode,
+    status = status
+  )
+}
+
+# ----------------------------------------------------------------------
+# Drop magnitude check
+# ----------------------------------------------------------------------
+
+#' Check Whether a Drop is Within an Acceptable Range
+#'
+#' @description
+#' Returns \code{TRUE} if \code{drop} is within \code{drop_multiplier}
+#' times the median of \code{recent_drops}. Always returns \code{TRUE}
+#' when \code{recent_drops} is empty or has a non-positive median.
+#'
+#' @param drop         Numeric scalar. The new drop to check.
+#' @param recent_drops Numeric vector. Recent drop history.
+#' @param drop_multiplier Positive numeric scalar.
+#'
+#' @return Logical scalar.
+#'
+#' @keywords internal
+check_drop <- function(drop, recent_drops, drop_multiplier) {
+  if (length(recent_drops) < 1L) {
+    return(TRUE)
+  }
+  ref <- median(recent_drops)
+  if (ref <= 0) {
+    return(TRUE)
+  }
+  drop <= drop_multiplier * ref
 }

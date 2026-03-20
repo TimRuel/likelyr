@@ -4,7 +4,8 @@
 
 # Depends on constructor functions from class-system.R:
 #   new_model_spec(), new_likelihood_spec(), new_estimand_spec(),
-#   new_parameter_spec(), new_optimizer_spec(), new_execution_spec()
+#   new_parameter_spec(), new_sampler_spec(), new_traversal_spec(),
+#   new_optimizer_spec(), new_execution_spec()
 
 # ======================================================================
 # INTERNAL: Calibration Lock Helpers
@@ -12,7 +13,7 @@
 
 #' @keywords internal
 .slot_is_structural <- function(slot) {
-  slot %in% c("parameter", "likelihood", "estimand")
+  slot %in% c("parameter", "likelihood", "estimand", "sampler", "traversal")
 }
 
 #' @keywords internal
@@ -22,7 +23,8 @@
       "parameter",
       "likelihood",
       "estimand",
-      "pipeline",
+      "sampler",
+      "traversal",
       "solver",
       "execution"
     )
@@ -42,7 +44,8 @@
 #'   • parameter_spec()
 #'   • likelihood_spec()
 #'   • estimand_spec()
-#'   • pipeline_spec()
+#'   • sampler_spec()
+#'   • traversal_spec()
 #'   • solver_spec()
 #'   • execution_spec()
 #'
@@ -52,8 +55,9 @@
 #'
 #' After calibration:
 #' \itemize{
-#'   \item Structural specifications (parameter, likelihood, estimand) are frozen.
-#'   \item Numerical and procedural specifications (pipeline, solver, execution)
+#'   \item Structural specifications (parameter, likelihood, estimand, sampler, traversal)
+#'         are frozen.
+#'   \item Numerical and procedural specifications (solver, execution)
 #'         may be updated to support alternative inference or execution
 #'         behavior without recalibration.
 #' }
@@ -63,7 +67,8 @@ model_spec <- function(
   parameter = NULL,
   likelihood = NULL,
   estimand = NULL,
-  pipeline = NULL,
+  sampler = NULL,
+  traversal = NULL,
   solver = NULL,
   execution = NULL,
   name = NULL,
@@ -74,7 +79,8 @@ model_spec <- function(
     parameter = parameter,
     likelihood = likelihood,
     estimand = estimand,
-    pipeline = pipeline,
+    sampler = sampler,
+    traversal = traversal,
     solver = solver,
     execution = execution,
     extra = list(...)
@@ -162,8 +168,11 @@ add.default <- function(model, spec, ...) {
   if (inherits(x, "estimand_spec")) {
     return("estimand")
   }
-  if (inherits(x, "pipeline_spec")) {
-    return("pipeline")
+  if (inherits(x, "sampler_spec")) {
+    return("sampler")
+  }
+  if (inherits(x, "traversal_spec")) {
+    return("traversal")
   }
   if (inherits(x, "solver_spec")) {
     return("solver")
@@ -194,8 +203,12 @@ add.default <- function(model, spec, ...) {
     stop("estimand must be an estimand_spec().", call. = FALSE)
   }
 
-  if (!is.null(x$pipeline) && !inherits(x$pipeline, "pipeline_spec")) {
-    stop("pipeline must be a pipeline_spec().", call. = FALSE)
+  if (!is.null(x$sampler) && !inherits(x$sampler, "sampler_spec")) {
+    stop("sampler must be a sampler_spec().", call. = FALSE)
+  }
+
+  if (!is.null(x$traversal) && !inherits(x$traversal, "traversal_spec")) {
+    stop("traversal must be a traversal_spec().", call. = FALSE)
   }
 
   if (!is.null(x$solver) && !inherits(x$solver, "solver_spec")) {
@@ -219,7 +232,8 @@ add.default <- function(model, spec, ...) {
     "parameter",
     "likelihood",
     "estimand",
-    "pipeline",
+    "sampler",
+    "traversal",
     "solver",
     "execution"
   )
@@ -256,8 +270,14 @@ print.model_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "Pipeline:       ",
-    if (!is.null(x$pipeline)) x$pipeline$name else "(missing)",
+    "Sampler:        ",
+    if (!is.null(x$sampler)) x$sampler$name else "(missing)",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "Traversal:      ",
+    if (!is.null(x$traversal)) x$traversal$name else "(missing)",
     "\n",
     sep = ""
   )

@@ -1,5 +1,5 @@
 # ======================================================================
-# branch-mode-hybrid.R — Hybrid Branch Mode Locator
+# branch-mode-bracket_gss.R — Hybrid Branch Mode Locator
 #
 # Two-phase approach:
 #   1. Bracket  — step outward from psi_hint until a unimodal triplet
@@ -11,17 +11,14 @@
 #                 psi_hat is grid-aligned with screen()'s geometry grid
 # ======================================================================
 
-branch_mode_locator_hybrid <- function(
-  branch_fn,
+branch_mode_locator_bracket_gss <- function(
+  branch_evaluator,
   psi_init,
   search_interval,
   param_init,
   psi_mle = NULL,
   increment = NULL,
-  n_adjacent = 3L, # MUST match screen()'s n_adjacent; snap window
-  # is ±n_adjacent increments so the locator and
-  # screen agree on what constitutes the mode before
-  # screen runs any geometry checks
+  n_adjacent = 3L,
   max_bracket_steps = 20L, # max outward steps per side in bracket phase
   n_fallback_grid = 25L, # coarse grid points used in fallback
   gss_tol = NULL # golden section convergence tolerance;
@@ -53,7 +50,7 @@ branch_mode_locator_hybrid <- function(
 
   # Evaluate branch at a single psi; returns -Inf on failure.
   .eval <- function(psi) {
-    out <- try(branch_fn(psi, param_init), silent = TRUE)
+    out <- try(branch_evaluator(psi, param_init), silent = TRUE)
     if (
       inherits(out, "try-error") ||
         is.null(out$branch_val) ||
@@ -66,7 +63,7 @@ branch_mode_locator_hybrid <- function(
 
   # Evaluate branch and return full result; returns NULL on failure.
   .eval_full <- function(psi) {
-    out <- try(branch_fn(psi, param_init), silent = TRUE)
+    out <- try(branch_evaluator(psi, param_init), silent = TRUE)
     if (
       inherits(out, "try-error") ||
         is.null(out$branch_val) ||
@@ -182,7 +179,7 @@ branch_mode_locator_hybrid <- function(
   # ---------------------------------------------------------------
   # Phase 2: Golden section search
   #
-  # Maximizes branch_fn over [lo, hi] to within gss_tol.
+  # Maximizes branch_evaluator over [lo, hi] to within gss_tol.
   # Returns list(psi, loglik) or NULL on failure.
   # ---------------------------------------------------------------
   .golden_section <- function(lo, hi) {

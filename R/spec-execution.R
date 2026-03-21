@@ -1,6 +1,6 @@
 # ======================================================================
 # Execution Mode Specifications (Serial / Parallel)
-# Unified class system (v3.1)
+# Unified class system (v3.2)
 # ======================================================================
 
 # ======================================================================
@@ -10,17 +10,22 @@
 #' Serial Execution Specification
 #'
 #' @description
-#' Runs Monte Carlo branch generation **in serial** (no parallelism).
+#' Runs Monte Carlo branch generation \strong{in serial} (no parallelism).
 #'
-#' @param R Positive integer: number of Monte Carlo branches.
+#' @param min_branches Positive integer. Minimum number of branches
+#'   to retain after aggregation filtering.
+#' @param branch_buffer Non-negative integer. Number of additional seeds
+#'   to evaluate beyond \code{min_branches}. Total seeds evaluated =
+#'   \code{min_branches + branch_buffer}.
 #' @param seed Logical or numeric seed for reproducibility.
 #' @param packages Character vector of packages to load.
 #' @param name Optional identifier.
 #'
-#' @return A `serial_spec` object.
+#' @return A \code{serial_spec} object.
 #' @export
 serial_spec <- function(
-  R,
+  min_branches,
+  branch_buffer = 0L,
   seed = TRUE,
   packages = character(),
   name = "serial"
@@ -28,7 +33,8 @@ serial_spec <- function(
   x <- list(
     name = name,
     mode = "serial",
-    R = R,
+    min_branches = min_branches,
+    branch_buffer = branch_buffer,
     seed = seed,
     packages = packages
   )
@@ -44,17 +50,28 @@ serial_spec <- function(
 
 #' Parallel Execution Specification (foreach + %dofuture%)
 #'
-#' @param num_workers Positive integer: number of parallel workers.
-#' @param chunk_size Positive integer: branches per worker.
+#' @description
+#' Runs Monte Carlo branch generation in parallel via
+#' \code{foreach} + \code{\%dofuture\%}. The chunk size is derived
+#' during calibration as the smallest integer \code{k} such that
+#' \code{k * num_workers >= min_branches + branch_buffer}.
+#'
+#' @param num_workers Positive integer. Number of parallel workers.
+#' @param min_branches Positive integer. Minimum number of branches
+#'   to retain after aggregation filtering.
+#' @param branch_buffer Non-negative integer. Extra seeds to evaluate
+#'   beyond \code{min_branches}. The actual number of seeds evaluated
+#'   will be \code{num_workers * chunk_size >= min_branches + branch_buffer}.
 #' @param seed Logical or numeric seed for reproducibility.
 #' @param packages Character vector of packages to load on workers.
 #' @param name Optional identifier.
 #'
-#' @return A `parallel_spec` object.
+#' @return A \code{parallel_spec} object.
 #' @export
 parallel_spec <- function(
   num_workers,
-  chunk_size = 1L,
+  min_branches,
+  branch_buffer = 0L,
   seed = TRUE,
   packages = character(),
   name = "parallel"
@@ -63,7 +80,8 @@ parallel_spec <- function(
     name = name,
     mode = "parallel",
     num_workers = num_workers,
-    chunk_size = chunk_size,
+    min_branches = min_branches,
+    branch_buffer = branch_buffer,
     seed = seed,
     packages = packages
   )
@@ -77,46 +95,39 @@ parallel_spec <- function(
 # VALIDATORS
 # ======================================================================
 
-#' Validate serial execution specification
-#'
-#' @description
-#' Internal validator for \code{serial_spec} execution objects. Ensures
-#' that all required fields are present and satisfy required type and
-#' value constraints for serial Monte Carlo execution.
-#'
-#' @param x A list representing a \code{serial_spec} object.
-#'
-#' @details
-#' The following components are validated:
-#'
-#' \itemize{
-#'   \item \code{R}: positive integer giving the number of serial MC branches.
-#'   \item \code{seed}: logical or numeric seed specification.
-#'   \item \code{packages}: character vector of package names to load.
-#' }
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
-#'
 #' @keywords internal
 #' @noRd
 .validate_execution_serial <- function(x) {
-  # R: number of serial MC branches
   if (
-    !is.numeric(x$R) ||
-      length(x$R) != 1 ||
-      !is.finite(x$R) ||
-      x$R < 1 ||
-      x$R != as.integer(x$R)
+    !is.numeric(x$min_branches) ||
+      length(x$min_branches) != 1L ||
+      !is.finite(x$min_branches) ||
+      x$min_branches < 1 ||
+      x$min_branches != as.integer(x$min_branches)
   ) {
-    stop("serial_spec(): R must be a positive integer.", call. = FALSE)
+    stop(
+      "serial_spec(): min_branches must be a positive integer.",
+      call. = FALSE
+    )
   }
 
-  # seed: logical or numeric
+  if (
+    !is.numeric(x$branch_buffer) ||
+      length(x$branch_buffer) != 1L ||
+      !is.finite(x$branch_buffer) ||
+      x$branch_buffer < 0 ||
+      x$branch_buffer != as.integer(x$branch_buffer)
+  ) {
+    stop(
+      "serial_spec(): branch_buffer must be a non-negative integer.",
+      call. = FALSE
+    )
+  }
+
   if (!is.logical(x$seed) && !is.numeric(x$seed)) {
     stop("serial_spec(): seed must be logical or numeric.", call. = FALSE)
   }
 
-  # packages: character vector
   if (!is.character(x$packages)) {
     stop("serial_spec(): packages must be a character vector.", call. = FALSE)
   }
@@ -124,35 +135,12 @@ parallel_spec <- function(
   invisible(x)
 }
 
-
-#' Validate parallel execution specification
-#'
-#' @description
-#' Internal validator for \code{parallel_spec} execution objects. Ensures
-#' that all required fields are present and satisfy required type and
-#' value constraints for parallel Monte Carlo execution.
-#'
-#' @param x A list representing a \code{parallel_spec} object.
-#'
-#' @details
-#' The following components are validated:
-#'
-#' \itemize{
-#'   \item \code{num_workers}: positive integer number of workers.
-#'   \item \code{chunk_size}: positive integer chunk size per worker.
-#'   \item \code{seed}: logical or numeric seed specification.
-#'   \item \code{packages}: character vector of package names to load.
-#' }
-#'
-#' @return Invisibly returns \code{x} if validation succeeds.
-#'
 #' @keywords internal
 #' @noRd
 .validate_execution_parallel <- function(x) {
-  # workers
   if (
     !is.numeric(x$num_workers) ||
-      length(x$num_workers) != 1 ||
+      length(x$num_workers) != 1L ||
       !is.finite(x$num_workers) ||
       x$num_workers < 1 ||
       x$num_workers != as.integer(x$num_workers)
@@ -163,26 +151,36 @@ parallel_spec <- function(
     )
   }
 
-  # chunk size
   if (
-    !is.numeric(x$chunk_size) ||
-      length(x$chunk_size) != 1 ||
-      !is.finite(x$chunk_size) ||
-      x$chunk_size < 1 ||
-      x$chunk_size != as.integer(x$chunk_size)
+    !is.numeric(x$min_branches) ||
+      length(x$min_branches) != 1L ||
+      !is.finite(x$min_branches) ||
+      x$min_branches < 1 ||
+      x$min_branches != as.integer(x$min_branches)
   ) {
     stop(
-      "parallel_spec(): chunk_size must be a positive integer.",
+      "parallel_spec(): min_branches must be a positive integer.",
       call. = FALSE
     )
   }
 
-  # seed
+  if (
+    !is.numeric(x$branch_buffer) ||
+      length(x$branch_buffer) != 1L ||
+      !is.finite(x$branch_buffer) ||
+      x$branch_buffer < 0 ||
+      x$branch_buffer != as.integer(x$branch_buffer)
+  ) {
+    stop(
+      "parallel_spec(): branch_buffer must be a non-negative integer.",
+      call. = FALSE
+    )
+  }
+
   if (!is.logical(x$seed) && !is.numeric(x$seed)) {
     stop("parallel_spec(): seed must be logical or numeric.", call. = FALSE)
   }
 
-  # packages
   if (!is.character(x$packages)) {
     stop("parallel_spec(): packages must be a character vector.", call. = FALSE)
   }
@@ -191,26 +189,42 @@ parallel_spec <- function(
 }
 
 # ======================================================================
-# total_branches() — S3 generic
+# total_seeds() — S3 generic
 # ======================================================================
 
-#' Total Number of Monte Carlo Branches
+#' Total Number of Seeds to Evaluate
+#'
+#' @description
+#' Returns the actual number of branch seeds to request from
+#' \code{sieve()} and evaluate. For serial execution this is
+#' \code{min_branches + branch_buffer}. For parallel execution this
+#' is \code{num_workers * chunk_size} (derived during calibration),
+#' which is >= \code{min_branches + branch_buffer}.
+#'
+#' Requires \code{calibrate_execution()} to have been run for
+#' parallel specs (to derive \code{chunk_size}).
+#'
 #' @keywords internal
-total_branches <- function(x) {
-  UseMethod("total_branches")
-}
+total_seeds <- function(x) UseMethod("total_seeds")
 
 #' @keywords internal
-total_branches.serial_spec <- function(x) x$R
+total_seeds.serial_spec <- function(x) x$min_branches + x$branch_buffer
 
 #' @keywords internal
-total_branches.parallel_spec <- function(x) {
+total_seeds.parallel_spec <- function(x) {
+  if (is.null(x$chunk_size)) {
+    stop(
+      "total_seeds() requires calibrated parallel_spec. ",
+      "Run calibrate_execution() first.",
+      call. = FALSE
+    )
+  }
   x$num_workers * x$chunk_size
 }
 
 #' @keywords internal
-total_branches.default <- function(x) {
-  stop("total_branches() expects an execution_spec object.")
+total_seeds.default <- function(x) {
+  stop("total_seeds() expects an execution_spec object.")
 }
 
 # ======================================================================
@@ -220,11 +234,13 @@ total_branches.default <- function(x) {
 #' @export
 print.serial_spec <- function(x, ...) {
   cat("# Execution Mode: SERIAL\n")
-  cat("- Name:        ", x$name, "\n", sep = "")
-  cat("- Branches:    ", total_branches(x), "\n", sep = "")
-  cat("- Seed:        ", x$seed, "\n", sep = "")
+  cat("- Name:          ", x$name, "\n", sep = "")
+  cat("- Min branches:  ", x$min_branches, "\n", sep = "")
+  cat("- Branch buffer: ", x$branch_buffer, "\n", sep = "")
+  cat("- Total seeds:   ", total_seeds(x), "\n", sep = "")
+  cat("- Seed:          ", x$seed, "\n", sep = "")
   cat(
-    "- Packages:    ",
+    "- Packages:      ",
     if (length(x$packages)) paste(x$packages, collapse = ", ") else "<none>",
     "\n",
     sep = ""
@@ -235,13 +251,17 @@ print.serial_spec <- function(x, ...) {
 #' @export
 print.parallel_spec <- function(x, ...) {
   cat("# Execution Mode: PARALLEL (foreach + %dofuture%)\n")
-  cat("- Name:        ", x$name, "\n", sep = "")
-  cat("- Workers:     ", x$num_workers, "\n", sep = "")
-  cat("- Chunk size:  ", x$chunk_size, "\n", sep = "")
-  cat("- Branches:    ", total_branches(x), "\n", sep = "")
-  cat("- Seed:        ", x$seed, "\n", sep = "")
+  cat("- Name:          ", x$name, "\n", sep = "")
+  cat("- Workers:       ", x$num_workers, "\n", sep = "")
+  cat("- Min branches:  ", x$min_branches, "\n", sep = "")
+  cat("- Branch buffer: ", x$branch_buffer, "\n", sep = "")
+  if (!is.null(x$chunk_size)) {
+    cat("- Chunk size:    ", x$chunk_size, "\n", sep = "")
+    cat("- Total seeds:   ", total_seeds(x), "\n", sep = "")
+  }
+  cat("- Seed:          ", x$seed, "\n", sep = "")
   cat(
-    "- Packages:    ",
+    "- Packages:      ",
     if (length(x$packages)) paste(x$packages, collapse = ", ") else "<none>",
     "\n",
     sep = ""

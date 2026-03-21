@@ -14,15 +14,18 @@
 #' Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
 #' A clear error is raised if it is absent.
 #'
-#' @param cal     A `calibrated` model object.
-#' @param verbose Logical; print diagnostics. Default: FALSE.
-#' @param ...     Additional arguments passed to `compute_branches()`.
+#' After branch computation, \code{aggregate()} is called internally
+#' with default parameters to produce an initial result. Call
+#' \code{aggregate()} directly on the returned model to re-aggregate
+#' with different settings without repeating branch computation.
 #'
-#' @return The SAME `calibrated` model object, augmented with:
-#'   \itemize{
-#'     \item class \code{integrated}
-#'     \item \code{$workspace$integrate} — integrated likelihood result
-#'   }
+#' @param cal     A \code{calibrated} model object.
+#' @param verbose Logical; print diagnostics. Default: \code{FALSE}.
+#' @param ...     Additional arguments passed to \code{compute_branches()}.
+#'
+#' @return The SAME \code{calibrated} model object, augmented with
+#'   \code{$workspace$integrate} containing branches, scores, and the
+#'   initial aggregation result.
 #'
 #' @export
 integrate <- function(cal, ...) {
@@ -64,13 +67,10 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
     )
   }
 
-  R <- length(branch_seeds)
-  param_mle <- cal$parameter$param_mle
-  psi_mle <- cal$estimand$psi_mle
   exec <- cal$execution
 
   # ------------------------------------------------------------------
-  # 1. Re-initialise integrate workspace (preserve branch seeds)
+  # 1. Re-initialise integrate workspace (preserve seeds and sieve diag)
   # ------------------------------------------------------------------
   sieve_diag <- cal$workspace$integrate$sieve
   cal$workspace$integrate <- list(
@@ -88,64 +88,42 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
     cat(
       "[integrate] Execution: ",
       if (inherits(exec, "parallel_spec")) "PARALLEL" else "SERIAL",
-      " | Branches: ",
-      R,
+      " | Seeds: ",
+      length(branch_seeds),
       "\n",
       sep = ""
     )
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch computation (uses fixed branch seeds)
+  # 3. Branch computation
   # ------------------------------------------------------------------
   branch_result <- compute_branches(cal = cal, verbose = verbose, ...)
 
   # ------------------------------------------------------------------
-  # 4. Final aggregation
+  # 4. Store branches, scores, omega_hats
   # ------------------------------------------------------------------
-  integrate_result <- tryCatch(
-    {
-      branches <- branch_result$branches
-      branch_agg_args <- cal$traversal$branch_agg_args %||% list()
-
-      branch_agg <- aggregate_branches(
-        branches,
-        min_points = branch_agg_args$min_points,
-        q_delta = branch_agg_args$q_delta,
-        delta_min = branch_agg_args$delta_min,
-        delta_max = branch_agg_args$delta_max,
-        min_support = branch_agg_args$min_support
-      )
-
-      new_integrate_result(list(
-        psi_ll_df = branch_agg$psi_ll_df,
-        branch_mat = branch_agg$branch_mat,
-        R_eff = branch_agg$R_eff,
-        branches = branches,
-        omega_draws = lapply(branch_seeds, `[[`, "omega_hat"),
-        param_mle = param_mle,
-        psi_mle = psi_mle,
-        status = "success"
-      ))
-    },
-    error = function(e) {
-      if (verbose) {
-        cat("[integrate] WARNING: Final aggregation failed.\n")
-      }
-
-      new_integrate_result(list(
-        status = "failed",
-        error_msg = conditionMessage(e),
-        branches = branch_result$branches,
-        omega_draws = lapply(branch_seeds, `[[`, "omega_hat")
-      ))
-    }
-  )
+  cal$workspace$integrate$branches <- branch_result$branches
+  cal$workspace$integrate$scores <- branch_result$scores
+  cal$workspace$integrate$omega_hats <- branch_result$omega_hats
 
   # ------------------------------------------------------------------
-  # 5. Store result
+  # 5. Tune score threshold and aggregate with best threshold
   # ------------------------------------------------------------------
-  cal$workspace$integrate <- integrate_result
+  cal <- tune(cal, verbose = verbose)
+
+  best_threshold <- cal$workspace$integrate$tune$best_threshold %||% 0
+
+  if (verbose) {
+    cat(
+      "[integrate] Best score threshold: ",
+      best_threshold,
+      "\n",
+      sep = ""
+    )
+  }
+
+  cal <- aggregate(cal, score_threshold = best_threshold, verbose = verbose)
 
   if (verbose) {
     cat("[integrate] Finished.\n")

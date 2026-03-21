@@ -3,11 +3,15 @@
 #
 # Draws omega-hats from cal$sampler$draw(), expands each to an orbit
 # via cal$sampler$expand_orbit(), and calls probe() on each candidate
-# until R accepted branch seeds have been accumulated.
+# until total_seeds accepted branch seeds have been accumulated.
 #
-# R is read from cal$execution$R. orbit_size is read from
-# cal$sampler$orbit_size. R need not be a multiple of orbit_size —
-# the final orbit is truncated to fill exactly R branch seeds.
+# total_seeds is read from cal$execution$total_seeds (derived during
+# calibration from min_branches + branch_buffer for serial, or
+# num_workers * chunk_size for parallel).
+#
+# orbit_size is read from cal$sampler$orbit_size. total_seeds need not
+# be a multiple of orbit_size — the final orbit is truncated to fill
+# exactly total_seeds branch seeds.
 #
 # probe() and sieve() arguments default to values stored on
 # cal$traversal, with any directly supplied arguments taking precedence.
@@ -32,16 +36,15 @@ sieve <- function(
   k_recent <- k_recent %||% cal$traversal$k_recent
   drop_multiplier <- drop_multiplier %||% cal$traversal$drop_multiplier
 
-  R <- as.integer(cal$execution$R %||% 50L)
+  total_seeds <- as.integer(cal$execution$total_seeds)
   max_trials <- as.integer(
-    max_trials %||% cal$traversal$max_trials %||% (10L * R)
+    max_trials %||% cal$traversal$max_trials %||% (10L * total_seeds)
   )
-  orbit_size <- cal$sampler$orbit_size
 
   draw <- cal$sampler$draw
   expand_orbit <- cal$sampler$expand_orbit
 
-  branch_seeds <- vector("list", R)
+  branch_seeds <- vector("list", total_seeds)
   diag_log <- list()
   n_accepted <- 0L
   n_trials <- 0L
@@ -62,12 +65,16 @@ sieve <- function(
         " (",
         reason,
         ")",
-        if (accepted) paste0(" — ", n_accepted, "/", R, " accepted") else ""
+        if (accepted) {
+          paste0(" — ", n_accepted, "/", total_seeds, " accepted")
+        } else {
+          ""
+        }
       )
     }
   }
 
-  while (n_accepted < R && n_trials < max_trials) {
+  while (n_accepted < total_seeds && n_trials < max_trials) {
     n_trials <- n_trials + 1L
 
     # -------------------------------------------------------------------
@@ -80,15 +87,15 @@ sieve <- function(
       next
     }
 
-    # ---------------------------------------------------------------------
-    # Expand to orbit, truncating to however many branch seeds still needed
-    # ---------------------------------------------------------------------
+    # -------------------------------------------------------------------
+    # Expand to orbit, truncating to however many seeds still needed
+    # -------------------------------------------------------------------
     candidates <- if (!is.null(expand_orbit)) {
       orbit <- tryCatch(expand_orbit(base), error = function(e) NULL)
       if (is.null(orbit)) {
         list(base)
       } else {
-        n_remaining <- R - n_accepted
+        n_remaining <- total_seeds - n_accepted
         n_take <- min(length(orbit), n_remaining)
         c(list(base), orbit[seq_len(n_take)])
       }
@@ -100,7 +107,7 @@ sieve <- function(
     # Probe each candidate
     # -------------------------------------------------------------------
     for (omega in candidates) {
-      if (n_accepted >= R) {
+      if (n_accepted >= total_seeds) {
         break
       }
 
@@ -147,8 +154,8 @@ sieve <- function(
 
   cal$workspace$integrate$branch_seeds <- branch_seeds
   cal$workspace$integrate$sieve <- list(
-    R_requested = R,
-    R_accepted = n_accepted,
+    total_seeds_requested = total_seeds,
+    total_seeds_accepted = n_accepted,
     trials = n_trials,
     candidates_processed = cand_id,
     accept_rate = if (n_trials > 0) n_accepted / n_trials else NA_real_,
@@ -161,7 +168,7 @@ sieve <- function(
       "[sieve] Accepted ",
       n_accepted,
       " / ",
-      R,
+      total_seeds,
       " branch seeds",
       " (",
       n_trials,
@@ -169,11 +176,10 @@ sieve <- function(
       cand_id,
       " candidates processed)"
     )
-  }
-
-  if (verbose && length(failure_tab) > 0) {
-    message("[sieve] Failure summary:")
-    print(failure_tab)
+    if (length(failure_tab) > 0) {
+      message("[sieve] Failure summary:")
+      print(failure_tab)
+    }
   }
 
   cal

@@ -11,7 +11,6 @@
 #   $branch_df        — tibble(psi, loglik, loglik_centered, k)
 #   $psi_hat          — numeric scalar mode (NA for leftright)
 #   $traversal_method — character scalar
-#   $has_holes        — logical; TRUE if any skip occurred during traversal
 # ======================================================================
 
 # ======================================================================
@@ -59,7 +58,6 @@
 #'     \item \code{$branch_df}        — tibble(psi, loglik, loglik_centered, k)
 #'     \item \code{$psi_hat}          — numeric scalar (NA for leftright)
 #'     \item \code{$traversal_method} — character scalar
-#'     \item \code{$has_holes}        — logical; TRUE if any skip occurred
 #'   }
 #'
 #' @keywords internal
@@ -151,11 +149,8 @@ traverse_branch_topdown <- function(
   # -------------------------------------------------------------------
   # Extend left side (skip entirely if probe hit left boundary)
   # -------------------------------------------------------------------
-  left_result <- if (isTRUE(branch_seed$left_boundary)) {
-    list(
-      df = tibble::tibble(k = integer(), loglik = numeric()),
-      has_holes = FALSE
-    )
+  left_df <- if (isTRUE(branch_seed$left_boundary)) {
+    tibble::tibble(k = integer(), loglik = numeric())
   } else {
     traverse_branch_side(
       grid = grid,
@@ -178,11 +173,8 @@ traverse_branch_topdown <- function(
   # -------------------------------------------------------------------
   # Extend right side (skip entirely if probe hit right boundary)
   # -------------------------------------------------------------------
-  right_result <- if (isTRUE(branch_seed$right_boundary)) {
-    list(
-      df = tibble::tibble(k = integer(), loglik = numeric()),
-      has_holes = FALSE
-    )
+  right_df <- if (isTRUE(branch_seed$right_boundary)) {
+    tibble::tibble(k = integer(), loglik = numeric())
   } else {
     traverse_branch_side(
       grid = grid,
@@ -207,14 +199,13 @@ traverse_branch_topdown <- function(
   # -------------------------------------------------------------------
   branch_df <- probe_evals_df |>
     dplyr::select(k, loglik) |>
-    dplyr::bind_rows(left_result$df, right_result$df) |>
+    dplyr::bind_rows(left_df, right_df) |>
     assemble_branch_df(grid)
 
   list(
     branch_df = branch_df,
     psi_hat = psi_mode,
-    traversal_method = "topdown",
-    has_holes = left_result$has_holes || right_result$has_holes
+    traversal_method = "topdown"
   )
 }
 
@@ -285,8 +276,7 @@ traverse_branch_leftright <- function(
   list(
     branch_df = branch_df,
     psi_hat = psi_hat,
-    traversal_method = "leftright",
-    has_holes = FALSE # leftright does not use skip logic
+    traversal_method = "leftright"
   )
 }
 
@@ -308,8 +298,7 @@ traverse_branch_leftright <- function(
 #' \code{max_consecutive_skips} holes accumulate in a row, the side
 #' is stopped.
 #'
-#' Returns a list with \code{$df} (the evaluated points) and
-#' \code{$has_holes} (logical flag set TRUE if any skip occurred).
+#' Returns a \code{$df} of the evaluated points
 #'
 #' @param grid                  ψ-grid object.
 #' @param k_direction           Integer +1 or -1.
@@ -345,7 +334,6 @@ traverse_branch_side <- function(
   current_val <- init_ll
   drops <- init_drops
   consecutive_skips <- 0L
-  has_holes <- FALSE
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
@@ -392,7 +380,6 @@ traverse_branch_side <- function(
     if (skip) {
       # Preserve current_par and current_val so the next point
       # warm-starts from the last good solution
-      has_holes <- TRUE
       consecutive_skips <- consecutive_skips + 1L
       if (consecutive_skips >= max_consecutive_skips) break
     } else {
@@ -411,12 +398,9 @@ traverse_branch_side <- function(
     k_curr <- k_curr + k_direction
   }
 
-  list(
-    df = df |>
-      dplyr::distinct() |>
-      dplyr::arrange(k),
-    has_holes = has_holes
-  )
+  df |>
+    dplyr::distinct() |>
+    dplyr::arrange(k)
 }
 
 # ======================================================================

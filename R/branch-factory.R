@@ -2,12 +2,13 @@
 # branch-factory.R — Monte Carlo Branch Computation
 #
 # Provides:
-#   compute_branches() — orchestrates R branch traversals using
+#   compute_branches() — orchestrates branch traversals for all
 #                        pre-sieved seeds from sieve()
 #
 # Relies on:
-#   traverse_branch()               — branch-traverse.R
-#   psi_grid_anchor()               — branch-utils.R
+#   traverse_branch()  — branch-traverse.R
+#   score_branch()     — branch-score.R
+#   psi_grid_anchor()  — branch-utils.R
 # ======================================================================
 
 #' Compute Monte Carlo Branches for Integrated Log-Likelihood
@@ -15,12 +16,11 @@
 #' @description
 #' Orchestrates branch traversal for all pre-sieved branch seeds
 #' stored in \code{cal$workspace$integrate$branch_seeds} by
-#' \code{sieve()}.
+#' \code{sieve()}. All seeds are evaluated — no early stopping.
 #'
-#' For each branch_seed, unpacks the pre-located mode (\code{psi_mode},
-#' \code{param_mode}, \code{ll_mode}) and dispatches to
-#' \code{traverse_branch()}, which selects the traversal strategy
-#' from \code{traversal$traversal_method}.
+#' Each completed branch is scored via \code{score_branch()}. Scores
+#' and diagnostics are stored alongside the branches for use by
+#' the aggregation step.
 #'
 #' No omega-hat sampling or mode location occurs here — those
 #' responsibilities belong to \code{sieve()}.
@@ -32,8 +32,9 @@
 #'
 #' @return A list with:
 #'   \itemize{
-#'     \item \code{$branches}    — list of branch tibbles
-#'     \item \code{$omega_draws} — list of omega-hat vectors (one per branch)
+#'     \item \code{$branches}   — list of branch tibbles (one per seed)
+#'     \item \code{$scores}     — numeric vector of branch scores
+#'     \item \code{$omega_hats} — list of omega-hat vectors (one per seed)
 #'   }
 #'
 #' @keywords internal
@@ -57,7 +58,7 @@ compute_branches <- function(cal, verbose = FALSE) {
     )
   }
 
-  R <- length(branch_seeds)
+  n_seeds <- length(branch_seeds)
 
   # -------------------------------------------------------------------
   # Branch binder — already built and stored during calibration
@@ -100,8 +101,8 @@ compute_branches <- function(cal, verbose = FALSE) {
       "[compute_branches] Traversal method: ",
       traversal$traversal_method %||% "topdown",
       "\n",
-      "[compute_branches] R = ",
-      R,
+      "[compute_branches] Seeds = ",
+      n_seeds,
       " | ",
       if (is_parallel) "PARALLEL" else "SERIAL",
       "\n",
@@ -110,10 +111,10 @@ compute_branches <- function(cal, verbose = FALSE) {
   }
 
   # -------------------------------------------------------------------
-  # Main loop
+  # Main loop — evaluate all seeds
   # -------------------------------------------------------------------
-  result <- foreach::foreach(
-    r = seq_len(R),
+  results <- foreach::foreach(
+    r = seq_len(n_seeds),
     .options.future = list(
       packages = pkg_list,
       seed = seed_opt,
@@ -124,24 +125,52 @@ compute_branches <- function(cal, verbose = FALSE) {
       branch_seed <- branch_seeds[[r]]
       branch_evaluator <- branch_binder(branch_seed$omega_hat)
 
-      traverse_branch(
+      result <- traverse_branch(
         branch_seed = branch_seed,
         traversal = traversal,
         grid = grid,
         branch_evaluator = branch_evaluator,
         effective_crit = effective_crit
       )
+
+      k_mode <- round(
+        (branch_seed$psi_mode - estimand$psi_mle) / traversal$increment
+      )
+
+      score <- score_branch(
+        branch_df = result$branch_df,
+        k_mode = k_mode,
+        ll_mode = branch_seed$ll_mode,
+        crit = crit
+      )
+
+      list(
+        branch_df = result$branch_df,
+        score = score,
+        omega_hat = branch_seed$omega_hat
+      )
     }
 
-  branches <- lapply(result, `[[`, "branch")
-  omega_hats <- lapply(branch_seeds, `[[`, "omega_hat")
+  branches <- lapply(results, `[[`, "branch_df")
+  scores <- vapply(results, `[[`, "score", FUN.VALUE = numeric(1))
+  omega_hats <- lapply(results, `[[`, "omega_hat")
 
   if (verbose) {
-    cat("[compute_branches] Complete.\n")
+    n_perfect <- sum(scores >= 1.0)
+    cat(
+      "[compute_branches] Complete.",
+      " Perfect branches: ",
+      n_perfect,
+      "/",
+      n_seeds,
+      ".\n",
+      sep = ""
+    )
   }
 
   list(
     branches = branches,
+    scores = scores,
     omega_hats = omega_hats
   )
 }

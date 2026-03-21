@@ -128,5 +128,5 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
 
   bounds <- paste0(lower_bracket, upper_bracket)
 
-  sets::interval(l = lower, r = upper, bounds = bounds)
+  interval(l = lower, r = upper, bounds = bounds)
 }

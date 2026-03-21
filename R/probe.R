@@ -31,8 +31,8 @@ probe <- function(
   if (is.finite(min(psi_interval)) || is.finite(max(psi_interval))) {
     lo <- min(psi_interval)
     hi <- max(psi_interval)
-    lo_open <- !sets::interval_is_left_closed(psi_interval)
-    hi_open <- !sets::interval_is_right_closed(psi_interval)
+    lo_open <- !interval_is_left_closed(psi_interval)
+    hi_open <- !interval_is_right_closed(psi_interval)
 
     k_min <- if (isTRUE(lo_open)) {
       floor((lo - psi_mle) / increment) + 1L

@@ -44,7 +44,8 @@ Imports:
     kableExtra,
     scales,
     tidyr,
-    yaml
+    yaml,
+    sets
 Suggests:
     rmarkdown,
     testthat (>= 3.0.0),

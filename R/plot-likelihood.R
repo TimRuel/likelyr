@@ -41,6 +41,7 @@ plot_pseudolikelihood_points <- function(psi_ll_df) {
 
 #' Plot single pseudolikelihood curve with inference overlays
 #'
+#' @importFrom stats qchisq
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_curve <- function(
@@ -344,7 +345,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   ) |>
     dplyr::distinct() |>
     dplyr::mutate(
-      crit = 0.5 * stats::qchisq(1 - alpha, df = 1),
+      crit = 0.5 * qchisq(1 - alpha, df = 1),
       label = paste0(100 * (1 - alpha), "%")
     )
 

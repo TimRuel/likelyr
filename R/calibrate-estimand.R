@@ -33,6 +33,7 @@
 #'       if no bounds specified
 #'   }
 #'
+#' @importFrom sets interval
 #' @keywords internal
 calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
   stopifnot(inherits(estimand, "estimand_spec"))
@@ -111,6 +112,7 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
 # INTERNAL: Convert bound slots to sets::interval
 # ======================================================================
 
+#' @importFrom sets interval
 #' @keywords internal
 #' @noRd
 .build_psi_interval <- function(psi_lower, psi_upper, psi_closed) {

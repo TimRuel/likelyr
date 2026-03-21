@@ -47,6 +47,7 @@ aggregate.default <- function(cal, ...) {
   stop("aggregate() requires a 'calibrated' model object.", call. = FALSE)
 }
 
+#' @importFrom stats median
 #' @export
 aggregate.calibrated <- function(
   cal,

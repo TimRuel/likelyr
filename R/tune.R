@@ -47,6 +47,7 @@ tune.default <- function(cal, ...) {
   stop("tune() requires a 'calibrated' model object.", call. = FALSE)
 }
 
+#' @importFrom stats qchisq
 #' @export
 tune.calibrated <- function(
   cal,
@@ -67,7 +68,7 @@ tune.calibrated <- function(
 
   # Confidence level for CI width computation — use the highest requested
   alpha_target <- min(1 - cal$traversal$confidence_levels)
-  ci_crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  ci_crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
 
   if (verbose) {
     cat(

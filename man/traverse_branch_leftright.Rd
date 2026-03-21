@@ -5,42 +5,45 @@
 \title{Traverse a Branch Left to Right Across the Full Search Interval}
 \usage{
 traverse_branch_leftright(
-  seed,
-  pipeline,
+  branch_seed,
+  traversal,
   grid,
   branch_evaluator,
   effective_crit
 )
 }
 \arguments{
-\item{seed}{A named list containing at minimum:
+\item{branch_seed}{A named list from \code{probe()}, containing at minimum:
 \itemize{
-\item \code{omega_hat}      — numeric vector
-\item \code{psi_hat}        — numeric scalar (topdown only)
-\item \code{param_hat}      — numeric vector (topdown only)
-\item \code{loglik_at_mode} — numeric scalar (topdown only)
+\item \code{omega_hat}        — numeric vector
+\item \code{psi_mode}         — numeric scalar (topdown only)
+\item \code{param_mode}       — numeric vector (topdown only)
+\item \code{ll_mode}          — numeric scalar (topdown only)
+\item \code{probe_evals_df}   — data frame of pre-evaluated points
+\item \code{drops_left}       — numeric vector of drops from probe
+\item \code{drops_right}      — numeric vector of drops from probe
+\item \code{param_left_edge}  — warm-start for leftward traversal
+\item \code{param_right_edge} — warm-start for rightward traversal
+\item \code{left_boundary}    — logical; TRUE if probe hit left bound
+\item \code{right_boundary}   — logical; TRUE if probe hit right bound
 }}
 
-\item{pipeline}{A calibrated \code{pipeline_spec} object.}
+\item{traversal}{A calibrated \code{traversal_spec} object.}
 
 \item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.}
 
 \item{branch_evaluator}{Function \code{(psi, param_init) -> list(param_hat, branch_val)}.}
 
 \item{effective_crit}{Numeric scalar. Log-likelihood drop defining the
-branch cutoff: \code{cutoff = loglik_at_mode - effective_crit}.}
+branch cutoff: \code{cutoff = ll_mode - effective_crit}.}
 }
 \description{
 Evaluates the branch at every grid point in the search interval from
 left to right, using warm-start chaining between adjacent points.
 After the full sweep, the mode is located retrospectively and points
-below \code{loglik_at_mode - effective_crit} are trimmed.
+below \code{ll_mode - effective_crit} are trimmed.
 
-This strategy does not require mode pre-location. It is intended as
-a fallback when \code{screen()} mode location is unreliable.
-
-The warm start at the left edge initialises from \code{seed$omega_hat}.
-No retries are performed — monotonicity is not enforced during the
-sweep.
+Does not require mode pre-location. Intended as a fallback when
+mode location is systematically unreliable.
 }
 \keyword{internal}

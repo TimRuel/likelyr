@@ -49,6 +49,7 @@ profile.default <- function(cal, ...) {
 
 # ----------------------------------------------------------------------
 
+#' @importFrom stats qchisq
 #' @export
 profile.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
@@ -92,7 +93,7 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
   loglik_at_mle <- loglik_fn(param_mle)
 
   alpha_target <- min(1 - estimand$confidence_levels)
-  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
 
   cutoff_buffer <- estimand$cutoff_buffer %||% 0
   effective_crit <- crit * (1 + cutoff_buffer)

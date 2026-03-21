@@ -191,7 +191,8 @@ make_branch_mode_result <- function(
 #' @param drop_multiplier Positive numeric scalar.
 #'
 #' @return Logical scalar.
-#'
+
+#' @importFrom stats median
 #' @keywords internal
 check_drop <- function(drop, recent_drops, drop_multiplier) {
   if (length(recent_drops) < 1L) {

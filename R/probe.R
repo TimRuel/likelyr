@@ -2,6 +2,9 @@
 # probe.R — Omega-Hat Pre-Check
 # ======================================================================
 
+#' @importFrom sets interval_is_left_closed interval_is_right_closed
+#' @importFrom stats median
+#' @importFrom utils tail
 #' @keywords internal
 probe <- function(
   cal,

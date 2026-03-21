@@ -116,6 +116,7 @@ shift_psi_ll_fn <- function(psi_ll_fn, shift_val) {
 #' @return
 #' A tibble with columns `alpha`, `lower`, and `upper`.
 #'
+#' @importFrom stats qchisq
 #' @keywords internal
 estimate_interval <- function(
   point_estimate,
@@ -124,7 +125,7 @@ estimate_interval <- function(
   alpha,
   expand_factor
 ) {
-  crit <- 0.5 * stats::qchisq(1 - alpha, df = 1)
+  crit <- 0.5 * qchisq(1 - alpha, df = 1)
   bounds <- expand_psi_bounds(psi_grid, point_estimate, expand_factor)
 
   lower <- find_interval_endpoint(

@@ -11,22 +11,25 @@ integrate(cal, ...)
 
 \item{...}{Additional arguments passed to \code{compute_branches()}.}
 
-\item{verbose}{Logical; print diagnostics. Default: FALSE.}
+\item{verbose}{Logical; print diagnostics. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, augmented with:
-\itemize{
-\item class \code{integrated}
-\item \code{$workspace$integrate} — integrated likelihood result
-}
+The SAME \code{calibrated} model object, augmented with
+\code{$workspace$integrate} containing branches, scores, and the
+initial aggregation result.
 }
 \description{
-Computes the integrated log-likelihood using \emph{pre-screened} omega-hat
-values stored in the calibrated model object.
+Computes the integrated log-likelihood using pre-screened branch seeds
+stored in the calibrated model object by \code{sieve()}.
 
-This function assumes \code{\link[=screen]{screen()}} has already been run and will error
-otherwise. No omega-hat sampling occurs inside integrate().
+This function assumes \code{sieve()} has already been run and will
+error otherwise. No omega-hat sampling or mode location occurs here.
 
 Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
 A clear error is raised if it is absent.
+
+After branch computation, \code{aggregate()} is called internally
+with default parameters to produce an initial result. Call
+\code{aggregate()} directly on the returned model to re-aggregate
+with different settings without repeating branch computation.
 }

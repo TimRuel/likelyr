@@ -9,28 +9,28 @@ compute_branches(cal, verbose = FALSE)
 \arguments{
 \item{cal}{A \code{calibrated} model object with
 \code{cal$workspace$integrate$branch_seeds} populated by
-\code{screen()}.}
+\code{sieve()}.}
 
 \item{verbose}{Logical. Print progress. Default: \code{FALSE}.}
 }
 \value{
 A list with:
 \itemize{
-\item \code{$branches}    — list of branch tibbles
-\item \code{$omega_draws} — list of omega-hat vectors (one per branch)
+\item \code{$branches}   — list of branch tibbles (one per seed)
+\item \code{$scores}     — numeric vector of branch scores
+\item \code{$omega_hats} — list of omega-hat vectors (one per seed)
 }
 }
 \description{
-Orchestrates branch traversal for all pre-screened omega-hat seeds
+Orchestrates branch traversal for all pre-sieved branch seeds
 stored in \code{cal$workspace$integrate$branch_seeds} by
-\code{screen()}.
+\code{sieve()}. All seeds are evaluated — no early stopping.
 
-For each seed, unpacks the pre-located mode (\code{psi_hat},
-\code{param_hat}, \code{loglik_at_mode}) and dispatches to
-\code{traverse_branch()}, which selects the traversal strategy
-from \code{pipeline$traversal_method}.
+Each completed branch is scored via \code{score_branch()}. Scores
+and diagnostics are stored alongside the branches for use by
+the aggregation step.
 
 No omega-hat sampling or mode location occurs here — those
-responsibilities belong to \code{screen()}.
+responsibilities belong to \code{sieve()}.
 }
 \keyword{internal}

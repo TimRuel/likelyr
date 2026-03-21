@@ -111,7 +111,7 @@ diagnose_integrate <- function(res) {
     warnings = warnings,
     summary = list(
       ess_min = min(ess, na.rm = TRUE),
-      ess_median = stats::median(ess, na.rm = TRUE),
+      ess_median = median(ess, na.rm = TRUE),
       rel_se_max = max(ll_stats$rel_se, na.rm = TRUE),
       outlier_max = max(outlier_frac, na.rm = TRUE),
       se_logL_max = max(ll_stats$se_logL, na.rm = TRUE)

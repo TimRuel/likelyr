@@ -4,42 +4,49 @@
 \alias{traverse_branch}
 \title{Traverse a Branch on the ψ-Grid}
 \usage{
-traverse_branch(seed, pipeline, grid, branch_evaluator, effective_crit)
+traverse_branch(branch_seed, traversal, grid, branch_evaluator, effective_crit)
 }
 \arguments{
-\item{seed}{A named list containing at minimum:
+\item{branch_seed}{A named list from \code{probe()}, containing at minimum:
 \itemize{
-\item \code{omega_hat}      — numeric vector
-\item \code{psi_hat}        — numeric scalar (topdown only)
-\item \code{param_hat}      — numeric vector (topdown only)
-\item \code{loglik_at_mode} — numeric scalar (topdown only)
+\item \code{omega_hat}        — numeric vector
+\item \code{psi_mode}         — numeric scalar (topdown only)
+\item \code{param_mode}       — numeric vector (topdown only)
+\item \code{ll_mode}          — numeric scalar (topdown only)
+\item \code{probe_evals_df}   — data frame of pre-evaluated points
+\item \code{drops_left}       — numeric vector of drops from probe
+\item \code{drops_right}      — numeric vector of drops from probe
+\item \code{param_left_edge}  — warm-start for leftward traversal
+\item \code{param_right_edge} — warm-start for rightward traversal
+\item \code{left_boundary}    — logical; TRUE if probe hit left bound
+\item \code{right_boundary}   — logical; TRUE if probe hit right bound
 }}
 
-\item{pipeline}{A calibrated \code{pipeline_spec} object.}
+\item{traversal}{A calibrated \code{traversal_spec} object.}
 
 \item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.}
 
 \item{branch_evaluator}{Function \code{(psi, param_init) -> list(param_hat, branch_val)}.}
 
 \item{effective_crit}{Numeric scalar. Log-likelihood drop defining the
-branch cutoff: \code{cutoff = loglik_at_mode - effective_crit}.}
+branch cutoff: \code{cutoff = ll_mode - effective_crit}.}
 }
 \value{
 A list with:
 \itemize{
-\item \code{$branch}           — tibble(psi, loglik, loglik_centered, k)
+\item \code{$branch_df}        — tibble(psi, loglik, loglik_centered, k)
 \item \code{$psi_hat}          — numeric scalar (NA for leftright)
 \item \code{$traversal_method} — character scalar
 }
 }
 \description{
 Dispatches to the appropriate traversal strategy based on
-\code{pipeline$traversal_method}:
+\code{traversal$traversal_method}:
 \itemize{
 \item \code{"topdown"} — outward sweep from a pre-located mode.
-Requires a fully populated \code{seed} object with \code{psi_hat},
-\code{param_hat}, and \code{loglik_at_mode}. This is the default
-strategy and requires \code{screen()} to have been run first.
+Requires a fully populated \code{branch_seed} object with \code{psi_mode},
+\code{param_mode}, and \code{ll_mode}. This is the default
+strategy and requires \code{sieve()} to have been run first.
 \item \code{"leftright"} — single left-to-right sweep over the full
 search interval, with the cutoff applied retrospectively. Does not
 require mode pre-location. Intended as a fallback when mode

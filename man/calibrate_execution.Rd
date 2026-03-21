@@ -7,15 +7,26 @@
 calibrate_execution(exec)
 }
 \arguments{
-\item{exec}{An execution_spec object.}
+\item{exec}{An \code{execution_spec} object.}
 }
 \value{
-The SAME execution_spec object, enriched with:
-• $total_branches — integer number of MC branches
+The SAME \code{execution_spec} object, enriched with:
+\itemize{
+\item \code{$total_seeds}  — integer; total seeds to request from
+\code{sieve()}
+\item \code{$chunk_size}   — integer (parallel only); tasks per
+worker
+}
 }
 \description{
-Execution specifications (serial or parallel) do not depend on data.
-Calibration simply computes the number of Monte Carlo branches implied
-by the execution mode and stores it as \verb{$total_branches}.
+Derives and stores computed quantities from the execution spec:
+\itemize{
+\item \strong{Serial}: stores \code{total_seeds =
+    min_branches + branch_buffer}.
+\item \strong{Parallel}: derives \code{chunk_size} as the smallest
+integer \code{k} such that \code{k * num_workers >=
+    min_branches + branch_buffer}, then stores \code{chunk_size} and
+\code{total_seeds = num_workers * chunk_size}.
+}
 }
 \keyword{internal}

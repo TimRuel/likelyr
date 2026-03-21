@@ -125,18 +125,18 @@ validate_diagnose_input <- function(cal) {
 #' Materializes diagnostics plots **on demand** from stored diagnostics data.
 #' Dispatches to pseudolikelihood-specific plot builders.
 #'
-#' @param diag A diagnostics result object.
+#' @param object A diagnostics result object.
 #'
 #' @return A named list of ggplot objects.
 #'
 #' @keywords internal
 #' @noRd
-build_diagnostics_plots <- function(diag) {
-  if (!inherits(diag, "diagnostics")) {
+build_diagnostics_plots <- function(object) {
+  if (!inherits(object, "diagnostics")) {
     stop("Expected a diagnostics result object.", call. = FALSE)
   }
 
-  if (!isTRUE(diag$supported)) {
+  if (!isTRUE(object$supported)) {
     stop(
       "Diagnostics plots not supported for this pseudolikelihood",
       call. = FALSE
@@ -144,12 +144,12 @@ build_diagnostics_plots <- function(diag) {
   }
 
   switch(
-    diag$pseudolikelihood,
-    integrate = build_diagnostics_plots_integrate(diag),
-    profile = build_diagnostics_plots_profile(diag),
+    object$pseudolikelihood,
+    integrate = build_diagnostics_plots_integrate(object),
+    profile = build_diagnostics_plots_profile(object),
     stop(
       "build_diagnostics_plots(): Unknown diagnostics pseudolikelihood '",
-      diag$pseudolikelihood,
+      object$pseudolikelihood,
       "'.",
       call. = FALSE
     )
@@ -232,12 +232,12 @@ print.diagnostics <- function(x, ...) {
 # ----------------------------------------------------------------------
 
 #' @export
-summary.diagnostics <- function(diag, ...) {
+summary.diagnostics <- function(object, ...) {
   out <- list(
-    pseudolikelihood = diag$pseudolikelihood,
-    supported = diag$supported,
-    summary = diag$summary %||% NULL,
-    warnings = diag$warnings
+    pseudolikelihood = object$pseudolikelihood,
+    supported = object$supported,
+    summary = object$summary %||% NULL,
+    warnings = object$warnings
   )
 
   class(out) <- "summary_diagnostics"

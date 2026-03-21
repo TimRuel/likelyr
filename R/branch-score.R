@@ -37,6 +37,7 @@
 #'
 #' @return Numeric scalar in [0, 1].
 #'
+#' @importFrom dplyr filter arrange desc
 #' @keywords internal
 score_branch <- function(
   branch_df,
@@ -77,12 +78,12 @@ score_branch <- function(
 
   # Sort each side outward from mode
   left_df <- branch_df |>
-    dplyr::filter(k < k_mode) |>
-    dplyr::arrange(desc(k))
+    filter(k < k_mode) |>
+    arrange(desc(k))
 
   right_df <- branch_df |>
-    dplyr::filter(k > k_mode) |>
-    dplyr::arrange(k)
+    filter(k > k_mode) |>
+    arrange(k)
 
   scores <- c(
     .score_side(left_df$k, left_df$loglik),

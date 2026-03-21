@@ -43,6 +43,7 @@
 #' estimand_spec(psi_fn = function(param) sum(param))
 #'
 #' # Closed lower, open upper — Simpson's index case
+#' J <- 10L
 #' estimand_spec(
 #'   psi_fn    = function(param) sum(softmax(param)^2),
 #'   psi_lower = 1/J,

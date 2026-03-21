@@ -315,6 +315,7 @@ traverse_branch_leftright <- function(
 #' @param max_consecutive_skips Integer. Stop side after this many
 #'   consecutive skipped points. Default: 2L.
 #'
+#' @importFrom utils tail
 #' @keywords internal
 traverse_branch_side <- function(
   grid,

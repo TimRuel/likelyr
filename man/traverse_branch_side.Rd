@@ -10,13 +10,52 @@ traverse_branch_side(
   k_start,
   branch_cutoff,
   init_guess,
+  init_ll,
+  init_drops,
   branch_evaluator,
-  max_retries = 0L,
-  stop_at_bounds = TRUE,
-  eval_at_bounds = TRUE
+  k_recent = 3L,
+  drop_multiplier = 10,
+  max_consecutive_skips = 2L
 )
 }
+\arguments{
+\item{grid}{ψ-grid object.}
+
+\item{k_direction}{Integer +1 or -1.}
+
+\item{k_start}{Integer starting grid index.}
+
+\item{branch_cutoff}{Numeric scalar cutoff log-likelihood.}
+
+\item{init_guess}{Numeric vector warm-start parameter.}
+
+\item{init_ll}{Numeric scalar log-likelihood of the
+last accepted point before k_start (used for first drop check).}
+
+\item{init_drops}{Numeric vector of drops from probe()
+seeding the recent drop history.}
+
+\item{branch_evaluator}{Function (psi, param_init) -> list.}
+
+\item{k_recent}{Integer. Recent drop window size.}
+
+\item{drop_multiplier}{Numeric. Jump detection multiplier.}
+
+\item{max_consecutive_skips}{Integer. Stop side after this many
+consecutive skipped points. Default: 2L.}
+}
 \description{
-One-Sided Branch Sweep Along the ψ-Grid
+Sweeps outward from \code{k_start} in the given direction, evaluating
+the branch at each grid point. Stops when the log-likelihood drops
+below \code{branch_cutoff} or a ψ bound is reached.
+
+When a point rises above the previous value or produces a jump larger
+than \code{drop_multiplier} times the recent median drop, it is
+skipped and the last good \code{param_hat} is reused as the
+warm-start for the next point, preserving the trajectory. If
+\code{max_consecutive_skips} holes accumulate in a row, the side
+is stopped.
+
+Returns a \code{$df} of the evaluated points
 }
 \keyword{internal}

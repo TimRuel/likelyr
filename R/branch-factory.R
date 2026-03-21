@@ -37,6 +37,7 @@
 #'     \item \code{$omega_hats} — list of omega-hat vectors (one per seed)
 #'   }
 #'
+#' @importFrom stats qchisq
 #' @keywords internal
 compute_branches <- function(cal, verbose = FALSE) {
   stopifnot(inherits(cal, "calibrated"))
@@ -79,7 +80,7 @@ compute_branches <- function(cal, verbose = FALSE) {
   # Branch cutoff
   # -------------------------------------------------------------------
   alpha_target <- min(1 - traversal$confidence_levels)
-  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
   effective_crit <- crit * traversal$cutoff_buffer
 
   # -------------------------------------------------------------------

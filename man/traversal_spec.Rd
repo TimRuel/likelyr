@@ -8,7 +8,8 @@ traversal_spec(
   increment,
   traversal_method = "topdown",
   mode_locator_fn = NULL,
-  confidence_levels = c(0.9, 0.95),
+  confidence_levels = c(0.9, 0.95, 0.99),
+  cutoff_buffer = 1.5,
   n_adjacent = 3L,
   max_mode_shifts = 20L,
   k_recent = 3L,
@@ -29,7 +30,11 @@ closure \code{function(omega_hat) -> mode result}. When \code{NULL},
 the built-in \code{bracket_gss} locator is used.}
 
 \item{confidence_levels}{Numeric vector in (0, 1).
-Default: \code{c(0.90, 0.95)}.}
+Default: \code{c(0.90, 0.95, 0.99)}.}
+
+\item{cutoff_buffer}{Positive numeric scalar. Each branch is required
+to extend this multiple of the theoretical minimum cutoff distance.
+Default: \code{1.5}.}
 
 \item{n_adjacent}{Non-negative integer. Number of grid points to
 evaluate on each side of the mode during \code{probe()}.

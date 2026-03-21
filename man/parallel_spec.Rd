@@ -6,16 +6,22 @@
 \usage{
 parallel_spec(
   num_workers,
-  chunk_size = 1L,
+  min_branches,
+  branch_buffer = 0L,
   seed = TRUE,
   packages = character(),
   name = "parallel"
 )
 }
 \arguments{
-\item{num_workers}{Positive integer: number of parallel workers.}
+\item{num_workers}{Positive integer. Number of parallel workers.}
 
-\item{chunk_size}{Positive integer: branches per worker.}
+\item{min_branches}{Positive integer. Minimum number of branches
+to retain after aggregation filtering.}
+
+\item{branch_buffer}{Non-negative integer. Extra seeds to evaluate
+beyond \code{min_branches}. The actual number of seeds evaluated
+will be \code{num_workers * chunk_size >= min_branches + branch_buffer}.}
 
 \item{seed}{Logical or numeric seed for reproducibility.}
 
@@ -27,5 +33,8 @@ parallel_spec(
 A \code{parallel_spec} object.
 }
 \description{
-Parallel Execution Specification (foreach + \%dofuture\%)
+Runs Monte Carlo branch generation in parallel via
+\code{foreach} + \code{\%dofuture\%}. The chunk size is derived
+during calibration as the smallest integer \code{k} such that
+\code{k * num_workers >= min_branches + branch_buffer}.
 }

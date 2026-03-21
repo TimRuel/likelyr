@@ -2,8 +2,7 @@
 # probe.R — Omega-Hat Pre-Check
 # ======================================================================
 
-#' @importFrom sets interval_is_left_closed interval_is_right_closed
-#' @importFrom stats median
+#' @importFrom stats qchisq median
 #' @importFrom utils tail
 #' @keywords internal
 probe <- function(
@@ -12,7 +11,8 @@ probe <- function(
   n_adjacent = NULL,
   max_mode_shifts = NULL,
   k_recent = NULL,
-  drop_multiplier = NULL
+  drop_multiplier = NULL,
+  max_drop_fraction = NULL
 ) {
   traversal <- cal$traversal
   estimand <- cal$estimand
@@ -24,6 +24,14 @@ probe <- function(
   max_mode_shifts <- max_mode_shifts %||% traversal$max_mode_shifts
   k_recent <- k_recent %||% traversal$k_recent
   drop_multiplier <- drop_multiplier %||% traversal$drop_multiplier
+  max_drop_fraction <- max_drop_fraction %||% traversal$max_drop_fraction
+
+  # -------------------------------------------------------------------
+  # Compute effective_crit for absolute drop cap
+  # -------------------------------------------------------------------
+  alpha_target <- min(1 - traversal$confidence_levels)
+  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * traversal$cutoff_buffer
 
   # -------------------------------------------------------------------
   # 1. Compute restricted grid bounds k_min, k_max
@@ -31,8 +39,8 @@ probe <- function(
   if (is.finite(min(psi_interval)) || is.finite(max(psi_interval))) {
     lo <- min(psi_interval)
     hi <- max(psi_interval)
-    lo_open <- !interval_is_left_closed(psi_interval)
-    hi_open <- !interval_is_right_closed(psi_interval)
+    lo_open <- !sets::interval_is_left_closed(psi_interval)
+    hi_open <- !sets::interval_is_right_closed(psi_interval)
 
     k_min <- if (isTRUE(lo_open)) {
       floor((lo - psi_mle) / increment) + 1L
@@ -183,7 +191,6 @@ probe <- function(
     } else {
       NULL
     }
-
     res_right <- if (!right_done) {
       .eval_safe(branch_evaluator, psi_right, param_right)
     } else {
@@ -265,7 +272,16 @@ probe <- function(
     if (!left_done && !is.null(res_left)) {
       drop_left <- ll_left - new_ll_left
       recent <- tail(drops_left, k_recent)
-      if (!check_drop(drop_left, recent, drop_multiplier)) {
+      if (
+        !check_drop_probe(
+          drop_left,
+          recent,
+          drop_multiplier,
+          effective_crit,
+          k_recent,
+          max_drop_fraction
+        )
+      ) {
         return(list(
           accepted = FALSE,
           reason = "jump_left",
@@ -295,7 +311,16 @@ probe <- function(
     if (!right_done && !is.null(res_right)) {
       drop_right <- ll_right - new_ll_right
       recent <- tail(drops_right, k_recent)
-      if (!check_drop(drop_right, recent, drop_multiplier)) {
+      if (
+        !check_drop_probe(
+          drop_right,
+          recent,
+          drop_multiplier,
+          effective_crit,
+          k_recent,
+          max_drop_fraction
+        )
+      ) {
         return(list(
           accepted = FALSE,
           reason = "jump_right",

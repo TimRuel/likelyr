@@ -9,7 +9,7 @@ integrate(cal, ...)
 \arguments{
 \item{cal}{A \code{calibrated} model object.}
 
-\item{...}{Additional arguments passed to \code{compute_branches()}.}
+\item{...}{Additional arguments passed to \code{generate()}.}
 
 \item{verbose}{Logical; print diagnostics. Default: \code{FALSE}.}
 }

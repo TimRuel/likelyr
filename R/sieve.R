@@ -9,6 +9,9 @@
 # calibration from min_branches + branch_buffer for serial, or
 # num_workers * chunk_size for parallel).
 #
+# Each orbit consists of one base draw plus its expanded candidates.
+# n_orbits counts base draws; n_candidates counts all probed omega-hats.
+#
 # orbit_size is read from cal$sampler$orbit_size. total_seeds need not
 # be a multiple of orbit_size — the final orbit is truncated to fill
 # exactly total_seeds branch seeds.
@@ -24,7 +27,6 @@ sieve <- function(
   max_mode_shifts = NULL,
   k_recent = NULL,
   drop_multiplier = NULL,
-  max_trials = NULL,
   verbose = FALSE
 ) {
   if (!is_calibrated(cal)) {
@@ -37,17 +39,13 @@ sieve <- function(
   drop_multiplier <- drop_multiplier %||% cal$traversal$drop_multiplier
 
   total_seeds <- as.integer(cal$execution$total_seeds)
-  max_trials <- as.integer(
-    max_trials %||% cal$traversal$max_trials %||% (10L * total_seeds)
-  )
-
   draw <- cal$sampler$draw
   expand_orbit <- cal$sampler$expand_orbit
 
   branch_seeds <- vector("list", total_seeds)
   diag_log <- list()
   n_accepted <- 0L
-  n_trials <- 0L
+  n_orbits <- 0L
   cand_id <- 0L
 
   .log <- function(id, accepted, reason) {
@@ -74,8 +72,8 @@ sieve <- function(
     }
   }
 
-  while (n_accepted < total_seeds && n_trials < max_trials) {
-    n_trials <- n_trials + 1L
+  while (n_accepted < total_seeds) {
+    n_orbits <- n_orbits + 1L
 
     # -------------------------------------------------------------------
     # Draw base omega-hat
@@ -156,9 +154,9 @@ sieve <- function(
   cal$workspace$integrate$sieve <- list(
     total_seeds_requested = total_seeds,
     total_seeds_accepted = n_accepted,
-    trials = n_trials,
+    n_orbits = n_orbits,
     candidates_processed = cand_id,
-    accept_rate = if (n_trials > 0) n_accepted / n_trials else NA_real_,
+    accept_rate = n_accepted / cand_id,
     diagnostics = diag_df,
     failure_summary = failure_tab
   )
@@ -170,11 +168,8 @@ sieve <- function(
       " / ",
       total_seeds,
       " branch seeds",
-      " (",
-      n_trials,
-      " trials, ",
-      cand_id,
-      " candidates processed)"
+      " | orbits: ",
+      n_orbits
     )
     if (length(failure_tab) > 0) {
       message("[sieve] Failure summary:")

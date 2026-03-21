@@ -26,10 +26,10 @@
 #'   Default: \code{3L}.
 #' @param drop_multiplier Positive numeric scalar. A new drop exceeding
 #'   this multiple of the recent median drop is flagged as a jump.
-#'   Default: \code{5.0}.
-#' @param max_trials Optional positive integer. Maximum number of base
-#'   draws attempted by \code{sieve()} before stopping. \code{NULL}
-#'   defaults to \code{10 * R}. Default: \code{NULL}.
+#'   Default: \code{2.0}.
+#' @param max_drop_fraction Numeric scalar in (0, 1]. A single step drop
+#'   exceeding this fraction of \code{effective_crit} is always flagged,
+#'   regardless of recent drop history. Default: \code{0.25}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -44,8 +44,8 @@ traversal_spec <- function(
   n_adjacent = 3L,
   max_mode_shifts = 20L,
   k_recent = 3L,
-  drop_multiplier = 5.0,
-  max_trials = NULL,
+  drop_multiplier = 2.0,
+  max_drop_fraction = 0.25,
   name = NULL,
   ...
 ) {
@@ -60,7 +60,7 @@ traversal_spec <- function(
     max_mode_shifts = max_mode_shifts,
     k_recent = k_recent,
     drop_multiplier = drop_multiplier,
-    max_trials = max_trials,
+    max_drop_fraction = max_drop_fraction,
     extra = list(...)
   )
 
@@ -174,16 +174,17 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     stop("drop_multiplier must be a positive numeric scalar.", call. = FALSE)
   }
 
-  # max_trials --------------------------------------------------------
-  if (!is.null(x$max_trials)) {
-    if (
-      !is.numeric(x$max_trials) ||
-        length(x$max_trials) != 1L ||
-        x$max_trials < 1
-    ) {
-      stop("max_trials must be a positive integer scalar.", call. = FALSE)
-    }
-    x$max_trials <- as.integer(x$max_trials)
+  # max_drop_fraction -------------------------------------------------
+  if (
+    !is.numeric(x$max_drop_fraction) ||
+      length(x$max_drop_fraction) != 1L ||
+      x$max_drop_fraction <= 0 ||
+      x$max_drop_fraction > 1
+  ) {
+    stop(
+      "max_drop_fraction must be a numeric scalar in (0, 1].",
+      call. = FALSE
+    )
   }
 
   invisible(x)
@@ -196,11 +197,11 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
 #' @export
 print.traversal_spec <- function(x, ...) {
   cat("# Traversal Specification\n")
-  cat("- Name:             ", x$name, "\n", sep = "")
-  cat("- Increment:        ", x$increment, "\n", sep = "")
-  cat("- Traversal method: ", x$traversal_method, "\n", sep = "")
+  cat("- Name:              ", x$name, "\n", sep = "")
+  cat("- Increment:         ", x$increment, "\n", sep = "")
+  cat("- Traversal method:  ", x$traversal_method, "\n", sep = "")
   cat(
-    "- Mode locator:      ",
+    "- Mode locator:       ",
     if (!is.null(x$mode_locator_fn)) {
       "custom (mode_locator_fn supplied)"
     } else {
@@ -210,18 +211,16 @@ print.traversal_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "- CI levels:         ",
+    "- CI levels:          ",
     paste(format(x$confidence_levels), collapse = ", "),
     "\n",
     sep = ""
   )
-  cat("- cutoff_buffer:     ", x$cutoff_buffer, "\n", sep = "")
+  cat("- Cutoff buffer:     ", x$cutoff_buffer, "\n", sep = "")
   cat("- n_adjacent:        ", x$n_adjacent, "\n", sep = "")
   cat("- max_mode_shifts:   ", x$max_mode_shifts, "\n", sep = "")
   cat("- k_recent:          ", x$k_recent, "\n", sep = "")
   cat("- drop_multiplier:   ", x$drop_multiplier, "\n", sep = "")
-  if (!is.null(x$max_trials)) {
-    cat("- max_trials:        ", x$max_trials, "\n", sep = "")
-  }
+  cat("- max_drop_fraction: ", x$max_drop_fraction, "\n", sep = "")
   invisible(x)
 }

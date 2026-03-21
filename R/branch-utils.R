@@ -44,7 +44,6 @@ psi_grid_anchor <- function(
   )
 }
 
-
 # ----------------------------------------------------------------------
 # Safe branch evaluation
 # ----------------------------------------------------------------------
@@ -55,8 +54,8 @@ psi_grid_anchor <- function(
 #' Evaluates the branch log-likelihood at a given ψ value, returning
 #' \code{-Inf} on failure. Intended for coarse scans and bracketing.
 #'
-#' @param psi            Numeric scalar ψ value.
-#' @param param_init     Numeric vector initial θ guess.
+#' @param psi              Numeric scalar ψ value.
+#' @param param_init       Numeric vector initial θ guess.
 #' @param branch_evaluator Function(psi, param_init) → list(param_hat, branch_val).
 #'
 #' @return Numeric scalar (possibly \code{-Inf}).
@@ -176,26 +175,51 @@ make_branch_mode_result <- function(
 }
 
 # ----------------------------------------------------------------------
-# Drop magnitude check
+# Drop magnitude checks
 # ----------------------------------------------------------------------
 
-#' Check Whether a Drop is Within an Acceptable Range
+#' Drop Check for Probe Phase
 #'
 #' @description
-#' Returns \code{TRUE} if \code{drop} is within \code{drop_multiplier}
-#' times the median of \code{recent_drops}. Always returns \code{TRUE}
-#' when \code{recent_drops} is empty or has a non-positive median.
+#' Used during \code{probe()} to decide whether to reject an omega-hat.
+#' Applies two checks:
+#' \enumerate{
+#'   \item \strong{Absolute cap}: rejects if the drop exceeds
+#'     \code{max_drop_fraction * effective_crit}, catching catastrophic
+#'     discontinuities regardless of surface curvature.
+#'   \item \strong{Relative check}: once \code{k_recent} drops have
+#'     accumulated, rejects if the drop exceeds \code{drop_multiplier}
+#'     times the recent median. Rarely fires given typical \code{n_adjacent}
+#'     and \code{k_recent} settings.
+#' }
 #'
-#' @param drop         Numeric scalar. The new drop to check.
-#' @param recent_drops Numeric vector. Recent drop history.
-#' @param drop_multiplier Positive numeric scalar.
+#' @param drop             Numeric scalar. The new drop to check.
+#' @param recent_drops     Numeric vector. Recent drop history.
+#' @param drop_multiplier  Positive numeric scalar.
+#' @param effective_crit   Numeric scalar. Branch cutoff distance.
+#' @param k_recent         Non-negative integer. Minimum history required
+#'   before the relative check applies.
+#' @param max_drop_fraction Numeric scalar in (0, 1]. Absolute cap fraction.
+#'   Default: \code{0.25}.
 #'
-#' @return Logical scalar.
-
-#' @importFrom stats median
+#' @return Logical scalar. \code{TRUE} if the drop is acceptable.
+#'
 #' @keywords internal
-check_drop <- function(drop, recent_drops, drop_multiplier) {
-  if (length(recent_drops) < 1L) {
+check_drop_probe <- function(
+  drop,
+  recent_drops,
+  drop_multiplier,
+  effective_crit,
+  k_recent,
+  max_drop_fraction = 0.25
+) {
+  # Absolute cap
+  if (drop > max_drop_fraction * effective_crit) {
+    return(FALSE)
+  }
+
+  # Relative check — only once enough history exists
+  if (length(recent_drops) < k_recent) {
     return(TRUE)
   }
   ref <- median(recent_drops)
@@ -203,4 +227,44 @@ check_drop <- function(drop, recent_drops, drop_multiplier) {
     return(TRUE)
   }
   drop <= drop_multiplier * ref
+}
+
+#' Drop Check for Traversal Phase
+#'
+#' @description
+#' Used during \code{traverse_branch_side()} to decide whether to skip
+#' a point. Once \code{k_recent} traversal drops have accumulated, rejects
+#' if the drop exceeds \code{drop_multiplier} times the recent median.
+#' The tolerance widens proportionally after consecutive skips.
+#' Always accepts until enough history exists.
+#'
+#' @param drop              Numeric scalar. The new drop to check.
+#' @param recent_drops      Numeric vector. Recent traversal drop history.
+#' @param drop_multiplier   Positive numeric scalar.
+#' @param k_recent          Non-negative integer. Minimum history required
+#'   before the check applies.
+#' @param consecutive_skips Non-negative integer. Widens tolerance after gaps.
+#'
+#' @return Logical scalar. \code{TRUE} if the drop is acceptable.
+#'
+#' @keywords internal
+check_drop_traversal <- function(
+  drop,
+  recent_drops,
+  drop_multiplier,
+  k_recent,
+  consecutive_skips = 0L
+) {
+  # Until k_recent traversal drops have accumulated, always accept —
+  # the drop pattern near the mode is not representative of the tails
+  if (length(recent_drops) < k_recent) {
+    return(TRUE)
+  }
+
+  effective_multiplier <- drop_multiplier * (consecutive_skips + 1L)
+  ref <- median(recent_drops)
+  if (ref <= 0) {
+    return(TRUE)
+  }
+  drop <= effective_multiplier * ref
 }

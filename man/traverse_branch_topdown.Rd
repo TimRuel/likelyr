@@ -42,7 +42,7 @@ Picks up where \code{probe()} left off: reads pre-evaluated points
 from \code{branch_seed$probe_evals_df}, then extends outward on each
 side using the edge warm-starts from the seed. Sides that probe()
 stopped at a boundary are not extended. Drop history from probe() is
-passed into each side sweep so the drop multiplier check is
-continuous across the probe/traversal boundary.
+passed into each side sweep so the drop check is continuous across
+the probe/traversal boundary.
 }
 \keyword{internal}

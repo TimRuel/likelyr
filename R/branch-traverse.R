@@ -107,8 +107,8 @@ traverse_branch <- function(
 #' from \code{branch_seed$probe_evals_df}, then extends outward on each
 #' side using the edge warm-starts from the seed. Sides that probe()
 #' stopped at a boundary are not extended. Drop history from probe() is
-#' passed into each side sweep so the drop multiplier check is
-#' continuous across the probe/traversal boundary.
+#' passed into each side sweep so the drop check is continuous across
+#' the probe/traversal boundary.
 #'
 #' @inheritParams traverse_branch
 #' @keywords internal
@@ -291,14 +291,12 @@ traverse_branch_leftright <- function(
 #' the branch at each grid point. Stops when the log-likelihood drops
 #' below \code{branch_cutoff} or a ψ bound is reached.
 #'
-#' When a point rises above the previous value or produces a jump larger
-#' than \code{drop_multiplier} times the recent median drop, it is
-#' skipped and the last good \code{param_hat} is reused as the
-#' warm-start for the next point, preserving the trajectory. If
-#' \code{max_consecutive_skips} holes accumulate in a row, the side
-#' is stopped.
+#' Drop checking uses \code{check_drop_traversal()}: once \code{k_recent}
+#' traversal drops have accumulated, a new drop exceeding
+#' \code{drop_multiplier} times the recent median is flagged as a jump.
+#' The tolerance widens proportionally after consecutive skips.
 #'
-#' Returns a \code{$df} of the evaluated points
+#' Returns a tibble of evaluated points.
 #'
 #' @param grid                  ψ-grid object.
 #' @param k_direction           Integer +1 or -1.
@@ -306,16 +304,15 @@ traverse_branch_leftright <- function(
 #' @param branch_cutoff         Numeric scalar cutoff log-likelihood.
 #' @param init_guess            Numeric vector warm-start parameter.
 #' @param init_ll               Numeric scalar log-likelihood of the
-#'   last accepted point before k_start (used for first drop check).
+#'   last accepted point before k_start.
 #' @param init_drops            Numeric vector of drops from probe()
 #'   seeding the recent drop history.
 #' @param branch_evaluator      Function (psi, param_init) -> list.
 #' @param k_recent              Integer. Recent drop window size.
 #' @param drop_multiplier       Numeric. Jump detection multiplier.
 #' @param max_consecutive_skips Integer. Stop side after this many
-#'   consecutive skipped points. Default: 2L.
+#'   consecutive skipped points. Default: \code{2L}.
 #'
-#' @importFrom utils tail
 #' @keywords internal
 traverse_branch_side <- function(
   grid,
@@ -327,7 +324,7 @@ traverse_branch_side <- function(
   init_drops,
   branch_evaluator,
   k_recent = 3L,
-  drop_multiplier = 10.0,
+  drop_multiplier = 2.0,
   max_consecutive_skips = 2L
 ) {
   k_curr <- k_start
@@ -365,22 +362,21 @@ traverse_branch_side <- function(
       new_drop <- current_val - new_val
       recent <- tail(drops, k_recent)
 
-      # After consecutive skips, widen the drop tolerance proportionally
-      # to how many steps were missed — a legitimate drop may span
-      # multiple grid points worth of descent
-      effective_multiplier <- drop_multiplier * (consecutive_skips + 1L)
-
       if (
         new_val > current_val ||
-          !check_drop(new_drop, recent, effective_multiplier)
+          !check_drop_traversal(
+            new_drop,
+            recent,
+            drop_multiplier,
+            k_recent,
+            consecutive_skips
+          )
       ) {
         skip <- TRUE
       }
     }
 
     if (skip) {
-      # Preserve current_par and current_val so the next point
-      # warm-starts from the last good solution
       consecutive_skips <- consecutive_skips + 1L
       if (consecutive_skips >= max_consecutive_skips) break
     } else {
@@ -399,9 +395,7 @@ traverse_branch_side <- function(
     k_curr <- k_curr + k_direction
   }
 
-  df |>
-    dplyr::distinct() |>
-    dplyr::arrange(k)
+  df |> dplyr::distinct() |> dplyr::arrange(k)
 }
 
 # ======================================================================

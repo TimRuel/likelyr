@@ -21,7 +21,7 @@
 #'
 #' @param cal     A \code{calibrated} model object.
 #' @param verbose Logical; print diagnostics. Default: \code{FALSE}.
-#' @param ...     Additional arguments passed to \code{compute_branches()}.
+#' @param ...     Additional arguments passed to \code{generate()}.
 #'
 #' @return The SAME \code{calibrated} model object, augmented with
 #'   \code{$workspace$integrate} containing branches, scores, and the
@@ -96,19 +96,12 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch computation
+  # 3. Branch generation
   # ------------------------------------------------------------------
-  branch_result <- compute_branches(cal = cal, verbose = verbose, ...)
+  cal <- generate(cal, task = "integrate", verbose = verbose, ...)
 
   # ------------------------------------------------------------------
-  # 4. Store branches, scores, omega_hats
-  # ------------------------------------------------------------------
-  cal$workspace$integrate$branches <- branch_result$branches
-  cal$workspace$integrate$scores <- branch_result$scores
-  cal$workspace$integrate$omega_hats <- branch_result$omega_hats
-
-  # ------------------------------------------------------------------
-  # 5. Tune score threshold and aggregate with best threshold
+  # 4. Tune score threshold and aggregate with best threshold
   # ------------------------------------------------------------------
   cal <- tune(cal, verbose = verbose)
 

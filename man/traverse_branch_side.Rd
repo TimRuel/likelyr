@@ -14,7 +14,7 @@ traverse_branch_side(
   init_drops,
   branch_evaluator,
   k_recent = 3L,
-  drop_multiplier = 10,
+  drop_multiplier = 2,
   max_consecutive_skips = 2L
 )
 }
@@ -30,7 +30,7 @@ traverse_branch_side(
 \item{init_guess}{Numeric vector warm-start parameter.}
 
 \item{init_ll}{Numeric scalar log-likelihood of the
-last accepted point before k_start (used for first drop check).}
+last accepted point before k_start.}
 
 \item{init_drops}{Numeric vector of drops from probe()
 seeding the recent drop history.}
@@ -42,20 +42,18 @@ seeding the recent drop history.}
 \item{drop_multiplier}{Numeric. Jump detection multiplier.}
 
 \item{max_consecutive_skips}{Integer. Stop side after this many
-consecutive skipped points. Default: 2L.}
+consecutive skipped points. Default: \code{2L}.}
 }
 \description{
 Sweeps outward from \code{k_start} in the given direction, evaluating
 the branch at each grid point. Stops when the log-likelihood drops
 below \code{branch_cutoff} or a ψ bound is reached.
 
-When a point rises above the previous value or produces a jump larger
-than \code{drop_multiplier} times the recent median drop, it is
-skipped and the last good \code{param_hat} is reused as the
-warm-start for the next point, preserving the trajectory. If
-\code{max_consecutive_skips} holes accumulate in a row, the side
-is stopped.
+Drop checking uses \code{check_drop_traversal()}: once \code{k_recent}
+traversal drops have accumulated, a new drop exceeding
+\code{drop_multiplier} times the recent median is flagged as a jump.
+The tolerance widens proportionally after consecutive skips.
 
-Returns a \code{$df} of the evaluated points
+Returns a tibble of evaluated points.
 }
 \keyword{internal}

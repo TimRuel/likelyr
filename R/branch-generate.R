@@ -1,9 +1,9 @@
 # ======================================================================
-# branch-factory.R — Monte Carlo Branch Computation
+# branch-generate.R — Monte Carlo Branch Generation
 #
 # Provides:
-#   compute_branches() — orchestrates branch traversals for all
-#                        pre-sieved seeds from sieve()
+#   generate() — orchestrates branch traversals for all
+#                pre-sieved seeds from sieve()
 #
 # Relies on:
 #   traverse_branch()  — branch-traverse.R
@@ -11,16 +11,16 @@
 #   psi_grid_anchor()  — branch-utils.R
 # ======================================================================
 
-#' Compute Monte Carlo Branches for Integrated Log-Likelihood
+#' Generate Monte Carlo Branches
 #'
 #' @description
 #' Orchestrates branch traversal for all pre-sieved branch seeds
 #' stored in \code{cal$workspace$integrate$branch_seeds} by
 #' \code{sieve()}. All seeds are evaluated — no early stopping.
 #'
-#' Each completed branch is scored via \code{score_branch()}. Scores
-#' and diagnostics are stored alongside the branches for use by
-#' the aggregation step.
+#' Each completed branch is scored via \code{score_branch()}. Branches,
+#' scores, and omega-hats are stored on the model for use by
+#' \code{aggregate()}.
 #'
 #' No omega-hat sampling or mode location occurs here — those
 #' responsibilities belong to \code{sieve()}.
@@ -28,20 +28,43 @@
 #' @param cal     A \code{calibrated} model object with
 #'   \code{cal$workspace$integrate$branch_seeds} populated by
 #'   \code{sieve()}.
+#' @param task    Character scalar. One of \code{"integrate"} or
+#'   \code{"profile"}. Controls which branch generation strategy is
+#'   used. Default: \code{"integrate"}.
 #' @param verbose Logical. Print progress. Default: \code{FALSE}.
+#' @param ...     Additional arguments passed to the task-specific
+#'   implementation.
 #'
-#' @return A list with:
-#'   \itemize{
-#'     \item \code{$branches}   — list of branch tibbles (one per seed)
-#'     \item \code{$scores}     — numeric vector of branch scores
-#'     \item \code{$omega_hats} — list of omega-hat vectors (one per seed)
-#'   }
+#' @return The SAME \code{calibrated} model object, with branch
+#'   results stored in \code{cal$workspace$integrate}.
 #'
-#' @importFrom stats qchisq
-#' @keywords internal
-compute_branches <- function(cal, verbose = FALSE) {
-  stopifnot(inherits(cal, "calibrated"))
+#' @export
+generate <- function(cal, ...) {
+  UseMethod("generate")
+}
 
+#' @export
+generate.default <- function(cal, ...) {
+  stop("generate() requires a 'calibrated' model object.", call. = FALSE)
+}
+
+#' @export
+generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
+  task <- match.arg(task, c("integrate", "profile"))
+
+  switch(
+    task,
+    integrate = .generate_integrate(cal, verbose = verbose, ...),
+    profile = .generate_profile(cal, verbose = verbose, ...)
+  )
+}
+
+# ======================================================================
+# TASK: integrate
+# ======================================================================
+
+#' @keywords internal
+.generate_integrate <- function(cal, verbose = FALSE, ...) {
   traversal <- cal$traversal
   estimand <- cal$estimand
   execution <- cal$execution
@@ -53,8 +76,8 @@ compute_branches <- function(cal, verbose = FALSE) {
 
   if (is.null(branch_seeds) || length(branch_seeds) == 0L) {
     stop(
-      "compute_branches() requires pre-sieved branch seeds.\n",
-      "Run sieve(cal) before integrate().",
+      "generate(task = 'integrate') requires pre-sieved branch seeds.\n",
+      "Run sieve(cal) before generate().",
       call. = FALSE
     )
   }
@@ -80,7 +103,7 @@ compute_branches <- function(cal, verbose = FALSE) {
   # Branch cutoff
   # -------------------------------------------------------------------
   alpha_target <- min(1 - traversal$confidence_levels)
-  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
+  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
   effective_crit <- crit * traversal$cutoff_buffer
 
   # -------------------------------------------------------------------
@@ -99,10 +122,11 @@ compute_branches <- function(cal, verbose = FALSE) {
 
   if (verbose) {
     cat(
-      "[compute_branches] Traversal method: ",
+      "[generate] task = integrate",
+      " | traversal method: ",
       traversal$traversal_method %||% "topdown",
       "\n",
-      "[compute_branches] Seeds = ",
+      "[generate] Seeds = ",
       n_seeds,
       " | ",
       if (is_parallel) "PARALLEL" else "SERIAL",
@@ -159,7 +183,7 @@ compute_branches <- function(cal, verbose = FALSE) {
   if (verbose) {
     n_perfect <- sum(scores >= 1.0)
     cat(
-      "[compute_branches] Complete.",
+      "[generate] Complete.",
       " Perfect branches: ",
       n_perfect,
       "/",
@@ -169,9 +193,21 @@ compute_branches <- function(cal, verbose = FALSE) {
     )
   }
 
-  list(
-    branches = branches,
-    scores = scores,
-    omega_hats = omega_hats
+  cal$workspace$integrate$branches <- branches
+  cal$workspace$integrate$scores <- scores
+  cal$workspace$integrate$omega_hats <- omega_hats
+
+  cal
+}
+
+# ======================================================================
+# TASK: profile (placeholder)
+# ======================================================================
+
+#' @keywords internal
+.generate_profile <- function(cal, verbose = FALSE, ...) {
+  stop(
+    "generate(task = 'profile') is not yet implemented.",
+    call. = FALSE
   )
 }

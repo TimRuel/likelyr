@@ -13,8 +13,8 @@ traversal_spec(
   n_adjacent = 3L,
   max_mode_shifts = 20L,
   k_recent = 3L,
-  drop_multiplier = 5,
-  max_trials = NULL,
+  drop_multiplier = 2,
+  max_drop_fraction = 0.25,
   name = NULL,
   ...
 )
@@ -50,11 +50,11 @@ Default: \code{3L}.}
 
 \item{drop_multiplier}{Positive numeric scalar. A new drop exceeding
 this multiple of the recent median drop is flagged as a jump.
-Default: \code{5.0}.}
+Default: \code{2.0}.}
 
-\item{max_trials}{Optional positive integer. Maximum number of base
-draws attempted by \code{sieve()} before stopping. \code{NULL}
-defaults to \code{10 * R}. Default: \code{NULL}.}
+\item{max_drop_fraction}{Numeric scalar in (0, 1]. A single step drop
+exceeding this fraction of \code{effective_crit} is always flagged,
+regardless of recent drop history. Default: \code{0.25}.}
 
 \item{name}{Optional descriptive name.}
 

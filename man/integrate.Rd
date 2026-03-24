@@ -15,7 +15,7 @@ integrate(cal, ...)
 }
 \value{
 The SAME \code{calibrated} model object, augmented with
-\code{$workspace$integrate} containing branches, scores, and the
+\code{$workspace$integrate} containing branches and the
 initial aggregation result.
 }
 \description{
@@ -28,8 +28,8 @@ error otherwise. No omega-hat sampling or mode location occurs here.
 Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
 A clear error is raised if it is absent.
 
-After branch computation, \code{aggregate()} is called internally
-with default parameters to produce an initial result. Call
-\code{aggregate()} directly on the returned model to re-aggregate
-with different settings without repeating branch computation.
+After branch computation, \code{aggregate()} is called with
+default parameters. Call \code{aggregate()} directly on the
+returned model to re-aggregate with different settings without
+repeating branch computation.
 }

@@ -7,39 +7,30 @@
 aggregate(cal, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object with
-\code{cal$workspace$integrate$branches} and
-\code{cal$workspace$integrate$scores} populated by
-\code{integrate()}.}
+\item{cal}{A \code{calibrated} model object.}
 
-\item{score_threshold}{Numeric scalar in \link{0, 1}. Branches with score
-below this threshold are excluded. Default: \code{0}.}
-
-\item{verbose}{Logical. Print diagnostics. Default: \code{FALSE}.}
+\item{verbose}{Logical. Default: \code{FALSE}.}
 }
 \value{
 The SAME \code{calibrated} model object, with
 \code{cal$workspace$integrate$result} updated.
 }
 \description{
-Filters branches by \code{score_threshold}, then computes a pointwise
-average log-likelihood curve using all retained branches that have
-support at each ψ value:
+Computes a pointwise average log-likelihood curve from all branches:
 
 \deqn{
   \log \bar{L}(\psi)
   = \log \left(
-    \frac{1}{n(\psi)} \sum_{b \,:\, \psi \in \mathrm{supp}(b)}
-    \exp\{\ell_b(\psi)\}
+    \frac{1}{R} \sum_{r=1}^{R}
+    \exp\{\ell_r(\psi)\}
   \right)
 }
 
-where \eqn{n(\psi)} is the number of retained branches with an
-evaluation at ψ. Coverage varies naturally across ψ — branches
-with holes drop out at affected grid points rather than being
-excluded entirely.
+All branches share a common ψ grid derived by \code{preprocess()},
+so every branch contributes at every ψ point. The \code{n_support}
+column in the result records the actual number of contributing
+branches at each point as a diagnostic.
 
-A floor warning is issued when the median number of branches
-supporting a ψ point falls below \code{min_branches}, indicating
-the threshold may be too aggressive.
+A floor warning is issued when the median \code{n_support} falls
+below \code{cal$execution$min_branches}.
 }

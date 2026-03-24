@@ -9,37 +9,27 @@ get_interval_estimate_df(
   zero_max_psi_ll_fn,
   psi_ll_df,
   alpha_levels,
-  expand_factor,
   psi_0 = NA_real_
 )
 }
 \arguments{
-\item{point_estimate}{Numeric scalar giving the MLE of \eqn{\psi}.}
+\item{point_estimate}{Numeric scalar. MLE of \eqn{\psi}.}
 
 \item{zero_max_psi_ll_fn}{Function returning
 \eqn{\ell(\psi) - \ell(\hat\psi)}.}
 
-\item{psi_ll_df}{Data frame containing at least a column \code{psi} giving
-the evaluated \eqn{\psi} grid.}
+\item{psi_ll_df}{Data frame with at least a \code{psi} column.}
 
 \item{alpha_levels}{Numeric vector of significance levels.}
 
-\item{expand_factor}{Numeric scalar controlling multiplicative
-expansion of the search bounds.}
-
-\item{psi_0}{Optional numeric scalar giving the true value of
-\eqn{\psi}. If \code{NA}, truth coverage is not evaluated.}
+\item{psi_0}{Optional numeric scalar. True value of
+\eqn{\psi}. Default: \code{NA_real_}.}
 }
 \value{
-A formatted data frame containing confidence interval summaries for
-each confidence level.
+Formatted data frame of confidence interval summaries.
 }
 \description{
-Computes likelihood-based confidence intervals for a scalar parameter
-\eqn{\psi} by inverting a zero-maximized log-likelihood function over
-multiple confidence levels.
-
-The returned table includes interval endpoints, lengths, deviations
-from the MLE, and optional truth coverage diagnostics.
+Computes likelihood-based confidence intervals by inverting a
+zero-maximized log-likelihood function over multiple confidence levels.
 }
 \keyword{internal}

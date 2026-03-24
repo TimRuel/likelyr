@@ -7,27 +7,20 @@
 find_interval_endpoint(zero_max_psi_ll_fn, crit, search_range)
 }
 \arguments{
-\item{zero_max_psi_ll_fn}{A function of \eqn{\psi} returning the
-zero-maximized log-likelihood
+\item{zero_max_psi_ll_fn}{Function returning
 \eqn{\ell(\psi) - \ell(\hat\psi)}.}
 
-\item{crit}{Numeric scalar giving the chi-square cutoff
+\item{crit}{Numeric scalar. Chi-square cutoff
 \eqn{c = \tfrac{1}{2}\chi^2_{1-\alpha,1}}.}
 
-\item{search_range}{Numeric length-2 vector giving the interval over
-which to search for a root.}
+\item{search_range}{Numeric length-2 vector. Search interval.}
 }
 \value{
-Numeric scalar giving the root, or \code{NA_real_} if root finding fails.
+Numeric scalar root, or \code{NA_real_}.
 }
 \description{
-Internal helper that solves for a root of the shifted log-likelihood
-equation
-\deqn{
-  \ell(\psi) - \ell(\hat\psi) + c = 0
-}
-using numeric root finding.
-
-Root-finding failures return \code{NA_real_} rather than erroring.
+Solves for a root of
+\deqn{\ell(\psi) - \ell(\hat\psi) + c = 0}
+using numeric root finding. Returns \code{NA_real_} on failure.
 }
 \keyword{internal}

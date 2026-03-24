@@ -4,36 +4,24 @@
 \alias{estimate_interval}
 \title{Compute Raw Psi Confidence Interval Bounds}
 \usage{
-estimate_interval(
-  point_estimate,
-  zero_max_psi_ll_fn,
-  psi_grid,
-  alpha,
-  expand_factor
-)
+estimate_interval(point_estimate, zero_max_psi_ll_fn, psi_grid, alpha)
 }
 \arguments{
-\item{point_estimate}{Numeric scalar giving the MLE of \eqn{\psi}.}
+\item{point_estimate}{Numeric scalar. MLE of \eqn{\psi}.}
 
 \item{zero_max_psi_ll_fn}{Function returning
 \eqn{\ell(\psi) - \ell(\hat\psi)}.}
 
 \item{psi_grid}{Numeric vector of evaluated \eqn{\psi} values.}
 
-\item{alpha}{Numeric scalar giving the significance level.}
-
-\item{expand_factor}{Numeric scalar controlling multiplicative
-expansion of the search bounds.}
+\item{alpha}{Numeric scalar significance level.}
 }
 \value{
-A tibble with columns \code{alpha}, \code{lower}, and \code{upper}.
+A tibble with columns \code{alpha}, \code{lower}, \code{upper}.
 }
 \description{
-Computes lower and upper confidence interval bounds for a scalar
-parameter \eqn{\psi} by inverting a zero-maximized log-likelihood
-function at a single significance level.
-
-This function returns \emph{raw numeric bounds only} and performs no
-formatting or diagnostics.
+Computes lower and upper confidence interval bounds by inverting a
+zero-maximized log-likelihood function at a single significance level.
+The search range is bounded by the extent of \code{psi_grid}.
 }
 \keyword{internal}

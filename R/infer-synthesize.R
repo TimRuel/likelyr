@@ -10,32 +10,30 @@
 #' numeric results and the data required for downstream presentation.
 #'
 #' This function performs **no table rendering or plotting**. Tables/plots
-#' are materialized later by `view()` and `plot()` (local-only).
+#' are materialized later by \code{view()} and \code{plot()} (local-only).
 #'
 #' This function assumes that likelihood evaluation has already been
-#' performed and that `psi_ll_df` represents a unimodal likelihood curve.
+#' performed and that \code{psi_ll_df} represents a unimodal likelihood
+#' curve.
 #'
-#' @param psi_ll_df A data frame containing columns `psi` and `loglik`
-#'   representing the evaluated log-likelihood curve.
+#' @param psi_ll_df    A data frame containing columns \code{psi} and
+#'   \code{loglik} representing the evaluated log-likelihood curve.
 #' @param alpha_levels Numeric vector of significance levels.
-#' @param psi_0 Optional numeric scalar giving the true value of ψ.
-#' @param expand_factor Numeric scalar controlling multiplicative expansion
-#'   of the search bounds for confidence interval root finding.
+#' @param psi_0        Optional numeric scalar giving the true value of ψ.
 #'
 #' @return A named list containing:
 #' \describe{
-#'   \item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function with max at 0.}
+#'   \item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function
+#'     with max at 0.}
 #'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
-#'   \item{interval_estimate_df}{Confidence interval diagnostics table (numeric).}
-#'   \item{estimate_df}{Combined point + interval summary table (numeric).}
+#'   \item{interval_estimate_df}{Confidence interval diagnostics table.}
 #' }
 #'
 #' @keywords internal
 synthesize_inference <- function(
   psi_ll_df,
   alpha_levels,
-  psi_0,
-  expand_factor
+  psi_0
 ) {
   type <- attr(psi_ll_df, "type")
 
@@ -60,10 +58,8 @@ synthesize_inference <- function(
   # Point estimate + SE
   # --------------------------------------------------
   psi_ll_max_point <- get_psi_ll_max_point(psi_ll_fn, psi_ll_df)
-
   point_estimate <- psi_ll_max_point$argmax
   max_loglik <- psi_ll_max_point$maximum
-
   se_point_estimate <- get_se_point_estimate(point_estimate, psi_ll_df)
 
   point_estimate_df <- tibble::tibble(
@@ -86,7 +82,6 @@ synthesize_inference <- function(
     zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     psi_ll_df = psi_ll_df,
     alpha_levels = alpha_levels,
-    expand_factor = expand_factor,
     psi_0 = psi_0
   )
 

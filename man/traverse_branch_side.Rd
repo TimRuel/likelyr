@@ -8,52 +8,31 @@ traverse_branch_side(
   grid,
   k_direction,
   k_start,
-  branch_cutoff,
   init_guess,
-  init_ll,
-  init_drops,
   branch_evaluator,
-  k_recent = 3L,
-  drop_multiplier = 2,
   max_consecutive_skips = 2L
 )
 }
 \arguments{
-\item{grid}{ψ-grid object.}
+\item{grid}{ψ-grid object. \code{psi_lower} and
+\code{psi_upper} define the stopping boundaries.}
 
 \item{k_direction}{Integer +1 or -1.}
 
 \item{k_start}{Integer starting grid index.}
 
-\item{branch_cutoff}{Numeric scalar cutoff log-likelihood.}
-
 \item{init_guess}{Numeric vector warm-start parameter.}
-
-\item{init_ll}{Numeric scalar log-likelihood of the
-last accepted point before k_start.}
-
-\item{init_drops}{Numeric vector of drops from probe()
-seeding the recent drop history.}
 
 \item{branch_evaluator}{Function (psi, param_init) -> list.}
 
-\item{k_recent}{Integer. Recent drop window size.}
-
-\item{drop_multiplier}{Numeric. Jump detection multiplier.}
-
 \item{max_consecutive_skips}{Integer. Stop side after this many
-consecutive skipped points. Default: \code{2L}.}
+consecutive solver failures. Default: \code{2L}.}
 }
 \description{
 Sweeps outward from \code{k_start} in the given direction, evaluating
-the branch at each grid point. Stops when the log-likelihood drops
-below \code{branch_cutoff} or a ψ bound is reached.
-
-Drop checking uses \code{check_drop_traversal()}: once \code{k_recent}
-traversal drops have accumulated, a new drop exceeding
-\code{drop_multiplier} times the recent median is flagged as a jump.
-The tolerance widens proportionally after consecutive skips.
-
-Returns a tibble of evaluated points.
+the branch at each grid point. Stops when the common interval boundary
+is reached. Points where the solver returns a non-finite value are
+skipped; if \code{max_consecutive_skips} such failures occur in a
+row, the side stops early.
 }
 \keyword{internal}

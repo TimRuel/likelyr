@@ -11,19 +11,17 @@ add_interval_diagnostics(
 )
 }
 \arguments{
-\item{interval_estimate_df}{Data frame with columns \code{alpha}, \code{lower},
-and \code{upper}.}
+\item{interval_estimate_df}{Data frame with columns \code{alpha},
+\code{lower}, \code{upper}.}
 
-\item{point_estimate}{Numeric scalar giving the MLE of \eqn{\psi}.}
+\item{point_estimate}{Numeric scalar. MLE of \eqn{\psi}.}
 
-\item{psi_0}{Optional numeric scalar giving the true value of
-\eqn{\psi}. If \code{NA}, truth coverage diagnostics are omitted.}
+\item{psi_0}{Optional numeric scalar. True value of \eqn{\psi}.}
 }
 \value{
-A data frame with additional diagnostic columns.
+Data frame with additional diagnostic columns.
 }
 \description{
-Augments raw confidence interval bounds with interval length,
-deviations from the MLE, and optional truth coverage indicators.
+Add Diagnostic Quantities to Psi Confidence Intervals
 }
 \keyword{internal}

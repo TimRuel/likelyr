@@ -7,20 +7,14 @@
 format_interval_estimate_df(interval_estimate_df, digits = 2)
 }
 \arguments{
-\item{interval_estimate_df}{Data frame containing confidence interval
-bounds and diagnostics.}
+\item{interval_estimate_df}{Data frame of CI bounds and diagnostics.}
 
-\item{digits}{Integer giving the number of decimal places to round
-numeric columns.}
+\item{digits}{Integer. Decimal places for rounding. Default: \code{2}.}
 }
 \value{
-A formatted data frame suitable for display.
+Formatted data frame suitable for display.
 }
 \description{
-Converts confidence interval results into a human-readable table by
-adding confidence levels, formatted interval strings, and rounding
-numeric quantities.
-
-This function is strictly a \emph{presentation helper}.
+Format Psi Confidence Interval Table for Display
 }
 \keyword{internal}

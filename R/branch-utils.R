@@ -178,7 +178,7 @@ make_branch_mode_result <- function(
 # Drop magnitude checks
 # ----------------------------------------------------------------------
 
-#' Drop Check for Probe Phase
+#' Drop Check
 #'
 #' @description
 #' Used during \code{probe()} to decide whether to reject an omega-hat.
@@ -205,7 +205,7 @@ make_branch_mode_result <- function(
 #' @return Logical scalar. \code{TRUE} if the drop is acceptable.
 #'
 #' @keywords internal
-check_drop_probe <- function(
+check_drop <- function(
   drop,
   recent_drops,
   drop_multiplier,
@@ -229,42 +229,120 @@ check_drop_probe <- function(
   drop <= drop_multiplier * ref
 }
 
-#' Drop Check for Traversal Phase
+
+# ----------------------------------------------------------------------
+# Common psi interval
+# ----------------------------------------------------------------------
+
+#' Compute Common ψ Interval for Branch Generation
 #'
 #' @description
-#' Used during \code{traverse_branch_side()} to decide whether to skip
-#' a point. Once \code{k_recent} traversal drops have accumulated, rejects
-#' if the drop exceeds \code{drop_multiplier} times the recent median.
-#' The tolerance widens proportionally after consecutive skips.
-#' Always accepts until enough history exists.
+#' Derives the common ψ support interval to be used across all Monte
+#' Carlo branches, ensuring full overlap and valid CI estimation.
 #'
-#' @param drop              Numeric scalar. The new drop to check.
-#' @param recent_drops      Numeric vector. Recent traversal drop history.
-#' @param drop_multiplier   Positive numeric scalar.
-#' @param k_recent          Non-negative integer. Minimum history required
-#'   before the check applies.
-#' @param consecutive_skips Non-negative integer. Widens tolerance after gaps.
+#' The interval is the union of two components:
+#' \enumerate{
+#'   \item The profile likelihood extent — from its leftmost to rightmost
+#'     ψ value, which by construction reaches
+#'     \code{effective_crit = crit * cutoff_buffer} on both sides.
+#'   \item A mode-distribution interval — \code{[x_bar - c * s,
+#'     x_bar + c * s]}, where \code{x_bar} and \code{s} are the mean
+#'     and standard deviation of the branch seed modes, and \code{c}
+#'     is a user-supplied multiplier (default: \code{qnorm(1 -
+#'     alpha_target / 2)}). This extends coverage into regions where
+#'     branch modes cluster far from the profile MLE.
+#' }
 #'
-#' @return Logical scalar. \code{TRUE} if the drop is acceptable.
+#' The union is then intersected with \code{psi_interval} if one
+#' exists, so branches never extend beyond the parameter space boundary.
 #'
+#' @param profile_psi_ll_df Data frame with a \code{psi} column, as
+#'   returned by \code{generate(task = "profile")}.
+#' @param branch_seeds      List of branch seed objects from
+#'   \code{sieve()}, each with a \code{$psi_mode} field.
+#' @param alpha_target      Numeric scalar. Significance level for the
+#'   default \code{c} multiplier. Ignored if \code{c} is supplied.
+#' @param c                 Positive numeric scalar. Multiplier for the
+#'   mode-distribution interval half-width. Default:
+#'   \code{qnorm(1 - alpha_target / 2)}.
+#' @param psi_interval      A \code{sets::interval} object or
+#'   \code{NULL}.
+#'
+#' @return A named list with:
+#'   \itemize{
+#'     \item \code{$psi_lower}  — numeric scalar lower bound
+#'     \item \code{$psi_upper}  — numeric scalar upper bound
+#'     \item \code{$mode_mean}  — mean of branch seed modes
+#'     \item \code{$mode_sd}    — sd of branch seed modes
+#'     \item \code{$c}          — multiplier used
+#'   }
+#'
+#' @importFrom stats qnorm sd
 #' @keywords internal
-check_drop_traversal <- function(
-  drop,
-  recent_drops,
-  drop_multiplier,
-  k_recent,
-  consecutive_skips = 0L
+compute_common_interval <- function(
+  profile_psi_ll_df,
+  branch_seeds,
+  alpha_target,
+  psi_interval = NULL
 ) {
-  # Until k_recent traversal drops have accumulated, always accept —
-  # the drop pattern near the mode is not representative of the tails
-  if (length(recent_drops) < k_recent) {
-    return(TRUE)
+  if (is.null(profile_psi_ll_df) || nrow(profile_psi_ll_df) == 0L) {
+    stop(
+      "compute_common_interval(): profile curve is empty or NULL.\n",
+      "Run profile() before computing the common interval.",
+      call. = FALSE
+    )
   }
 
-  effective_multiplier <- drop_multiplier * (consecutive_skips + 1L)
-  ref <- median(recent_drops)
-  if (ref <= 0) {
-    return(TRUE)
+  # -------------------------------------------------------------------
+  # Component 1: profile extent
+  # -------------------------------------------------------------------
+  profile_lower <- min(profile_psi_ll_df$psi)
+  profile_upper <- max(profile_psi_ll_df$psi)
+
+  # -------------------------------------------------------------------
+  # Component 2: mode-distribution interval
+  # -------------------------------------------------------------------
+  psi_modes <- vapply(branch_seeds, `[[`, "psi_mode", FUN.VALUE = numeric(1))
+  mode_mean <- mean(psi_modes)
+  mode_sd <- sd(psi_modes)
+
+  z <- qnorm(1 - alpha_target / 2)
+
+  mode_lower <- mode_mean - z * mode_sd
+  mode_upper <- mode_mean + z * mode_sd
+
+  # -------------------------------------------------------------------
+  # Union of profile extent and mode-distribution interval
+  # -------------------------------------------------------------------
+  psi_lower <- min(profile_lower, mode_lower)
+  psi_upper <- max(profile_upper, mode_upper)
+
+  # -------------------------------------------------------------------
+  # Intersect with psi_interval if it exists
+  # -------------------------------------------------------------------
+  if (!is.null(psi_interval)) {
+    domain_lower <- min(psi_interval)
+    domain_upper <- max(psi_interval)
+
+    if (is.finite(domain_lower)) {
+      psi_lower <- max(psi_lower, domain_lower)
+    }
+    if (is.finite(domain_upper)) psi_upper <- min(psi_upper, domain_upper)
   }
-  drop <= effective_multiplier * ref
+
+  if (psi_lower >= psi_upper) {
+    stop(
+      "compute_common_interval(): lower bound >= upper bound after intersection.\n",
+      "Check profile extent, branch seed modes, and psi_interval.",
+      call. = FALSE
+    )
+  }
+
+  list(
+    psi_lower = psi_lower,
+    psi_upper = psi_upper,
+    mode_mean = mode_mean,
+    mode_sd = mode_sd,
+    z = z
+  )
 }

@@ -24,39 +24,34 @@
 #' \code{traversal$traversal_method}:
 #' \itemize{
 #'   \item \code{"topdown"} — outward sweep from a pre-located mode.
-#'     Requires a fully populated \code{branch_seed} object with \code{psi_mode},
-#'     \code{param_mode}, and \code{ll_mode}. This is the default
-#'     strategy and requires \code{sieve()} to have been run first.
-#'   \item \code{"leftright"} — single left-to-right sweep over the full
-#'     search interval, with the cutoff applied retrospectively. Does not
-#'     require mode pre-location. Intended as a fallback when mode
-#'     location is systematically unreliable.
+#'     Traversal continues until the common interval boundary is reached
+#'     on each side. Requires a fully populated \code{branch_seed} from
+#'     \code{probe()}.
+#'   \item \code{"leftright"} — single left-to-right sweep over the
+#'     full grid interval, with a log-likelihood cutoff applied
+#'     retrospectively. Intended as a fallback when mode pre-location
+#'     is unreliable.
 #' }
 #'
-#' @param branch_seed A named list from \code{probe()}, containing at minimum:
+#' @param branch_seed A named list from \code{probe()}, containing:
 #'   \itemize{
-#'     \item \code{omega_hat}        — numeric vector
-#'     \item \code{psi_mode}         — numeric scalar (topdown only)
-#'     \item \code{param_mode}       — numeric vector (topdown only)
-#'     \item \code{ll_mode}          — numeric scalar (topdown only)
-#'     \item \code{probe_evals_df}   — data frame of pre-evaluated points
-#'     \item \code{drops_left}       — numeric vector of drops from probe
-#'     \item \code{drops_right}      — numeric vector of drops from probe
-#'     \item \code{param_left_edge}  — warm-start for leftward traversal
-#'     \item \code{param_right_edge} — warm-start for rightward traversal
-#'     \item \code{left_boundary}    — logical; TRUE if probe hit left bound
-#'     \item \code{right_boundary}   — logical; TRUE if probe hit right bound
+#'     \item \code{omega_hat}, \code{psi_mode}, \code{param_mode},
+#'       \code{ll_mode}, \code{probe_evals_df},
+#'       \code{param_left_edge}, \code{param_right_edge},
+#'       \code{left_boundary}, \code{right_boundary}
 #'   }
 #' @param traversal        A calibrated \code{traversal_spec} object.
 #' @param grid             A ψ-grid object from \code{psi_grid_anchor()}.
-#' @param branch_evaluator Function \code{(psi, param_init) -> list(param_hat, branch_val)}.
-#' @param effective_crit   Numeric scalar. Log-likelihood drop defining the
-#'   branch cutoff: \code{cutoff = ll_mode - effective_crit}.
+#'   The \code{psi_lower} and \code{psi_upper} slots define the common
+#'   interval boundaries that stop traversal.
+#' @param branch_evaluator Function \code{(psi, param_init) ->
+#'   list(param_hat, branch_val)}.
 #'
 #' @return A list with:
 #'   \itemize{
-#'     \item \code{$branch_df}        — tibble(psi, loglik, loglik_centered, k)
-#'     \item \code{$psi_hat}          — numeric scalar (NA for leftright)
+#'     \item \code{$branch_df}        — tibble(psi, loglik,
+#'       loglik_centered, k)
+#'     \item \code{$psi_hat}          — numeric scalar
 #'     \item \code{$traversal_method} — character scalar
 #'   }
 #'
@@ -65,8 +60,7 @@ traverse_branch <- function(
   branch_seed,
   traversal,
   grid,
-  branch_evaluator,
-  effective_crit
+  branch_evaluator
 ) {
   method <- traversal$traversal_method %||% "topdown"
 
@@ -74,17 +68,14 @@ traverse_branch <- function(
     method,
     topdown = traverse_branch_topdown(
       branch_seed = branch_seed,
-      traversal = traversal,
       grid = grid,
-      branch_evaluator = branch_evaluator,
-      effective_crit = effective_crit
+      branch_evaluator = branch_evaluator
     ),
     leftright = traverse_branch_leftright(
       branch_seed = branch_seed,
       traversal = traversal,
       grid = grid,
-      branch_evaluator = branch_evaluator,
-      effective_crit = effective_crit
+      branch_evaluator = branch_evaluator
     ),
     stop(
       "Unknown traversal_method: '",
@@ -105,31 +96,20 @@ traverse_branch <- function(
 #' @description
 #' Picks up where \code{probe()} left off: reads pre-evaluated points
 #' from \code{branch_seed$probe_evals_df}, then extends outward on each
-#' side using the edge warm-starts from the seed. Sides that probe()
-#' stopped at a boundary are not extended. Drop history from probe() is
-#' passed into each side sweep so the drop check is continuous across
-#' the probe/traversal boundary.
+#' side using the edge warm-starts from the seed. Traversal continues
+#' until the common interval boundary is reached. Sides that
+#' \code{probe()} stopped at a boundary are not extended.
 #'
 #' @inheritParams traverse_branch
 #' @keywords internal
 traverse_branch_topdown <- function(
   branch_seed,
-  traversal,
   grid,
-  branch_evaluator,
-  effective_crit
+  branch_evaluator
 ) {
   psi_mode <- branch_seed$psi_mode
-  ll_mode <- branch_seed$ll_mode
   probe_evals_df <- branch_seed$probe_evals_df
 
-  branch_cutoff <- ll_mode - effective_crit
-  k_recent <- traversal$k_recent
-  drop_multiplier <- traversal$drop_multiplier
-
-  # -------------------------------------------------------------------
-  # Determine outermost k already evaluated on each side
-  # -------------------------------------------------------------------
   k_mode <- round((psi_mode - grid$psi_mle) / grid$increment)
 
   probe_evals_df_left <- probe_evals_df |> dplyr::filter(side == "left")
@@ -156,17 +136,8 @@ traverse_branch_topdown <- function(
       grid = grid,
       k_direction = -1L,
       k_start = k_left_edge - 1L,
-      branch_cutoff = branch_cutoff,
       init_guess = branch_seed$param_left_edge,
-      init_ll = if (nrow(probe_evals_df_left) > 0L) {
-        probe_evals_df_left$loglik[which.min(probe_evals_df_left$k)]
-      } else {
-        ll_mode
-      },
-      init_drops = branch_seed$drops_left,
-      branch_evaluator = branch_evaluator,
-      k_recent = k_recent,
-      drop_multiplier = drop_multiplier
+      branch_evaluator = branch_evaluator
     )
   }
 
@@ -180,23 +151,11 @@ traverse_branch_topdown <- function(
       grid = grid,
       k_direction = +1L,
       k_start = k_right_edge + 1L,
-      branch_cutoff = branch_cutoff,
       init_guess = branch_seed$param_right_edge,
-      init_ll = if (nrow(probe_evals_df_right) > 0L) {
-        probe_evals_df_right$loglik[which.max(probe_evals_df_right$k)]
-      } else {
-        ll_mode
-      },
-      init_drops = branch_seed$drops_right,
-      branch_evaluator = branch_evaluator,
-      k_recent = k_recent,
-      drop_multiplier = drop_multiplier
+      branch_evaluator = branch_evaluator
     )
   }
 
-  # -------------------------------------------------------------------
-  # Combine probe evals df with new traversal points
-  # -------------------------------------------------------------------
   branch_df <- probe_evals_df |>
     dplyr::select(k, loglik) |>
     dplyr::bind_rows(left_df, right_df) |>
@@ -216,13 +175,10 @@ traverse_branch_topdown <- function(
 #' Traverse a Branch Left to Right Across the Full Search Interval
 #'
 #' @description
-#' Evaluates the branch at every grid point in the search interval from
-#' left to right, using warm-start chaining between adjacent points.
-#' After the full sweep, the mode is located retrospectively and points
-#' below \code{ll_mode - effective_crit} are trimmed.
-#'
-#' Does not require mode pre-location. Intended as a fallback when
-#' mode location is systematically unreliable.
+#' Evaluates the branch at every grid point from left to right using
+#' warm-start chaining. After the full sweep, the mode is located
+#' retrospectively and points below \code{ll_mode - effective_crit}
+#' are trimmed.
 #'
 #' @inheritParams traverse_branch
 #' @keywords internal
@@ -230,14 +186,17 @@ traverse_branch_leftright <- function(
   branch_seed,
   traversal,
   grid,
-  branch_evaluator,
-  effective_crit
+  branch_evaluator
 ) {
   omega_hat <- branch_seed$omega_hat
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
   psi_mle <- grid$psi_mle
   increment <- grid$increment
+
+  alpha_target <- min(1 - traversal$confidence_levels)
+  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * traversal$cutoff_buffer
 
   k_min <- ceiling((psi_lower - psi_mle) / increment)
   k_max <- floor((psi_upper - psi_mle) / increment)
@@ -288,49 +247,31 @@ traverse_branch_leftright <- function(
 #'
 #' @description
 #' Sweeps outward from \code{k_start} in the given direction, evaluating
-#' the branch at each grid point. Stops when the log-likelihood drops
-#' below \code{branch_cutoff} or a ψ bound is reached.
+#' the branch at each grid point. Stops when the common interval boundary
+#' is reached. Points where the solver returns a non-finite value are
+#' skipped; if \code{max_consecutive_skips} such failures occur in a
+#' row, the side stops early.
 #'
-#' Drop checking uses \code{check_drop_traversal()}: once \code{k_recent}
-#' traversal drops have accumulated, a new drop exceeding
-#' \code{drop_multiplier} times the recent median is flagged as a jump.
-#' The tolerance widens proportionally after consecutive skips.
-#'
-#' Returns a tibble of evaluated points.
-#'
-#' @param grid                  ψ-grid object.
+#' @param grid                  ψ-grid object. \code{psi_lower} and
+#'   \code{psi_upper} define the stopping boundaries.
 #' @param k_direction           Integer +1 or -1.
 #' @param k_start               Integer starting grid index.
-#' @param branch_cutoff         Numeric scalar cutoff log-likelihood.
 #' @param init_guess            Numeric vector warm-start parameter.
-#' @param init_ll               Numeric scalar log-likelihood of the
-#'   last accepted point before k_start.
-#' @param init_drops            Numeric vector of drops from probe()
-#'   seeding the recent drop history.
 #' @param branch_evaluator      Function (psi, param_init) -> list.
-#' @param k_recent              Integer. Recent drop window size.
-#' @param drop_multiplier       Numeric. Jump detection multiplier.
 #' @param max_consecutive_skips Integer. Stop side after this many
-#'   consecutive skipped points. Default: \code{2L}.
+#'   consecutive solver failures. Default: \code{2L}.
 #'
 #' @keywords internal
 traverse_branch_side <- function(
   grid,
   k_direction,
   k_start,
-  branch_cutoff,
   init_guess,
-  init_ll,
-  init_drops,
   branch_evaluator,
-  k_recent = 3L,
-  drop_multiplier = 2.0,
   max_consecutive_skips = 2L
 ) {
   k_curr <- k_start
   current_par <- init_guess
-  current_val <- init_ll
-  drops <- init_drops
   consecutive_skips <- 0L
 
   psi_lower <- grid$psi_lower
@@ -341,10 +282,10 @@ traverse_branch_side <- function(
   repeat {
     psi_k <- grid$psi_mle + k_curr * grid$increment
 
-    hit_lower <- !is.null(psi_lower) && psi_k < psi_lower
-    hit_upper <- !is.null(psi_upper) && psi_k > psi_upper
-
-    if (hit_lower || hit_upper) {
+    if (!is.null(psi_lower) && psi_k < psi_lower) {
+      break
+    }
+    if (!is.null(psi_upper) && psi_k > psi_upper) {
       break
     }
 
@@ -353,43 +294,13 @@ traverse_branch_side <- function(
       error = function(e) NULL
     )
 
-    skip <- FALSE
-
     if (is.null(eval) || !is.finite(eval$branch_val)) {
-      skip <- TRUE
-    } else {
-      new_val <- eval$branch_val
-      new_drop <- current_val - new_val
-      recent <- tail(drops, k_recent)
-
-      if (
-        new_val > current_val ||
-          !check_drop_traversal(
-            new_drop,
-            recent,
-            drop_multiplier,
-            k_recent,
-            consecutive_skips
-          )
-      ) {
-        skip <- TRUE
-      }
-    }
-
-    if (skip) {
       consecutive_skips <- consecutive_skips + 1L
       if (consecutive_skips >= max_consecutive_skips) break
     } else {
-      drops <- c(drops, new_drop)
-      df <- dplyr::add_row(df, k = k_curr, loglik = new_val)
+      df <- dplyr::add_row(df, k = k_curr, loglik = eval$branch_val)
       consecutive_skips <- 0L
-
-      if (new_val < branch_cutoff) {
-        break
-      }
-
       current_par <- eval$param_hat
-      current_val <- new_val
     }
 
     k_curr <- k_curr + k_direction

@@ -14,17 +14,17 @@
 #' Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
 #' A clear error is raised if it is absent.
 #'
-#' After branch computation, \code{aggregate()} is called internally
-#' with default parameters to produce an initial result. Call
-#' \code{aggregate()} directly on the returned model to re-aggregate
-#' with different settings without repeating branch computation.
+#' After branch computation, \code{aggregate()} is called with
+#' default parameters. Call \code{aggregate()} directly on the
+#' returned model to re-aggregate with different settings without
+#' repeating branch computation.
 #'
 #' @param cal     A \code{calibrated} model object.
 #' @param verbose Logical; print diagnostics. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to \code{generate()}.
 #'
 #' @return The SAME \code{calibrated} model object, augmented with
-#'   \code{$workspace$integrate} containing branches, scores, and the
+#'   \code{$workspace$integrate} containing branches and the
 #'   initial aggregation result.
 #'
 #' @export
@@ -73,12 +73,12 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   # 1. Re-initialise integrate workspace (preserve seeds and sieve diag)
   # ------------------------------------------------------------------
   sieve_diag <- cal$workspace$integrate$sieve
+  common_interval <- cal$workspace$integrate$common_interval
   cal$workspace$integrate <- list(
     branch_seeds = branch_seeds,
-    sieve = sieve_diag
+    sieve = sieve_diag,
+    common_interval = common_interval
   )
-
-  cal <- mark_integrated(cal)
 
   # ------------------------------------------------------------------
   # 2. Execution summary
@@ -96,27 +96,37 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch generation
+  # 3. Branch generation + aggregation with failure handling
   # ------------------------------------------------------------------
-  cal <- generate(cal, task = "integrate", verbose = verbose, ...)
+  cal <- tryCatch(
+    {
+      cal <- generate(cal, task = "integrate", verbose = verbose, ...)
+      cal <- aggregate(cal, verbose = verbose)
+      cal
+    },
+    error = function(e) {
+      if (verbose) {
+        cat("[integrate] ERROR during integration.\n")
+      }
+      cal$workspace$integrate$result <- list(
+        status = "failed",
+        error_msg = conditionMessage(e)
+      )
+      cal
+    }
+  )
 
   # ------------------------------------------------------------------
-  # 4. Tune score threshold and aggregate with best threshold
+  # 4. Wrap result and mark
   # ------------------------------------------------------------------
-  cal <- tune(cal, verbose = verbose)
+  raw <- cal$workspace$integrate$result
 
-  best_threshold <- cal$workspace$integrate$tune$best_threshold %||% 0
+  cal$workspace$integrate$result <- new_integrate_result(c(
+    raw,
+    list(status = raw$status %||% "success")
+  ))
 
-  if (verbose) {
-    cat(
-      "[integrate] Best score threshold: ",
-      best_threshold,
-      "\n",
-      sep = ""
-    )
-  }
-
-  cal <- aggregate(cal, score_threshold = best_threshold, verbose = verbose)
+  cal <- mark_integrated(cal)
 
   if (verbose) {
     cat("[integrate] Finished.\n")
@@ -199,7 +209,6 @@ print.integrate <- function(x, ...) {
   if (!is.null(x$psi_mle)) {
     cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
   }
-
   if (!is.null(x$param_mle)) {
     cat(
       "param_MLE: (",
@@ -208,13 +217,11 @@ print.integrate <- function(x, ...) {
       sep = ""
     )
   }
-
   if (!is.null(x$psi_ll_df)) {
     cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
   }
-
   if (!is.null(x$branches)) {
-    cat("# Branches:    ", length(x$branches), "\n", sep = "")
+    cat("# Branches: ", length(x$branches), "\n", sep = "")
   }
 
   invisible(x)

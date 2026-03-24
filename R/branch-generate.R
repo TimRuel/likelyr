@@ -1,42 +1,40 @@
 # ======================================================================
-# branch-generate.R — Monte Carlo Branch Generation
+# branch-generate.R — Branch Generation
 #
 # Provides:
-#   generate() — orchestrates branch traversals for all
-#                pre-sieved seeds from sieve()
+#   generate() — dispatches to task-specific branch generation
 #
 # Relies on:
-#   traverse_branch()  — branch-traverse.R
-#   score_branch()     — branch-score.R
-#   psi_grid_anchor()  — branch-utils.R
+#   traverse_branch()        — branch-traverse.R
+#   traverse_profile_side()  — profile-traverse.R
+#   psi_grid_anchor()        — branch-utils.R
+#   assemble_branch_df()     — branch-traverse.R
+#   compute_common_interval() — branch-utils.R
 # ======================================================================
 
-#' Generate Monte Carlo Branches
+#' Generate Branches
 #'
 #' @description
-#' Orchestrates branch traversal for all pre-sieved branch seeds
-#' stored in \code{cal$workspace$integrate$branch_seeds} by
-#' \code{sieve()}. All seeds are evaluated — no early stopping.
+#' Dispatches to the appropriate branch generation strategy based on
+#' \code{task}:
+#' \itemize{
+#'   \item \code{"integrate"} — Monte Carlo branches from pre-sieved
+#'     seeds stored in \code{cal$workspace$integrate$branch_seeds}.
+#'     The ψ grid is set from the common interval derived by
+#'     \code{preprocess()}, ensuring full overlap across all branches.
+#'   \item \code{"profile"} — single deterministic branch at
+#'     \code{param_mle}, stored in \code{cal$workspace$profile}.
+#' }
 #'
-#' Each completed branch is scored via \code{score_branch()}. Branches,
-#' scores, and omega-hats are stored on the model for use by
-#' \code{aggregate()}.
-#'
-#' No omega-hat sampling or mode location occurs here — those
-#' responsibilities belong to \code{sieve()}.
-#'
-#' @param cal     A \code{calibrated} model object with
-#'   \code{cal$workspace$integrate$branch_seeds} populated by
-#'   \code{sieve()}.
+#' @param cal     A \code{calibrated} model object.
 #' @param task    Character scalar. One of \code{"integrate"} or
-#'   \code{"profile"}. Controls which branch generation strategy is
-#'   used. Default: \code{"integrate"}.
+#'   \code{"profile"}. Default: \code{"integrate"}.
 #' @param verbose Logical. Print progress. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to the task-specific
 #'   implementation.
 #'
-#' @return The SAME \code{calibrated} model object, with branch
-#'   results stored in \code{cal$workspace$integrate}.
+#' @return The SAME \code{calibrated} model object with results stored
+#'   on the workspace.
 #'
 #' @export
 generate <- function(cal, ...) {
@@ -85,26 +83,29 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
   n_seeds <- length(branch_seeds)
 
   # -------------------------------------------------------------------
-  # Branch binder — already built and stored during calibration
+  # Branch binder
   # -------------------------------------------------------------------
   branch_binder <- traversal$branch_binder
 
   # -------------------------------------------------------------------
-  # ψ-grid
+  # ψ-grid — use common interval derived by preprocess()
   # -------------------------------------------------------------------
+  common_interval <- cal$workspace$integrate$common_interval
+
+  if (is.null(common_interval)) {
+    stop(
+      "generate(task = 'integrate') requires a common interval.\n",
+      "Run preprocess(cal) before generate().",
+      call. = FALSE
+    )
+  }
+
   grid <- psi_grid_anchor(
     psi_mle = estimand$psi_mle,
     increment = traversal$increment,
-    psi_lower = min(estimand$psi_interval),
-    psi_upper = max(estimand$psi_interval)
+    psi_lower = common_interval$psi_lower,
+    psi_upper = common_interval$psi_upper
   )
-
-  # -------------------------------------------------------------------
-  # Branch cutoff
-  # -------------------------------------------------------------------
-  alpha_target <- min(1 - traversal$confidence_levels)
-  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
-  effective_crit <- crit * traversal$cutoff_buffer
 
   # -------------------------------------------------------------------
   # Execution setup
@@ -131,6 +132,11 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
       " | ",
       if (is_parallel) "PARALLEL" else "SERIAL",
       "\n",
+      "[generate] Common interval: [",
+      common_interval$psi_lower,
+      ", ",
+      common_interval$psi_upper,
+      "]\n",
       sep = ""
     )
   }
@@ -154,60 +160,127 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
         branch_seed = branch_seed,
         traversal = traversal,
         grid = grid,
-        branch_evaluator = branch_evaluator,
-        effective_crit = effective_crit
+        branch_evaluator = branch_evaluator
       )
 
-      k_mode <- round(
-        (branch_seed$psi_mode - estimand$psi_mle) / traversal$increment
-      )
+      if (verbose && !is_parallel) {
+        cat("[generate] Branch ", r, "/", n_seeds, " complete.\n", sep = "")
+      }
 
-      score <- score_branch(
-        branch_df = result$branch_df,
-        k_mode = k_mode,
-        ll_mode = branch_seed$ll_mode,
-        crit = crit
-      )
-
-      list(
-        branch_df = result$branch_df,
-        score = score,
-        omega_hat = branch_seed$omega_hat
-      )
+      result$branch_df
     }
 
-  branches <- lapply(results, `[[`, "branch_df")
-  scores <- vapply(results, `[[`, "score", FUN.VALUE = numeric(1))
-  omega_hats <- lapply(results, `[[`, "omega_hat")
+  branches <- results
 
   if (verbose) {
-    n_perfect <- sum(scores >= 1.0)
-    cat(
-      "[generate] Complete.",
-      " Perfect branches: ",
-      n_perfect,
-      "/",
-      n_seeds,
-      ".\n",
-      sep = ""
-    )
+    cat("[generate] Complete. Branches: ", n_seeds, ".\n", sep = "")
   }
 
   cal$workspace$integrate$branches <- branches
-  cal$workspace$integrate$scores <- scores
-  cal$workspace$integrate$omega_hats <- omega_hats
 
   cal
 }
 
 # ======================================================================
-# TASK: profile (placeholder)
+# TASK: profile
 # ======================================================================
 
 #' @keywords internal
 .generate_profile <- function(cal, verbose = FALSE, ...) {
-  stop(
-    "generate(task = 'profile') is not yet implemented.",
-    call. = FALSE
+  traversal <- cal$traversal
+  estimand <- cal$estimand
+  param_mle <- cal$parameter$param_mle
+  psi_mle <- estimand$psi_mle
+
+  # -------------------------------------------------------------------
+  # Profile evaluator fixed at param_mle
+  # -------------------------------------------------------------------
+  profile_evaluator <- traversal$branch_binder(param_mle)
+
+  # -------------------------------------------------------------------
+  # ψ-grid — use full psi_interval for profile
+  # -------------------------------------------------------------------
+  grid <- psi_grid_anchor(
+    psi_mle = psi_mle,
+    increment = traversal$increment,
+    psi_lower = min(estimand$psi_interval),
+    psi_upper = max(estimand$psi_interval)
   )
+
+  # -------------------------------------------------------------------
+  # Branch cutoff
+  # -------------------------------------------------------------------
+  alpha_target <- min(1 - traversal$confidence_levels)
+  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * traversal$cutoff_buffer
+  loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
+  cutoff <- loglik_at_mle - effective_crit
+
+  max_retries <- traversal$max_retries %||% 4L
+
+  if (verbose) {
+    cat(
+      "[generate] task = profile",
+      " | increment = ",
+      traversal$increment,
+      " | cutoff = ",
+      round(cutoff, 3),
+      "\n",
+      sep = ""
+    )
+  }
+
+  # -------------------------------------------------------------------
+  # Left and right sweeps
+  # -------------------------------------------------------------------
+  left <- traverse_profile_side(
+    grid = grid,
+    k_start = -1L,
+    cutoff = cutoff,
+    init_guess = param_mle,
+    profile_evaluator = profile_evaluator,
+    max_retries = max_retries,
+    stop_at_bounds = TRUE,
+    eval_at_bounds = TRUE
+  )
+
+  right <- traverse_profile_side(
+    grid = grid,
+    k_start = +1L,
+    cutoff = cutoff,
+    init_guess = param_mle,
+    profile_evaluator = profile_evaluator,
+    max_retries = max_retries,
+    stop_at_bounds = TRUE,
+    eval_at_bounds = TRUE
+  )
+
+  # -------------------------------------------------------------------
+  # Assemble and store as plain list — wrapping done in profile()
+  # -------------------------------------------------------------------
+  df <- dplyr::bind_rows(
+    left,
+    tibble::tibble(k = 0L, loglik = loglik_at_mle),
+    right
+  )
+
+  psi_ll_df <- assemble_branch_df(df, grid)
+  attr(psi_ll_df, "type") <- "profile"
+
+  if (verbose) {
+    cat(
+      "[generate] Complete. Profile points: ",
+      nrow(psi_ll_df),
+      ".\n",
+      sep = ""
+    )
+  }
+
+  cal$workspace$profile <- list(
+    psi_ll_df = psi_ll_df,
+    psi_mle = psi_mle,
+    param_mle = param_mle
+  )
+
+  cal
 }

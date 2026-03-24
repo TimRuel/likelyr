@@ -4,26 +4,23 @@
 \alias{synthesize_inference}
 \title{Synthesize Likelihood-Based Inference Results}
 \usage{
-synthesize_inference(psi_ll_df, alpha_levels, psi_0, expand_factor)
+synthesize_inference(psi_ll_df, alpha_levels, psi_0)
 }
 \arguments{
-\item{psi_ll_df}{A data frame containing columns \code{psi} and \code{loglik}
-representing the evaluated log-likelihood curve.}
+\item{psi_ll_df}{A data frame containing columns \code{psi} and
+\code{loglik} representing the evaluated log-likelihood curve.}
 
 \item{alpha_levels}{Numeric vector of significance levels.}
 
 \item{psi_0}{Optional numeric scalar giving the true value of ψ.}
-
-\item{expand_factor}{Numeric scalar controlling multiplicative expansion
-of the search bounds for confidence interval root finding.}
 }
 \value{
 A named list containing:
 \describe{
-\item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function with max at 0.}
+\item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function
+with max at 0.}
 \item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
-\item{interval_estimate_df}{Confidence interval diagnostics table (numeric).}
-\item{estimate_df}{Combined point + interval summary table (numeric).}
+\item{interval_estimate_df}{Confidence interval diagnostics table.}
 }
 }
 \description{
@@ -35,6 +32,7 @@ This function performs \strong{no table rendering or plotting}. Tables/plots
 are materialized later by \code{view()} and \code{plot()} (local-only).
 
 This function assumes that likelihood evaluation has already been
-performed and that \code{psi_ll_df} represents a unimodal likelihood curve.
+performed and that \code{psi_ll_df} represents a unimodal likelihood
+curve.
 }
 \keyword{internal}

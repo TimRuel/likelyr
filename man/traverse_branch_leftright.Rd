@@ -4,46 +4,30 @@
 \alias{traverse_branch_leftright}
 \title{Traverse a Branch Left to Right Across the Full Search Interval}
 \usage{
-traverse_branch_leftright(
-  branch_seed,
-  traversal,
-  grid,
-  branch_evaluator,
-  effective_crit
-)
+traverse_branch_leftright(branch_seed, traversal, grid, branch_evaluator)
 }
 \arguments{
-\item{branch_seed}{A named list from \code{probe()}, containing at minimum:
+\item{branch_seed}{A named list from \code{probe()}, containing:
 \itemize{
-\item \code{omega_hat}        — numeric vector
-\item \code{psi_mode}         — numeric scalar (topdown only)
-\item \code{param_mode}       — numeric vector (topdown only)
-\item \code{ll_mode}          — numeric scalar (topdown only)
-\item \code{probe_evals_df}   — data frame of pre-evaluated points
-\item \code{drops_left}       — numeric vector of drops from probe
-\item \code{drops_right}      — numeric vector of drops from probe
-\item \code{param_left_edge}  — warm-start for leftward traversal
-\item \code{param_right_edge} — warm-start for rightward traversal
-\item \code{left_boundary}    — logical; TRUE if probe hit left bound
-\item \code{right_boundary}   — logical; TRUE if probe hit right bound
+\item \code{omega_hat}, \code{psi_mode}, \code{param_mode},
+\code{ll_mode}, \code{probe_evals_df},
+\code{param_left_edge}, \code{param_right_edge},
+\code{left_boundary}, \code{right_boundary}
 }}
 
 \item{traversal}{A calibrated \code{traversal_spec} object.}
 
-\item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.}
+\item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.
+The \code{psi_lower} and \code{psi_upper} slots define the common
+interval boundaries that stop traversal.}
 
-\item{branch_evaluator}{Function \code{(psi, param_init) -> list(param_hat, branch_val)}.}
-
-\item{effective_crit}{Numeric scalar. Log-likelihood drop defining the
-branch cutoff: \code{cutoff = ll_mode - effective_crit}.}
+\item{branch_evaluator}{Function \code{(psi, param_init) ->
+list(param_hat, branch_val)}.}
 }
 \description{
-Evaluates the branch at every grid point in the search interval from
-left to right, using warm-start chaining between adjacent points.
-After the full sweep, the mode is located retrospectively and points
-below \code{ll_mode - effective_crit} are trimmed.
-
-Does not require mode pre-location. Intended as a fallback when
-mode location is systematically unreliable.
+Evaluates the branch at every grid point from left to right using
+warm-start chaining. After the full sweep, the mode is located
+retrospectively and points below \code{ll_mode - effective_crit}
+are trimmed.
 }
 \keyword{internal}

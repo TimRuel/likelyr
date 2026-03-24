@@ -7,38 +7,20 @@
 profile(cal, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object produced by \code{\link[=calibrate]{calibrate()}}.}
+\item{cal}{A \code{calibrated} model object.}
 
-\item{...}{Additional arguments forwarded to \code{\link[=generate_profile]{generate_profile()}}.}
+\item{...}{Additional arguments passed to
+\code{generate(task = "profile")}.}
 
-\item{verbose}{Logical; print diagnostic messages (default FALSE).}
+\item{verbose}{Logical. Print diagnostics. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, augmented with:
-\itemize{
-\item class \code{profiled}
-\item \code{workspace$profile} — a \code{profile} object
-}
+The SAME \code{calibrated} model object, augmented with
+class \code{profiled} and \code{cal$workspace$profile}.
 }
 \description{
-Computes the \emph{profile log-likelihood} curve for the calibrated model.
-
-Unlike the integrated log-likelihood, the profile log-likelihood
-does \strong{not} involve ω̂–sampling or Monte Carlo methods. Instead,
-nuisance parameters are fixed at their MLE:
-
-\preformatted{
-   ω̂ = θ̂_MLE
-}
-
-The log-likelihood is then evaluated along a ψ–grid, forming a \emph{single
-deterministic branch}. The result is attached to:
-
-\preformatted{
-  cal$workspace$profile
-}
-
-This function performs \strong{no plotting or table rendering}. Visualization
-is deferred to \code{plot()} / \code{view()} methods, which materialize plots/tables
-locally from stored data frames.
+Computes the profile log-likelihood curve for the calibrated model.
+Nuisance parameters are fixed at the MLE, forming a single
+deterministic branch evaluated along the ψ-grid. The result is
+stored in \code{cal$workspace$profile}.
 }

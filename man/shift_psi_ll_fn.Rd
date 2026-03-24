@@ -7,15 +7,14 @@
 shift_psi_ll_fn(psi_ll_fn, shift_val)
 }
 \arguments{
-\item{shift_val}{Numeric scalar giving the shift value.}
+\item{psi_ll_fn}{Function returning \eqn{\ell(\psi)}.}
 
-\item{zero_max_psi_ll_fn}{Function returning \eqn{\ell(\psi)}.}
+\item{shift_val}{Numeric scalar shift value.}
 }
 \value{
-A function of \eqn{\psi} returning the shifted log-likelihood.
+Function of \eqn{\psi} returning the shifted log-likelihood.
 }
 \description{
-Returns a new function corresponding to
-\eqn{\ell(\psi) - c}, where \eqn{c} is a constant shift.
+Returns a new function corresponding to \eqn{\ell(\psi) - c}.
 }
 \keyword{internal}

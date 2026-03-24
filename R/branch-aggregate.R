@@ -1,42 +1,35 @@
 # ======================================================================
-# likelihood-aggregate.R — Branch Aggregation
+# branch-aggregate.R — Branch Aggregation
 # ======================================================================
 
 #' Aggregate Branches into Integrated Log-Likelihood Curve
 #'
 #' @description
-#' Filters branches by \code{score_threshold}, then computes a pointwise
-#' average log-likelihood curve using all retained branches that have
-#' support at each ψ value:
+#' Computes a pointwise average log-likelihood curve from all branches:
 #'
 #' \deqn{
 #'   \log \bar{L}(\psi)
 #'   = \log \left(
-#'     \frac{1}{n(\psi)} \sum_{b \,:\, \psi \in \mathrm{supp}(b)}
-#'     \exp\{\ell_b(\psi)\}
+#'     \frac{1}{R} \sum_{r=1}^{R}
+#'     \exp\{\ell_r(\psi)\}
 #'   \right)
 #' }
 #'
-#' where \eqn{n(\psi)} is the number of retained branches with an
-#' evaluation at ψ. Coverage varies naturally across ψ — branches
-#' with holes drop out at affected grid points rather than being
-#' excluded entirely.
+#' All branches share a common ψ grid derived by \code{preprocess()},
+#' so every branch contributes at every ψ point. The \code{n_support}
+#' column in the result records the actual number of contributing
+#' branches at each point as a diagnostic.
 #'
-#' A floor warning is issued when the median number of branches
-#' supporting a ψ point falls below \code{min_branches}, indicating
-#' the threshold may be too aggressive.
+#' A floor warning is issued when the median \code{n_support} falls
+#' below \code{cal$execution$min_branches}.
 #'
-#' @param cal A \code{calibrated} model object with
-#'   \code{cal$workspace$integrate$branches} and
-#'   \code{cal$workspace$integrate$scores} populated by
-#'   \code{integrate()}.
-#' @param score_threshold Numeric scalar in [0, 1]. Branches with score
-#'   below this threshold are excluded. Default: \code{0}.
-#' @param verbose Logical. Print diagnostics. Default: \code{FALSE}.
+#' @param cal     A \code{calibrated} model object.
+#' @param verbose Logical. Default: \code{FALSE}.
 #'
 #' @return The SAME \code{calibrated} model object, with
 #'   \code{cal$workspace$integrate$result} updated.
 #'
+#' @importFrom stats median qchisq qchisq
 #' @export
 aggregate <- function(cal, ...) {
   UseMethod("aggregate")
@@ -47,16 +40,10 @@ aggregate.default <- function(cal, ...) {
   stop("aggregate() requires a 'calibrated' model object.", call. = FALSE)
 }
 
-#' @importFrom stats median
 #' @export
-aggregate.calibrated <- function(
-  cal,
-  score_threshold = 0,
-  verbose = FALSE,
-  ...
-) {
+aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   branches <- cal$workspace$integrate$branches %||% NULL
-  scores <- cal$workspace$integrate$scores %||% NULL
+  min_branches <- cal$execution$min_branches
 
   if (is.null(branches) || length(branches) == 0L) {
     stop(
@@ -66,32 +53,15 @@ aggregate.calibrated <- function(
     )
   }
 
-  min_branches <- cal$execution$min_branches
+  R <- length(branches)
 
   # -------------------------------------------------------------------
-  # 1. Filter by score threshold
+  # 1. Build ψ × R matrix over union of all branches' support
   # -------------------------------------------------------------------
-  keep <- scores >= score_threshold
-  retained <- branches[keep]
-  R_eff <- length(retained)
-
-  if (R_eff == 0L) {
-    stop(
-      "No branches retained at score_threshold = ",
-      score_threshold,
-      ".\n",
-      "Lower the threshold or re-run integrate().",
-      call. = FALSE
-    )
-  }
-
-  # -------------------------------------------------------------------
-  # 2. Build ψ × R matrix over union of retained support
-  # -------------------------------------------------------------------
-  psi_grid <- sort(unique(unlist(lapply(retained, function(b) b$psi))))
+  psi_grid <- sort(unique(unlist(lapply(branches, function(b) b$psi))))
 
   branch_mat <- vapply(
-    retained,
+    branches,
     function(b) {
       out <- rep(NA_real_, length(psi_grid))
       idx <- match(b$psi, psi_grid)
@@ -103,20 +73,28 @@ aggregate.calibrated <- function(
   )
 
   # -------------------------------------------------------------------
-  # 3. Pointwise log-mean-exp
+  # 2. Pointwise log-mean-exp
   # -------------------------------------------------------------------
+  alpha_target <- min(1 - cal$traversal$confidence_levels)
+  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * cal$traversal$cutoff_buffer
+
   n_support <- rowSums(is.finite(branch_mat))
   loglik <- matrixStats::rowLogSumExps(branch_mat, na.rm = TRUE) -
     log(n_support)
 
+  loglik_centered <- loglik - max(loglik, na.rm = TRUE)
+
   psi_ll_df <- tibble::tibble(
     psi = psi_grid,
     loglik = loglik,
+    loglik_centered = loglik_centered,
+    above_crit = loglik_centered >= -effective_crit,
     n_support = n_support
   )
 
   # -------------------------------------------------------------------
-  # 4. Floor check — warn if median n_support < min_branches
+  # 3. Floor check
   # -------------------------------------------------------------------
   med_support <- median(n_support)
 
@@ -127,19 +105,17 @@ aggregate.calibrated <- function(
       ") is below min_branches (",
       min_branches,
       ").\n",
-      "Consider lowering score_threshold.",
+      "Consider running preprocess() with a larger buffer.",
       call. = FALSE
     )
   }
 
   if (verbose) {
     cat(
-      "[aggregate] score_threshold = ",
-      score_threshold,
-      " | retained = ",
-      R_eff,
-      "/",
-      length(branches),
+      "[aggregate] R = ",
+      R,
+      " | psi points = ",
+      length(psi_grid),
       " | median support = ",
       round(med_support, 1),
       "\n",
@@ -148,14 +124,11 @@ aggregate.calibrated <- function(
   }
 
   # -------------------------------------------------------------------
-  # 5. Store result
+  # 4. Return plain list — wrapping done in integrate()
   # -------------------------------------------------------------------
   cal$workspace$integrate$result <- list(
     psi_ll_df = psi_ll_df,
-    R_eff = R_eff,
-    score_threshold = score_threshold,
-    scores_used = scores[keep],
-    scores_all = scores,
+    R = R,
     med_support = med_support,
     min_branches = min_branches,
     floor_violated = med_support < min_branches

@@ -4,45 +4,29 @@
 \alias{traverse_branch_topdown}
 \title{Traverse a Branch Outward from a Pre-Located Mode}
 \usage{
-traverse_branch_topdown(
-  branch_seed,
-  traversal,
-  grid,
-  branch_evaluator,
-  effective_crit
-)
+traverse_branch_topdown(branch_seed, grid, branch_evaluator)
 }
 \arguments{
-\item{branch_seed}{A named list from \code{probe()}, containing at minimum:
+\item{branch_seed}{A named list from \code{probe()}, containing:
 \itemize{
-\item \code{omega_hat}        — numeric vector
-\item \code{psi_mode}         — numeric scalar (topdown only)
-\item \code{param_mode}       — numeric vector (topdown only)
-\item \code{ll_mode}          — numeric scalar (topdown only)
-\item \code{probe_evals_df}   — data frame of pre-evaluated points
-\item \code{drops_left}       — numeric vector of drops from probe
-\item \code{drops_right}      — numeric vector of drops from probe
-\item \code{param_left_edge}  — warm-start for leftward traversal
-\item \code{param_right_edge} — warm-start for rightward traversal
-\item \code{left_boundary}    — logical; TRUE if probe hit left bound
-\item \code{right_boundary}   — logical; TRUE if probe hit right bound
+\item \code{omega_hat}, \code{psi_mode}, \code{param_mode},
+\code{ll_mode}, \code{probe_evals_df},
+\code{param_left_edge}, \code{param_right_edge},
+\code{left_boundary}, \code{right_boundary}
 }}
 
-\item{traversal}{A calibrated \code{traversal_spec} object.}
+\item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.
+The \code{psi_lower} and \code{psi_upper} slots define the common
+interval boundaries that stop traversal.}
 
-\item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.}
-
-\item{branch_evaluator}{Function \code{(psi, param_init) -> list(param_hat, branch_val)}.}
-
-\item{effective_crit}{Numeric scalar. Log-likelihood drop defining the
-branch cutoff: \code{cutoff = ll_mode - effective_crit}.}
+\item{branch_evaluator}{Function \code{(psi, param_init) ->
+list(param_hat, branch_val)}.}
 }
 \description{
 Picks up where \code{probe()} left off: reads pre-evaluated points
 from \code{branch_seed$probe_evals_df}, then extends outward on each
-side using the edge warm-starts from the seed. Sides that probe()
-stopped at a boundary are not extended. Drop history from probe() is
-passed into each side sweep so the drop check is continuous across
-the probe/traversal boundary.
+side using the edge warm-starts from the seed. Traversal continues
+until the common interval boundary is reached. Sides that
+\code{probe()} stopped at a boundary are not extended.
 }
 \keyword{internal}

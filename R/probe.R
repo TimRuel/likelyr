@@ -204,18 +204,19 @@ probe <- function(
     right_rose <- !right_done && new_ll_right > ll_right
 
     if (left_rose && right_rose) {
+      probe_evals_df <- .make_probe_evals_df(
+        k_mode,
+        c(evals_left, new_ll_left),
+        ll_mode,
+        c(evals_right, new_ll_right)
+      )
       return(list(
         accepted = FALSE,
         reason = "oscillation",
         psi_mode = psi_mode,
         omega_hat = omega_hat,
         step = step,
-        probe_evals_df = .make_probe_evals_df(
-          k_mode,
-          c(evals_left, new_ll_left),
-          ll_mode,
-          c(evals_right, new_ll_right)
-        ),
+        probe_evals_df = probe_evals_df,
         drops_left = drops_left,
         drops_right = drops_right,
         new_ll_left = new_ll_left,
@@ -226,18 +227,19 @@ probe <- function(
     if (left_rose || right_rose) {
       n_shifts <- n_shifts + 1L
       if (n_shifts > max_mode_shifts) {
+        probe_evals_df <- .make_probe_evals_df(
+          k_mode,
+          evals_left,
+          ll_mode,
+          evals_right
+        )
         return(list(
           accepted = FALSE,
           reason = "mode_shift_exhausted",
           psi_mode = psi_mode,
           omega_hat = omega_hat,
           n_shifts = n_shifts,
-          probe_evals_df = .make_probe_evals_df(
-            k_mode,
-            evals_left,
-            ll_mode,
-            evals_right
-          ),
+          probe_evals_df = probe_evals_df,
           drops_left = drops_left,
           drops_right = drops_right
         ))
@@ -273,7 +275,7 @@ probe <- function(
       drop_left <- ll_left - new_ll_left
       recent <- tail(drops_left, k_recent)
       if (
-        !check_drop_probe(
+        !check_drop(
           drop_left,
           recent,
           drop_multiplier,
@@ -282,6 +284,12 @@ probe <- function(
           max_drop_fraction
         )
       ) {
+        probe_evals_df <- .make_probe_evals_df(
+          k_mode,
+          c(evals_left, new_ll_left),
+          ll_mode,
+          evals_right
+        )
         return(list(
           accepted = FALSE,
           reason = "jump_left",
@@ -292,12 +300,7 @@ probe <- function(
           recent_drops = recent,
           ref_median = median(recent),
           threshold = drop_multiplier * median(recent),
-          probe_evals_df = .make_probe_evals_df(
-            k_mode,
-            c(evals_left, new_ll_left),
-            ll_mode,
-            evals_right
-          ),
+          probe_evals_df = probe_evals_df,
           drops_left = c(drops_left, drop_left),
           drops_right = drops_right
         ))
@@ -312,7 +315,7 @@ probe <- function(
       drop_right <- ll_right - new_ll_right
       recent <- tail(drops_right, k_recent)
       if (
-        !check_drop_probe(
+        !check_drop(
           drop_right,
           recent,
           drop_multiplier,
@@ -321,6 +324,12 @@ probe <- function(
           max_drop_fraction
         )
       ) {
+        probe_evals_df <- .make_probe_evals_df(
+          k_mode,
+          evals_left,
+          ll_mode,
+          c(evals_right, new_ll_right)
+        )
         return(list(
           accepted = FALSE,
           reason = "jump_right",
@@ -331,12 +340,7 @@ probe <- function(
           recent_drops = recent,
           ref_median = median(recent),
           threshold = drop_multiplier * median(recent),
-          probe_evals_df = .make_probe_evals_df(
-            k_mode,
-            evals_left,
-            ll_mode,
-            c(evals_right, new_ll_right)
-          ),
+          probe_evals_df = probe_evals_df,
           drops_left = drops_left,
           drops_right = c(drops_right, drop_right)
         ))
@@ -350,6 +354,13 @@ probe <- function(
     step <- step + 1L
   }
 
+  probe_evals_df <- .make_probe_evals_df(
+    k_mode,
+    evals_left,
+    ll_mode,
+    evals_right
+  )
+
   list(
     accepted = TRUE,
     reason = "ok",
@@ -357,12 +368,7 @@ probe <- function(
     psi_mode = psi_mode,
     ll_mode = ll_mode,
     param_mode = param_mode,
-    probe_evals_df = .make_probe_evals_df(
-      k_mode,
-      evals_left,
-      ll_mode,
-      evals_right
-    ),
+    probe_evals_df = probe_evals_df,
     drops_left = drops_left,
     drops_right = drops_right,
     n_shifts = n_shifts,

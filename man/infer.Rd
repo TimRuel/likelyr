@@ -6,10 +6,24 @@
 \usage{
 infer(cal, which = NULL, alpha_levels = NULL)
 }
-\description{
-Computes likelihood-based inference \strong{data only} (point estimates and
-confidence interval diagnostics) for each pseudolikelihood result.
+\arguments{
+\item{cal}{A \code{calibrated} model object with at least
+one of \code{profile()} or \code{integrate()} having been run.}
 
-This function performs \strong{no table rendering and no plotting}.
-Presentation is deferred to \code{view()} and \code{plot()} (local-only).
+\item{which}{Character vector. Subset of
+\code{c("profile", "integrate")}. Default: all available.}
+
+\item{alpha_levels}{Numeric vector of significance levels. Default:
+derived from \code{traversal$confidence_levels}.}
+}
+\value{
+The SAME \code{calibrated} model object with inference
+results attached to each relevant workspace entry.
+}
+\description{
+Computes point estimates and confidence intervals from the profile
+and/or integrated log-likelihood curves stored on the model workspace.
+
+Pass \code{which} to restrict inference to a single pseudolikelihood
+type. By default both are inferred if present.
 }

@@ -1,5 +1,5 @@
 # ================================================================================
-# likelihood-diagnose-integrate-plots.R
+# likelihood-diagnose-integrated-plots.R
 # Plot helpers for integrated likelihood diagnostics (local-only)
 # ================================================================================
 
@@ -12,9 +12,9 @@
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_ess_plot <- function(ess) {
+build_integrated_ess_plot <- function(ess) {
   idx <- seq_along(ess)
-  style <- plot_diagnostics_style("integrate", "ess")
+  style <- plot_diagnostics_style("integrated", "ess")
 
   plot_base(plot = "ess") +
     make_diagnostics_line(
@@ -32,9 +32,9 @@ build_integrate_ess_plot <- function(ess) {
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_rel_se_plot <- function(rel_se) {
+build_integrated_rel_se_plot <- function(rel_se) {
   idx <- seq_along(rel_se)
-  style <- plot_diagnostics_style("integrate", "rel_se")
+  style <- plot_diagnostics_style("integrated", "rel_se")
 
   plot_base(plot = "rel_se") +
     make_diagnostics_line(
@@ -52,9 +52,9 @@ build_integrate_rel_se_plot <- function(rel_se) {
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_outlier_plot <- function(outlier_fraction) {
+build_integrated_outlier_plot <- function(outlier_fraction) {
   idx <- seq_along(outlier_fraction)
-  style <- plot_diagnostics_style("integrate", "outliers")
+  style <- plot_diagnostics_style("integrated", "outliers")
 
   plot_base(plot = "outliers") +
     make_diagnostics_line(
@@ -72,13 +72,13 @@ build_integrate_outlier_plot <- function(outlier_fraction) {
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_omega_eigen_plot <- function(eigenvalues) {
+build_integrated_omega_eigen_plot <- function(eigenvalues) {
   if (is.null(eigenvalues)) {
     return(NULL)
   }
 
   k <- seq_along(eigenvalues)
-  style <- plot_diagnostics_style("integrate", "omega_eigen")
+  style <- plot_diagnostics_style("integrated", "omega_eigen")
 
   plot_base(plot = "omega_eigen") +
     make_diagnostics_point(
@@ -100,13 +100,13 @@ build_integrate_omega_eigen_plot <- function(eigenvalues) {
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_omega_pca_plot <- function(Omega) {
+build_integrated_omega_pca_plot <- function(Omega) {
   if (is.null(Omega) || ncol(Omega) < 2) {
     return(NULL)
   }
 
   pca <- stats::prcomp(Omega, scale. = TRUE)
-  style <- plot_diagnostics_style("integrate", "omega_pca")
+  style <- plot_diagnostics_style("integrated", "omega_pca")
 
   plot_base(plot = "omega_pca") +
     make_diagnostics_point(
@@ -124,8 +124,8 @@ build_integrate_omega_pca_plot <- function(Omega) {
 #'
 #' @keywords internal
 #' @noRd
-build_integrate_omega_branch_plot <- function(branch_mat, psi_vals) {
-  style <- plot_diagnostics_style("integrate", "omega_branches")
+build_integrated_omega_branch_plot <- function(branch_mat, psi_vals) {
+  style <- plot_diagnostics_style("integrated", "omega_branches")
 
   # Shift each branch relative to its max
   branch_mat_shifted <- t(apply(branch_mat, 2, function(col) {
@@ -194,5 +194,5 @@ build_integrate_omega_branch_plot <- function(branch_mat, psi_vals) {
 }
 
 # ================================================================================
-# END likelihood-diagnose-integrate-plots.R
+# END likelihood-diagnose-integrated-plots.R
 # ================================================================================

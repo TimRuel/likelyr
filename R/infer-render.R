@@ -14,10 +14,7 @@ render_point_estimate_table <- function(point_estimate_df) {
   required <- c("psi_0", "psi_hat", "error", "se_psi_hat")
   stopifnot(all(required %in% names(point_estimate_df)))
 
-  type <- attr(point_estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) {
-    type <- NULL
-  }
+  pseudolikelihood <- attr(point_estimate_df, "pseudolikelihood", exact = TRUE)
 
   .render_point_estimate_base(
     df = point_estimate_df,
@@ -30,7 +27,7 @@ render_point_estimate_table <- function(point_estimate_df) {
     header_groups = c("Truth" = 1, "Estimate" = 3),
     caption = .table_caption(
       "Point Estimate and Uncertainty Measures",
-      type
+      pseudolikelihood
     )
   )
 }
@@ -54,10 +51,11 @@ render_interval_estimate_table <- function(interval_estimate_df) {
   )
   stopifnot(all(required %in% names(interval_estimate_df)))
 
-  type <- attr(interval_estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) {
-    type <- NULL
-  }
+  pseudolikelihood <- attr(
+    interval_estimate_df,
+    "pseudolikelihood",
+    exact = TRUE
+  )
 
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
   point_estimate <- attr(interval_estimate_df, "point_estimate")
@@ -103,7 +101,7 @@ render_interval_estimate_table <- function(interval_estimate_df) {
     header_groups = c("Truth" = 1, "Estimate" = 7),
     caption = .table_caption(
       "Interval Estimates and Uncertainty Measures",
-      type
+      pseudolikelihood
     ),
     stripe_bg = stripe_bg,
     diagram_x = rep(point_estimate, nrow(interval_estimate_raw)),
@@ -152,10 +150,7 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
   # --------------------------------------------------
   # Extract rendering metadata
   # --------------------------------------------------
-  type <- attr(point_estimate_df, "type", exact = TRUE)
-  if (length(type) == 0) {
-    type <- NULL
-  }
+  pseudolikelihood <- attr(point_estimate_df, "pseudolikelihood", exact = TRUE)
 
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
   stopifnot(!is.null(interval_estimate_raw))
@@ -210,7 +205,7 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
     )
 
   bg_interval <- .interval_level_bg(df_render$level)
-  bg_pe <- table_pe_row_bg(type)
+  bg_pe <- table_pe_row_bg(pseudolikelihood)
 
   body_spec_fun <- function(tbl) {
     tbl |>
@@ -245,7 +240,7 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
     df_render = df_render,
     caption = .table_caption(
       "Estimates and Uncertainty Measures",
-      type
+      pseudolikelihood
     ),
     header_groups = c(
       "Point Estimates" = 3,

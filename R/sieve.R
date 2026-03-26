@@ -150,8 +150,8 @@ sieve <- function(
     integer()
   }
 
-  cal$workspace$integrate$branch_seeds <- branch_seeds
-  cal$workspace$integrate$sieve <- list(
+  cal$workspace$integrated$branch_seeds <- branch_seeds
+  cal$workspace$integrated$sieve <- list(
     total_seeds_requested = total_seeds,
     total_seeds_accepted = n_accepted,
     n_orbits = n_orbits,

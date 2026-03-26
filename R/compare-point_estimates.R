@@ -13,7 +13,7 @@
 #'   \code{point_estimate_df}.
 #'
 #' @return A data frame of point estimates with an added
-#'   \code{pseudolikelihood} column indicating the likelihood type.
+#'   \code{pseudolikelihood} column indicating the pseudolikelihood type.
 #'
 #' @keywords internal
 get_point_estimates_df <- function(res) {

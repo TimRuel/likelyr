@@ -41,8 +41,8 @@ diagnose.default <- function(cal, ...) {
 diagnose.calibrated <- function(cal, verbose = FALSE) {
   which <- validate_diagnose_input(cal)
 
-  for (name in which) {
-    res <- cal$workspace[[name]]
+  for (pseudolikelihood in which) {
+    res <- cal$workspace[[pseudolikelihood]]
 
     # --------------------------------------------------
     # Run diagnostics engine (compute-only)
@@ -51,7 +51,7 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
       diag_raw <- diagnose_integrate(res)
       res$diagnostics <- new_diagnostics_result(
         diag_raw,
-        pseudolikelihood = "integrate"
+        pseudolikelihood = "integrated"
       )
     } else if (is_profile(res)) {
       diag_raw <- diagnose_profile(res)
@@ -62,7 +62,7 @@ diagnose.calibrated <- function(cal, verbose = FALSE) {
     } else {
       stop(
         "diagnose(): Unsupported result type for '",
-        name,
+        pseudolikelihood,
         "'.",
         call. = FALSE
       )
@@ -145,7 +145,7 @@ build_diagnostics_plots <- function(object) {
 
   switch(
     object$pseudolikelihood,
-    integrate = build_diagnostics_plots_integrate(object),
+    integrated = build_diagnostics_plots_integrated(object),
     profile = build_diagnostics_plots_profile(object),
     stop(
       "build_diagnostics_plots(): Unknown diagnostics pseudolikelihood '",

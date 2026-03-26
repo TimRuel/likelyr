@@ -9,32 +9,28 @@
 #' \code{integrate()} can be run:
 #'
 #' \enumerate{
-#'   \item \code{profile()} — computes the profile log-likelihood curve,
-#'     establishing the extent of the ψ-grid.
+#'   \item \code{profile()} — computes the profile log-likelihood curve.
 #'   \item \code{sieve()} — generates and screens branch seeds.
 #'   \item \code{compute_common_interval()} — derives the common ψ
 #'     support interval from the profile extent and the distribution of
 #'     branch seed modes, intersected with the parameter space boundary
-#'     if one exists. This interval is used by all Monte Carlo branches
-#'     in \code{generate()} to ensure full overlap and valid CI
-#'     estimation.
+#'     if one exists.
 #' }
 #'
 #' The common interval is stored on
-#' \code{cal$workspace$integrate$common_interval} for use by
+#' \code{cal$workspace$integrated$cache$common_interval} for use by
 #' \code{generate(task = "integrate")}.
 #'
 #' @param cal     A \code{calibrated} model object.
-#' @param c       Positive numeric scalar. Multiplier for the
+#' @param z       Positive numeric scalar. Multiplier for the
 #'   mode-distribution component of the common interval. Default:
-#'   \code{qnorm(1 - alpha_target / 2)} where \code{alpha_target}
-#'   is derived from \code{traversal$confidence_levels}.
+#'   \code{qnorm(1 - alpha_target / 2)}.
 #' @param verbose Logical. Print diagnostics. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to \code{sieve()}.
 #'
-#' @return The SAME \code{calibrated} model object, with
+#' @return The SAME \code{calibrated} model object with
 #'   \code{cal$workspace$profile} and
-#'   \code{cal$workspace$integrate} populated.
+#'   \code{cal$workspace$integrated$cache} populated.
 #'
 #' @export
 preprocess <- function(cal, ...) {
@@ -47,7 +43,7 @@ preprocess.default <- function(cal, ...) {
 }
 
 #' @export
-preprocess.calibrated <- function(cal, c = NULL, verbose = FALSE, ...) {
+preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
   if (!is_calibrated(cal)) {
     stop("preprocess() requires a calibrated model.", call. = FALSE)
   }
@@ -79,8 +75,8 @@ preprocess.calibrated <- function(cal, c = NULL, verbose = FALSE, ...) {
   cal <- sieve(cal, verbose = verbose, ...)
 
   if (verbose) {
-    n_accepted <- cal$workspace$integrate$sieve$total_seeds_accepted
-    n_requested <- cal$workspace$integrate$sieve$total_seeds_requested
+    n_accepted <- cal$workspace$integrated$cache$sieve$total_seeds_accepted
+    n_requested <- cal$workspace$integrated$cache$sieve$total_seeds_requested
     cat(
       "[preprocess] Sieve complete: ",
       n_accepted,
@@ -94,17 +90,12 @@ preprocess.calibrated <- function(cal, c = NULL, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 3. Common interval
   # ------------------------------------------------------------------
-  psi_interval <- if (!is.null(cal$estimand$psi_interval)) {
-    cal$estimand$psi_interval
-  } else {
-    NULL
-  }
-
+  psi_interval <- cal$estimand$psi_interval %||% NULL
   alpha_target <- min(1 - cal$traversal$confidence_levels)
 
   common_interval <- compute_common_interval(
-    profile_psi_ll_df = cal$workspace$profile$psi_ll_df,
-    branch_seeds = cal$workspace$integrate$branch_seeds,
+    psi_loglik_df = cal$workspace$profile$psi_loglik_df,
+    branch_seeds = cal$workspace$integrated$cache$branch_seeds,
     alpha_target = alpha_target,
     psi_interval = psi_interval
   )
@@ -127,7 +118,7 @@ preprocess.calibrated <- function(cal, c = NULL, verbose = FALSE, ...) {
     )
   }
 
-  cal$workspace$integrate$common_interval <- common_interval
+  cal$workspace$integrated$cache$common_interval <- common_interval
 
   cal
 }

@@ -1,31 +1,23 @@
 # ======================================================================
-# likelihood-integrate.R — Integrated Likelihood (post-sieving)
+# likelihood-integrate.R — Integrated Likelihood
 # ======================================================================
 
 #' Integrated Log-Likelihood
 #'
 #' @description
 #' Computes the integrated log-likelihood using pre-screened branch seeds
-#' stored in the calibrated model object by \code{sieve()}.
+#' stored in \code{cal$workspace$integrated$cache} by \code{preprocess()}.
 #'
-#' This function assumes \code{sieve()} has already been run and will
-#' error otherwise. No omega-hat sampling or mode location occurs here.
-#'
-#' Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
-#' A clear error is raised if it is absent.
-#'
-#' After branch computation, \code{aggregate()} is called with
-#' default parameters. Call \code{aggregate()} directly on the
-#' returned model to re-aggregate with different settings without
-#' repeating branch computation.
+#' After branch computation, \code{aggregate()} is called with default
+#' parameters. Call \code{aggregate()} directly on the returned model
+#' to re-aggregate without repeating branch computation.
 #'
 #' @param cal     A \code{calibrated} model object.
-#' @param verbose Logical; print diagnostics. Default: \code{FALSE}.
+#' @param verbose Logical. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to \code{generate()}.
 #'
-#' @return The SAME \code{calibrated} model object, augmented with
-#'   \code{$workspace$integrate} containing branches and the
-#'   initial aggregation result.
+#' @return The SAME \code{calibrated} model object, with
+#'   \code{$workspace$integrated} populated.
 #'
 #' @export
 integrate <- function(cal, ...) {
@@ -39,50 +31,27 @@ integrate.default <- function(cal, ...) {
 
 #' @export
 integrate.calibrated <- function(cal, verbose = FALSE, ...) {
-  # ------------------------------------------------------------------
-  # 0A. Ensure object has been calibrated
-  # ------------------------------------------------------------------
   if (!is_calibrated(cal)) {
     stop(
-      "integrate() requires a model that has been calibrated via calibrate().",
+      "integrate() requires a model calibrated via calibrate().",
       call. = FALSE
     )
   }
 
-  # ------------------------------------------------------------------
-  # 0B. Validate structural completeness
-  # ------------------------------------------------------------------
   validate_integrate_input(cal)
 
-  # ------------------------------------------------------------------
-  # 0C. Require pre-sieved branch seeds
-  # ------------------------------------------------------------------
-  branch_seeds <- cal$workspace$integrate$branch_seeds %||% NULL
+  branch_seeds <- cal$workspace$integrated$cache$branch_seeds %||% NULL
 
   if (is.null(branch_seeds) || length(branch_seeds) == 0L) {
     stop(
       "integrate() requires pre-sieved branch seeds.\n",
-      "Pass the model through sieve() before running integrate().",
+      "Run preprocess() before integrate().",
       call. = FALSE
     )
   }
 
   exec <- cal$execution
 
-  # ------------------------------------------------------------------
-  # 1. Re-initialise integrate workspace (preserve seeds and sieve diag)
-  # ------------------------------------------------------------------
-  sieve_diag <- cal$workspace$integrate$sieve
-  common_interval <- cal$workspace$integrate$common_interval
-  cal$workspace$integrate <- list(
-    branch_seeds = branch_seeds,
-    sieve = sieve_diag,
-    common_interval = common_interval
-  )
-
-  # ------------------------------------------------------------------
-  # 2. Execution summary
-  # ------------------------------------------------------------------
   if (verbose) {
     cat("[integrate] Integrated Log-Likelihood\n")
     cat(
@@ -96,7 +65,7 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # ------------------------------------------------------------------
-  # 3. Branch generation + aggregation with failure handling
+  # Generate + aggregate with failure handling
   # ------------------------------------------------------------------
   cal <- tryCatch(
     {
@@ -108,7 +77,9 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
       if (verbose) {
         cat("[integrate] ERROR during integration.\n")
       }
-      cal$workspace$integrate$result <- list(
+      cal$workspace$integrated <- list(
+        psi_loglik_df = NULL,
+        psi_hat = NA_real_,
         status = "failed",
         error_msg = conditionMessage(e)
       )
@@ -117,14 +88,13 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
   )
 
   # ------------------------------------------------------------------
-  # 4. Wrap result and mark
+  # Wrap and mark
   # ------------------------------------------------------------------
-  raw <- cal$workspace$integrate$result
+  raw <- cal$workspace$integrated
 
-  cal$workspace$integrate$result <- new_integrate_result(c(
-    raw,
-    list(status = raw$status %||% "success")
-  ))
+  cal$workspace$integrated <- new_integrated_result(
+    c(raw, list(status = raw$status %||% "success"))
+  )
 
   cal <- mark_integrated(cal)
 
@@ -136,12 +106,12 @@ integrate.calibrated <- function(cal, verbose = FALSE, ...) {
 }
 
 # ======================================================================
-# INTERNAL VALIDATION
+# VALIDATION
 # ======================================================================
 
 #' @keywords internal
 #' @noRd
-validate_integrate_input <- function(cal) {
+validate_integrated_input <- function(cal) {
   missing <- character(0)
 
   if (!inherits(cal$parameter, "parameter_spec")) {
@@ -191,59 +161,51 @@ validate_integrate_input <- function(cal) {
 # PRINT METHOD
 # ======================================================================
 
-#' @method print integrate
+#' @method print integrated
 #' @export
-print.integrate <- function(x, ...) {
+print.integrated <- function(integrated_result, ...) {
   cat("<Integrated Log-Likelihood Result>\n")
-  cat("Status: ", x$status, "\n", sep = "")
+  cat("Status: ", integrated_result$status, "\n", sep = "")
 
   cat("Lifecycle:\n")
-  cat("  inferred:   ", if (!is.null(x$inference)) "✓" else "×", "\n", sep = "")
+  cat(
+    "  inferred:   ",
+    if (is_inferred(integrated_result)) "✓" else "×",
+    "\n",
+    sep = ""
+  )
   cat(
     "  diagnosed:  ",
-    if (!is.null(x$diagnostics)) "✓" else "×",
+    if (is_diagnosed(integrated_result)) "✓" else "×",
     "\n",
     sep = ""
   )
 
-  if (!is.null(x$psi_mle)) {
-    cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
+  if (!is.null(integrated_result$psi_hat)) {
+    cat("psi_hat: ", format(integrated_result$psi_hat), "\n", sep = "")
   }
-  if (!is.null(x$param_mle)) {
-    cat(
-      "param_MLE: (",
-      paste(format(x$param_mle), collapse = ", "),
-      ")\n",
-      sep = ""
-    )
+  if (!is.null(integrated_result$psi_loglik_df)) {
+    cat("Grid points: ", nrow(integrated_result$psi_loglik_df), "\n", sep = "")
   }
-  if (!is.null(x$psi_ll_df)) {
-    cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
-  }
-  if (!is.null(x$branches)) {
-    cat("# Branches: ", length(x$branches), "\n", sep = "")
+  if (!is.null(integrated_result$R)) {
+    cat("Branches: ", integrated_result$R, "\n", sep = "")
   }
 
-  invisible(x)
+  invisible(integrated_result)
 }
 
 # ======================================================================
 # PLOT METHOD
 # ======================================================================
 
-#' @method plot integrate
+#' @method plot integrated
 #' @export
-plot.integrate <- function(x, ...) {
+plot.integrated <- function(integrated_result, ...) {
   .assert_local_plotting()
 
-  psi_ll_df <- x$psi_ll_df
-  if (is.null(psi_ll_df) && !is.null(x$inference)) {
-    psi_ll_df <- x$inference$psi_ll_df
-  }
-
-  if (is.null(psi_ll_df)) {
+  if (is.null(integrated_result$psi_loglik_df)) {
     stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  plot_pseudolikelihood_points(psi_ll_df)
+  plot_pseudolikelihood_points(integrated_result)
 }

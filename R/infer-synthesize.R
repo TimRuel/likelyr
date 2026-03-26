@@ -5,94 +5,39 @@
 #' Synthesize Likelihood-Based Inference Results
 #'
 #' @description
-#' Orchestrates point estimation and confidence interval construction from
-#' a ψ log-likelihood grid, returning a unified inference object containing
-#' numeric results and the data required for downstream presentation.
+#' Orchestrates point estimation and confidence interval construction
+#' from a log-likelihood grid, returning point estimates, interval
+#' estimates, and the zero-maximized likelihood function needed for
+#' plotting.
 #'
-#' This function performs **no table rendering or plotting**. Tables/plots
-#' are materialized later by \code{view()} and \code{plot()} (local-only).
-#'
-#' This function assumes that likelihood evaluation has already been
-#' performed and that \code{psi_ll_df} represents a unimodal likelihood
-#' curve.
-#'
-#' @param psi_ll_df    A data frame containing columns \code{psi} and
-#'   \code{loglik} representing the evaluated log-likelihood curve.
+#' @param psi_loglik_df A data frame containing columns \code{psi} and
+#'   \code{loglik}
 #' @param alpha_levels Numeric vector of significance levels.
-#' @param psi_0        Optional numeric scalar giving the true value of ψ.
+#' @param psi_0        Optional numeric scalar. True value of ψ.
 #'
-#' @return A named list containing:
-#' \describe{
-#'   \item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function
-#'     with max at 0.}
-#'   \item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
-#'   \item{interval_estimate_df}{Confidence interval diagnostics table.}
-#' }
+#' @return A named list with \code{rel_psi_loglik},
+#'   \code{point_estimate_df}, and \code{interval_estimate_df}.
 #'
 #' @keywords internal
-synthesize_inference <- function(
-  psi_ll_df,
-  alpha_levels,
-  psi_0
-) {
-  type <- attr(psi_ll_df, "type")
-
-  # --------------------------------------------------
-  # Defensive checks
-  # --------------------------------------------------
+synthesize_inference <- function(psi_loglik_df, alpha_levels, psi_0) {
   required <- c("psi", "loglik")
-  if (!all(required %in% names(psi_ll_df))) {
+  if (!all(required %in% names(psi_loglik_df))) {
     stop(
-      "synthesize_inference(): psi_ll_df must contain columns ",
+      "synthesize_inference(): psi_loglik_df must contain columns ",
       paste(shQuote(required), collapse = ", "),
       call. = FALSE
     )
   }
 
-  # --------------------------------------------------
-  # Smoothed likelihood
-  # --------------------------------------------------
-  psi_ll_fn <- fit_psi_ll_fn(psi_ll_df)
-
-  # --------------------------------------------------
-  # Point estimate + SE
-  # --------------------------------------------------
-  psi_ll_max_point <- get_psi_ll_max_point(psi_ll_fn, psi_ll_df)
-  point_estimate <- psi_ll_max_point$argmax
-  max_loglik <- psi_ll_max_point$maximum
-  se_point_estimate <- get_se_point_estimate(point_estimate, psi_ll_df)
-
-  point_estimate_df <- tibble::tibble(
-    psi_0 = psi_0,
-    psi_hat = point_estimate,
-    error = point_estimate - psi_0,
-    se_psi_hat = se_point_estimate
-  ) |>
-    round(2)
-
-  attr(point_estimate_df, "type") <- type
-
-  # --------------------------------------------------
-  # Interval estimate
-  # --------------------------------------------------
-  zero_max_psi_ll_fn <- shift_psi_ll_fn(psi_ll_fn, max_loglik)
+  point_estimate_df <- get_point_estimate_df(psi_loglik_df)
 
   interval_estimate_df <- get_interval_estimate_df(
-    point_estimate = point_estimate,
-    zero_max_psi_ll_fn = zero_max_psi_ll_fn,
-    psi_ll_df = psi_ll_df,
+    psi_loglik_df = psi_loglik_df,
     alpha_levels = alpha_levels,
     psi_0 = psi_0
   )
 
-  attr(interval_estimate_df, "type") <- type
-
-  # --------------------------------------------------
-  # Return data only (no tables, no plots)
-  # --------------------------------------------------
   list(
-    psi_ll_df = psi_ll_df,
-    zero_max_psi_ll_fn = zero_max_psi_ll_fn,
     point_estimate_df = point_estimate_df,
     interval_estimate_df = interval_estimate_df
   )

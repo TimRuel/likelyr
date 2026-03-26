@@ -8,27 +8,29 @@
 
 #' @export
 print.workspace <- function(x, ...) {
-
   cat("<workspace>\n\n")
 
-  has_profile    <- "profile"    %in% names(x)
-  has_integrate  <- "integrate"  %in% names(x)
+  has_profile <- "profile" %in% names(x)
+  has_integrated <- "integrated" %in% names(x)
   has_comparison <- "comparison" %in% names(x)
 
   cat("Results:\n")
   cat(
     "  profile:     ",
-    if (has_profile)    "✓ present" else "× absent", "\n",
+    if (has_profile) "✓ present" else "× absent",
+    "\n",
     sep = ""
   )
   cat(
-    "  integrate:   ",
-    if (has_integrate)  "✓ present" else "× absent", "\n",
+    "  integrated:   ",
+    if (has_integrated) "✓ present" else "× absent",
+    "\n",
     sep = ""
   )
   cat(
     "  comparison:  ",
-    if (has_comparison) "✓ present" else "× absent", "\n",
+    if (has_comparison) "✓ present" else "× absent",
+    "\n",
     sep = ""
   )
 

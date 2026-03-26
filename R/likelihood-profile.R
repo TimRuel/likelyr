@@ -47,8 +47,8 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
         cat("[profile] ERROR during generation.\n")
       }
       cal$workspace$profile <- new_profile_result(list(
-        psi_ll_df = NULL,
-        psi_mle = cal$estimand$psi_mle,
+        pl_df = NULL,
+        psi_hat = NA_real_,
         param_mle = cal$parameter$param_mle,
         status = "failed",
         error_msg = conditionMessage(e)
@@ -57,12 +57,11 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
     }
   )
 
-  # Wrap raw list from .generate_profile() into classed result
   if (!inherits(cal$workspace$profile, "profile")) {
     raw <- cal$workspace$profile
     cal$workspace$profile <- new_profile_result(list(
-      psi_ll_df = raw$psi_ll_df,
-      psi_mle = raw$psi_mle,
+      pl_df = raw$pl_df,
+      psi_hat = raw$psi_hat,
       param_mle = raw$param_mle,
       status = "success"
     ))
@@ -110,7 +109,12 @@ print.profile <- function(x, ...) {
   cat("Status: ", x$status, "\n", sep = "")
 
   cat("Lifecycle:\n")
-  cat("  inferred:   ", if (!is.null(x$inference)) "✓" else "×", "\n", sep = "")
+  cat(
+    "  inferred:   ",
+    if (!is.null(x$point_estimate_df)) "✓" else "×",
+    "\n",
+    sep = ""
+  )
   cat(
     "  diagnosed:  ",
     if (!is.null(x$diagnostics)) "✓" else "×",
@@ -118,19 +122,19 @@ print.profile <- function(x, ...) {
     sep = ""
   )
 
-  if (!is.null(x$psi_mle)) {
-    cat("psi_MLE: ", format(x$psi_mle), "\n", sep = "")
+  if (!is.null(x$psi_hat)) {
+    cat("psi_hat: ", format(x$psi_hat), "\n", sep = "")
   }
   if (!is.null(x$param_mle)) {
     cat(
-      "param_MLE: (",
+      "param_mle: (",
       paste(format(x$param_mle), collapse = ", "),
       ")\n",
       sep = ""
     )
   }
-  if (!is.null(x$psi_ll_df)) {
-    cat("Grid points: ", nrow(x$psi_ll_df), "\n", sep = "")
+  if (!is.null(x$pl_df)) {
+    cat("Grid points: ", nrow(x$pl_df), "\n", sep = "")
   }
 
   invisible(x)
@@ -145,14 +149,17 @@ print.profile <- function(x, ...) {
 plot.profile <- function(x, ...) {
   .assert_local_plotting()
 
-  psi_ll_df <- x$psi_ll_df
-  if (is.null(psi_ll_df) && !is.null(x$inference)) {
-    psi_ll_df <- x$inference$psi_ll_df
+  if (!is.null(x$point_estimate_df)) {
+    plot_pseudolikelihood_curve(
+      psi_ll_df = x$pl_df,
+      zero_max_psi_ll_fn = x$zero_max_psi_ll_fn,
+      point_estimate_df = x$point_estimate_df,
+      interval_estimate_df = x$interval_estimate_df
+    )
+  } else {
+    if (is.null(x$pl_df)) {
+      stop("No pseudolikelihood data available to plot.", call. = FALSE)
+    }
+    plot_pseudolikelihood_points(x$pl_df)
   }
-
-  if (is.null(psi_ll_df)) {
-    stop("No pseudolikelihood data available to plot.", call. = FALSE)
-  }
-
-  plot_pseudolikelihood_points(psi_ll_df)
 }

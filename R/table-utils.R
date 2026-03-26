@@ -3,17 +3,17 @@
 #' @description
 #' Internal helper that constructs a styled HTML caption for
 #' `kableExtra` tables. Supports an optional secondary subtitle,
-#' typically used to indicate likelihood type.
+#' typically used to indicate pseudolikelihood type.
 #'
 #' @details
 #' The caption consists of a primary title rendered in bold text, with an
 #' optional italicized subtitle displayed on a new line beneath the title.
 #'
 #' @param text Character scalar giving the primary caption title.
-#' @param type Optional character scalar giving a likelihood type label.
+#' @param pseudolikelihood Optional character scalar giving a pseudolikelihood label.
 #'   Accepted special values:
 #'   \itemize{
-#'     \item \code{"integrate"} → "Integrated Log-Likelihood"
+#'     \item \code{"integrated"} → "Integrated Log-Likelihood"
 #'     \item \code{"profile"}   → "Profile Log-Likelihood"
 #'   }
 #'   Other values are used verbatim.
@@ -22,18 +22,18 @@
 #'
 #' @keywords internal
 #' @noRd
-.table_caption <- function(text, type = NULL) {
-  subtitle <- if (!is.null(type)) {
-    type_norm <- tolower(type)
+.table_caption <- function(text, pseudolikelihood = NULL) {
+  subtitle <- if (!is.null(pseudolikelihood)) {
+    pseudolikelihood <- tolower(pseudolikelihood)
 
-    type_label <- switch(
-      type_norm,
-      integrate = "Integrated",
+    pseudolikelihood_label <- switch(
+      pseudolikelihood,
+      integrated = "Integrated",
       profile = "Profile",
-      type # fallback
+      pseudolikelihood # fallback
     )
 
-    paste0("<em>(", type_label, " Log-Likelihood)</em>")
+    paste0("<em>(", pseudolikelihood_label, " Log-Likelihood)</em>")
   } else {
     ""
   }
@@ -116,13 +116,12 @@
   )
 }
 
-
 #' Compute background colors by pseudolikelihood
 #'
 #' @description
 #' Maps pseudolikelihood identifiers to row background colors.
 #'
-#' @param pseudolikelihood Character vector identifying likelihood type.
+#' @param pseudolikelihood Character vector identifying pseudolikelihood type.
 #'
 #' @return A character vector of background colors.
 #'

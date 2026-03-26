@@ -10,7 +10,7 @@ curve:
   linewidth: 1.5
 
   by_method:
-    integrate:
+    integrated:
       color: "#052880"
       linetype: solid
     profile:
@@ -18,7 +18,7 @@ curve:
       linetype: solid
 
   comparison:
-    integrate:
+    integrated:
       color: "#052880"
       linetype: solid
     profile:
@@ -42,7 +42,7 @@ point_estimate:
   linetype: solid
 
   comparison:
-    integrate:
+    integrated:
       color: "#052880"
       linetype: solid
       linewidth: 1.5
@@ -258,7 +258,7 @@ diagnostics:
 
   by_method:
 
-    integrate:
+    integrated:
       line:
         color: "#6FA3D9"
         linewidth: 1.4

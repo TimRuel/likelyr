@@ -20,16 +20,13 @@
 #' column in the result records the actual number of contributing
 #' branches at each point as a diagnostic.
 #'
-#' A floor warning is issued when the median \code{n_support} falls
-#' below \code{cal$execution$min_branches}.
-#'
 #' @param cal     A \code{calibrated} model object.
 #' @param verbose Logical. Default: \code{FALSE}.
 #'
 #' @return The SAME \code{calibrated} model object, with
-#'   \code{cal$workspace$integrate$result} updated.
+#'   \code{cal$workspace$integrated} updated.
 #'
-#' @importFrom stats median qchisq qchisq
+#' @importFrom stats median
 #' @export
 aggregate <- function(cal, ...) {
   UseMethod("aggregate")
@@ -42,7 +39,7 @@ aggregate.default <- function(cal, ...) {
 
 #' @export
 aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
-  branches <- cal$workspace$integrate$branches %||% NULL
+  branches <- cal$workspace$integrated$cache$branches %||% NULL
   min_branches <- cal$execution$min_branches
 
   if (is.null(branches) || length(branches) == 0L) {
@@ -56,7 +53,7 @@ aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   R <- length(branches)
 
   # -------------------------------------------------------------------
-  # 1. Build ψ × R matrix over union of all branches' support
+  # 1. Build ψ × R matrix
   # -------------------------------------------------------------------
   psi_grid <- sort(unique(unlist(lapply(branches, function(b) b$psi))))
 
@@ -83,15 +80,16 @@ aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   loglik <- matrixStats::rowLogSumExps(branch_mat, na.rm = TRUE) -
     log(n_support)
 
-  loglik_centered <- loglik - max(loglik, na.rm = TRUE)
+  rel_loglik <- loglik - max(loglik, na.rm = TRUE)
 
-  psi_ll_df <- tibble::tibble(
+  psi_loglik_df <- tibble::tibble(
     psi = psi_grid,
     loglik = loglik,
-    loglik_centered = loglik_centered,
-    above_crit = loglik_centered >= -effective_crit,
+    rel_loglik = rel_loglik,
+    above_crit = rel_loglik >= -effective_crit,
     n_support = n_support
-  )
+  ) |>
+    magrittr::set_attr("pseudolikelihood", "integrated")
 
   # -------------------------------------------------------------------
   # 3. Floor check
@@ -124,10 +122,11 @@ aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   }
 
   # -------------------------------------------------------------------
-  # 4. Return plain list — wrapping done in integrate()
+  # 4. Return plain list — wrapping/marking done in integrate()
   # -------------------------------------------------------------------
-  cal$workspace$integrate$result <- list(
-    psi_ll_df = psi_ll_df,
+  cal$workspace$integrated <- list(
+    psi_loglik_df = psi_loglik_df,
+    psi_hat = psi_grid[which.max(loglik)],
     R = R,
     med_support = med_support,
     min_branches = min_branches,

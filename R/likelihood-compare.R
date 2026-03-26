@@ -40,13 +40,13 @@ validate_compare_input <- function(cal) {
     stop("compare() requires a model that has been calibrated.", call. = FALSE)
   }
 
-  if (is.null(cal$workspace$profile) || is.null(cal$workspace$integrate)) {
+  if (is.null(cal$workspace$profile) || is.null(cal$workspace$integrated)) {
     stop("compare() requires profile() and integrate().", call. = FALSE)
   }
 
   if (
     is.null(cal$workspace$profile$inference) ||
-      is.null(cal$workspace$integrate$inference)
+      is.null(cal$workspace$integrated$inference)
   ) {
     stop("compare() requires infer() on both likelihoods.", call. = FALSE)
   }
@@ -159,7 +159,7 @@ plot.comparison <- function(x, ...) {
   plot_pseudolikelihood_curves(
     list(
       profile = ws$profile,
-      integrate = ws$integrate
+      integrate = ws$integrated
     )
   )
 }

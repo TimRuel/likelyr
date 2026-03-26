@@ -23,7 +23,7 @@
 #'
 #' @keywords internal
 #' @noRd
-validate_integrate_result <- function(x) {
+validate_integrated_result <- function(x) {
   if (!is.list(x)) {
     stop("Integrated log-likelihood result must be a list.", call. = FALSE)
   }

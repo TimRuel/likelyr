@@ -140,8 +140,9 @@ load_spec_env <- function(dir) {
     "parameter.R",
     "likelihood.R",
     "estimand.R",
-    "nuisance.R",
-    "optimizer.R",
+    "sampler.R",
+    "traversal.R",
+    "solver.R",
     "execution.R"
   )) {
     path <- file.path(dir, f)

@@ -57,7 +57,7 @@
 
 #' Resolve curve color
 #'
-#' @param pseudolikelihood "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param comparison Logical; use comparison styling?
 #' @return Hex color string
 #' @keywords internal
@@ -68,12 +68,12 @@ plot_curve_color <- function(pseudolikelihood, comparison = FALSE) {
   if (isTRUE(comparison)) {
     node <- .get_style_node(c("curve", "comparison"))
   } else {
-    node <- .get_style_node(c("curve", "by_method"))
+    node <- .get_style_node(c("curve", "by_pseudolikelihood"))
   }
 
   if (is.null(node) || !pseudolikelihood %in% names(node)) {
     stop(
-      "Unknown curve styling for method '",
+      "Unknown curve styling for pseudolikelihood '",
       pseudolikelihood,
       "'.",
       call. = FALSE
@@ -85,7 +85,7 @@ plot_curve_color <- function(pseudolikelihood, comparison = FALSE) {
 
 #' Resolve curve linetype
 #'
-#' @param pseudolikelihood "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param comparison Logical; use comparison styling?
 #' @return Character linetype
 #' @keywords internal
@@ -101,7 +101,7 @@ plot_curve_linetype <- function(pseudolikelihood, comparison = FALSE) {
 
   if (is.null(node) || !pseudolikelihood %in% names(node)) {
     stop(
-      "Unknown curve styling for method '",
+      "Unknown curve styling for pseudolikelihood '",
       pseudolikelihood,
       "'.",
       call. = FALSE
@@ -113,7 +113,7 @@ plot_curve_linetype <- function(pseudolikelihood, comparison = FALSE) {
 
 #' Resolve curve linewidth
 #'
-#' @param pseudolikelihood Optional likelihood type
+#' @param pseudolikelihood Optional pseudolikelihood type
 #' @param comparison Logical; use comparison styling?
 #' @return Numeric linewidth
 #' @keywords internal
@@ -161,7 +161,7 @@ plot_point_cloud_alpha <- function() {
 
 #' Resolve point estimate color
 #'
-#' @param pseudolikelihood "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param comparison Logical
 #' @return Hex color string
 #' @keywords internal
@@ -188,7 +188,7 @@ plot_point_estimate_size <- function() {
 
 #' Resolve point estimate linetype
 #'
-#' @param pseudolikelihood "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param comparison Logical
 #' @return Character linetype
 #' @keywords internal
@@ -206,7 +206,7 @@ plot_point_estimate_linetype <- function(pseudolikelihood, comparison = FALSE) {
 
 #' Resolve point estimate linewidth
 #'
-#' @param pseudolikelihood "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param comparison Logical
 #' @return Numeric linewidth
 #' @keywords internal
@@ -432,14 +432,14 @@ plot_diagnostics_defaults <- function() {
   .get_style_node(c("diagnostics", "defaults"))
 }
 
-#' Diagnostics method overrides
+#' Diagnostics pseudolikelihood overrides
 #'
-#' @param method "integrate" or "profile"
+#' @param pseudolikelihood "integrated" or "profile"
 #' @return Named list
 #' @keywords internal
 #' @noRd
-plot_diagnostics_method_cfg <- function(method) {
-  .get_style_node(c("diagnostics", "by_method"))[[method]]
+plot_diagnostics_pseudolikelihood_cfg <- function(pseudolikelihood) {
+  .get_style_node(c("diagnostics", "by_pseudolikelihood"))[[pseudolikelihood]]
 }
 
 #' Diagnostics plot overrides
@@ -454,17 +454,20 @@ plot_diagnostics_plot_cfg <- function(plot_name) {
 
 #' Resolve diagnostics style
 #'
-#' @param method Likelihood type
+#' @param pseudolikelihood "integrated" or "profile"
 #' @param plot Plot key
 #' @return Named list of merged styles
 #' @keywords internal
 #' @noRd
-plot_diagnostics_style <- function(method, plot) {
+plot_diagnostics_style <- function(pseudolikelihood, plot) {
   defaults <- plot_diagnostics_defaults()
-  by_meth <- plot_diagnostics_method_cfg(method) %||% list()
+  by_pseudolikelihood <- plot_diagnostics_pseudolikelihood_cfg(
+    pseudolikelihood
+  ) %||%
+    list()
   by_plot <- plot_diagnostics_plot_cfg(plot) %||% list()
 
-  style <- modifyList(defaults, by_meth)
+  style <- modifyList(defaults, by_pseudolikelihood)
   style <- modifyList(style, by_plot)
 
   style

@@ -1,5 +1,5 @@
 # ================================================================================
-# likelihood-diagnose-integrate-metrics.R
+# likelihood-diagnose-integrated-metrics.R
 # Modular diagnostics computations
 # ================================================================================
 
@@ -21,7 +21,7 @@
 #' }
 #'
 #' @keywords internal
-compute_integrate_likelihood_stats <- function(branch_mat) {
+compute_integrated_likelihood_stats <- function(branch_mat) {
   R <- ncol(branch_mat)
 
   L_mat <- exp(branch_mat)
@@ -52,7 +52,7 @@ compute_integrate_likelihood_stats <- function(branch_mat) {
 #' @return Numeric vector of outlier fractions (one per ψ grid point).
 #'
 #' @keywords internal
-compute_integrate_outliers <- function(branch_mat) {
+compute_integrated_outliers <- function(branch_mat) {
   med_vals <- matrixStats::rowMedians(branch_mat)
   mad_vals <- matrixStats::rowMads(branch_mat)
 
@@ -74,7 +74,7 @@ compute_integrate_outliers <- function(branch_mat) {
 #' @return Numeric vector of effective sample sizes.
 #'
 #' @keywords internal
-compute_integrate_ess <- function(cv2, R) {
+compute_integrated_ess <- function(cv2, R) {
   R / (1 + cv2)
 }
 
@@ -92,7 +92,7 @@ compute_integrate_ess <- function(cv2, R) {
 #' @return Character vector of warning messages (possibly empty).
 #'
 #' @keywords internal
-compute_integrate_warnings <- function(ess, outlier_frac, rel_se, R) {
+compute_integrated_warnings <- function(ess, outlier_frac, rel_se, R) {
   warnings <- character()
 
   if (any(ess < 0.10 * R, na.rm = TRUE)) {
@@ -131,7 +131,7 @@ compute_integrate_warnings <- function(ess, outlier_frac, rel_se, R) {
 #' }
 #'
 #' @keywords internal
-compute_integrate_omega_dispersion <- function(omega_draws, R) {
+compute_integrated_omega_dispersion <- function(omega_draws, R) {
   if (
     is.null(omega_draws) ||
       !is.list(omega_draws) ||
@@ -183,5 +183,5 @@ compute_integrate_omega_dispersion <- function(omega_draws, R) {
 }
 
 # ================================================================================
-# END likelihood-diagnose-integrate-metrics.R
+# END likelihood-diagnose-integrated-metrics.R
 # ================================================================================

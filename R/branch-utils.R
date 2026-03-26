@@ -75,7 +75,7 @@ safe_eval_branch <- function(psi, param_init, branch_evaluator) {
 
 #' Generate Coarse ψ Grid
 #'
-#' @param interval Numeric length-2 vector \code{c(lower, upper)}.
+#' @param interval Numeric length-2 vector \code{z(lower, upper)}.
 #' @param n        Integer number of grid points.
 #'
 #' @return Numeric vector of ψ values.
@@ -245,9 +245,9 @@ check_drop <- function(
 #'   \item The profile likelihood extent — from its leftmost to rightmost
 #'     ψ value, which by construction reaches
 #'     \code{effective_crit = crit * cutoff_buffer} on both sides.
-#'   \item A mode-distribution interval — \code{[x_bar - c * s,
-#'     x_bar + c * s]}, where \code{x_bar} and \code{s} are the mean
-#'     and standard deviation of the branch seed modes, and \code{c}
+#'   \item A mode-distribution interval — \code{[x_bar - z * s,
+#'     x_bar + z * s]}, where \code{x_bar} and \code{s} are the mean
+#'     and standard deviation of the branch seed modes, and \code{z}
 #'     is a user-supplied multiplier (default: \code{qnorm(1 -
 #'     alpha_target / 2)}). This extends coverage into regions where
 #'     branch modes cluster far from the profile MLE.
@@ -256,15 +256,12 @@ check_drop <- function(
 #' The union is then intersected with \code{psi_interval} if one
 #' exists, so branches never extend beyond the parameter space boundary.
 #'
-#' @param profile_psi_ll_df Data frame with a \code{psi} column, as
-#'   returned by \code{generate(task = "profile")}.
+#' @param psi_loglik_df        Data frame with a \code{psi} column (the profile
+#'   likelihood result, i.e. \code{cal$workspace$profile$psi_loglik_df}).
 #' @param branch_seeds      List of branch seed objects from
 #'   \code{sieve()}, each with a \code{$psi_mode} field.
 #' @param alpha_target      Numeric scalar. Significance level for the
-#'   default \code{c} multiplier. Ignored if \code{c} is supplied.
-#' @param c                 Positive numeric scalar. Multiplier for the
-#'   mode-distribution interval half-width. Default:
-#'   \code{qnorm(1 - alpha_target / 2)}.
+#'   default \code{z} multiplier. Ignored if \code{z} is supplied.
 #' @param psi_interval      A \code{sets::interval} object or
 #'   \code{NULL}.
 #'
@@ -274,18 +271,18 @@ check_drop <- function(
 #'     \item \code{$psi_upper}  — numeric scalar upper bound
 #'     \item \code{$mode_mean}  — mean of branch seed modes
 #'     \item \code{$mode_sd}    — sd of branch seed modes
-#'     \item \code{$c}          — multiplier used
+#'     \item \code{$z}          — multiplier used
 #'   }
 #'
 #' @importFrom stats qnorm sd
 #' @keywords internal
 compute_common_interval <- function(
-  profile_psi_ll_df,
+  psi_loglik_df,
   branch_seeds,
   alpha_target,
   psi_interval = NULL
 ) {
-  if (is.null(profile_psi_ll_df) || nrow(profile_psi_ll_df) == 0L) {
+  if (is.null(psi_loglik_df) || nrow(psi_loglik_df) == 0L) {
     stop(
       "compute_common_interval(): profile curve is empty or NULL.\n",
       "Run profile() before computing the common interval.",
@@ -296,8 +293,8 @@ compute_common_interval <- function(
   # -------------------------------------------------------------------
   # Component 1: profile extent
   # -------------------------------------------------------------------
-  profile_lower <- min(profile_psi_ll_df$psi)
-  profile_upper <- max(profile_psi_ll_df$psi)
+  profile_lower <- min(psi_loglik_df$psi)
+  profile_upper <- max(psi_loglik_df$psi)
 
   # -------------------------------------------------------------------
   # Component 2: mode-distribution interval

@@ -34,7 +34,7 @@ get_interval_estimates_df <- function(res) {
       pseudolikelihood = dplyr::recode(
         pseudolikelihood,
         profile = "Profile",
-        integrate = "Integrated"
+        integrated = "Integrated"
       )
     ) |>
     dplyr::arrange(level) |>
@@ -62,7 +62,7 @@ get_interval_estimates_df <- function(res) {
 
   attr(interval_estimates_df, "point_estimate") <- NULL
   attr(interval_estimates_df, "interval_estimate_raw") <- NULL
-  attr(interval_estimates_df, "type") <- NULL
+  attr(interval_estimates_df, "pseudolikelihood") <- NULL
 
   interval_estimates_df
 }

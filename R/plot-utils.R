@@ -129,26 +129,24 @@ plot_base <- function(plot = NULL) {
 #' log-likelihood function using semantic styling from
 #' \code{plot-style.R}.
 #'
-#' @param psi_endpoints Numeric vector of length 2 giving
-#'   the x-axis limits.
-#' @param zero_max_psi_ll_fn Function computing zero-shifted
-#'   log-likelihood values.
-#' @param pseudolikelihood Character, \code{"integrate"} or
-#'   \code{"profile"}.
+#' @param psi_loglik Function computing log-likelihood values for psi.
 #' @param comparison Logical; apply comparison styling?
 #'
 #' @return A ggplot layer.
 #'
 #' @keywords internal
 #' @noRd
-make_stat_fn <- function(
-  psi_endpoints,
-  zero_max_psi_ll_fn,
-  pseudolikelihood,
+make_curve_layer <- function(
+  psi_loglik,
   comparison = FALSE
 ) {
+  psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
+  psi_loglik_max <- psi_loglik_max_point[["maximum"]]
+  rel_psi_loglik <- shift_psi_loglik(psi_loglik, -psi_loglik_max)
+  pseudolikelihood <- attr(psi_loglik, "pseudolikelihood")
+
   ggplot2::stat_function(
-    fun = zero_max_psi_ll_fn,
+    fun = rel_psi_loglik,
     geom = "line",
     color = plot_curve_color(pseudolikelihood, comparison),
     linetype = plot_curve_linetype(pseudolikelihood, comparison),
@@ -163,25 +161,25 @@ make_stat_fn <- function(
 
 #' Generate likelihood plot title
 #'
-#' @param type Character likelihood type.
+#' @param pseudolikelihood Character pseudolikelihood type ("integrated" or "profile")
 #'
 #' @return Character plot title.
 #'
 #' @keywords internal
 #' @noRd
-likelihood_title <- function(type) {
-  type <- tolower(type)
+likelihood_title <- function(pseudolikelihood) {
+  pseudolikelihood <- tolower(pseudolikelihood)
 
-  if (type == "integrate") {
+  if (pseudolikelihood == "integrated") {
     return("Integrated Log-Likelihood")
   }
-  if (type == "profile") {
+  if (pseudolikelihood == "profile") {
     return("Profile Log-Likelihood")
   }
 
   stop(
-    "likelihood_title(): unknown type '",
-    type,
+    "likelihood_title(): unknown pseudolikelihood '",
+    typseudolikelihoodpe,
     "'.",
     call. = FALSE
   )

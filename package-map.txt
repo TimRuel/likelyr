@@ -330,7 +330,7 @@ utils.R
   # bundle_fn() — injects function dependencies for parallel workers
 
 validators-results.R
-  # validate_integrate_result(), validate_infer_input(),
+  # validate_integrated_result(), validate_infer_input(),
   # validate_compare_input(), .is_df()
 
 imports.R

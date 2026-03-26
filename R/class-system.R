@@ -96,8 +96,8 @@ new_profile_result <- function(x) {
   .new_typed_result(x, "profile", validate_profile_result)
 }
 
-new_integrate_result <- function(x) {
-  .new_typed_result(x, "integrate", validate_integrate_result)
+new_integrated_result <- function(x) {
+  .new_typed_result(x, "integrated", validate_integrated_result)
 }
 
 new_comparison_result <- function(x) {
@@ -116,7 +116,7 @@ new_diagnostics_result <- function(x, pseudolikelihood) {
     stop("'likelihood' must be a single character string.", call. = FALSE)
   }
 
-  if (!pseudolikelihood %in% c("integrate", "profile")) {
+  if (!pseudolikelihood %in% c("integrated", "profile")) {
     stop(
       "Invalid diagnostics likelihood: '",
       pseudolikelihood,
@@ -196,7 +196,7 @@ is_compared <- function(x) inherits(x, "compared")
 is_result <- function(x) inherits(x, "result")
 
 is_profile <- function(x) inherits(x, "profile")
-is_integrate <- function(x) inherits(x, "integrate")
+is_integrate <- function(x) inherits(x, "integrated")
 
 is_inferred <- function(x) inherits(x, "inference")
 is_diagnosed <- function(x) inherits(x, "diagnostics")

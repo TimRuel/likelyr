@@ -1,14 +1,14 @@
 # ======================================================================
-# branch-generate.R — Branch Generation
+# likelihood-generate.R — Branch Generation
 #
 # Provides:
 #   generate() — dispatches to task-specific branch generation
 #
 # Relies on:
-#   traverse_branch()        — branch-traverse.R
-#   traverse_profile_side()  — profile-traverse.R
-#   psi_grid_anchor()        — branch-utils.R
-#   assemble_branch_df()     — branch-traverse.R
+#   traverse_branch()         — branch-traverse.R
+#   traverse_profile_side()   — profile-traverse.R
+#   psi_grid_anchor()         — branch-utils.R
+#   assemble_branch_df()      — branch-traverse.R
 #   compute_common_interval() — branch-utils.R
 # ======================================================================
 
@@ -19,7 +19,7 @@
 #' \code{task}:
 #' \itemize{
 #'   \item \code{"integrate"} — Monte Carlo branches from pre-sieved
-#'     seeds stored in \code{cal$workspace$integrate$branch_seeds}.
+#'     seeds stored in \code{cal$workspace$integrated$cache$branch_seeds}.
 #'     The ψ grid is set from the common interval derived by
 #'     \code{preprocess()}, ensuring full overlap across all branches.
 #'   \item \code{"profile"} — single deterministic branch at
@@ -67,10 +67,7 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
   estimand <- cal$estimand
   execution <- cal$execution
 
-  # -------------------------------------------------------------------
-  # Unpack pre-sieved seeds
-  # -------------------------------------------------------------------
-  branch_seeds <- cal$workspace$integrate$branch_seeds
+  branch_seeds <- cal$workspace$integrated$cache$branch_seeds
 
   if (is.null(branch_seeds) || length(branch_seeds) == 0L) {
     stop(
@@ -82,15 +79,8 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
 
   n_seeds <- length(branch_seeds)
 
-  # -------------------------------------------------------------------
-  # Branch binder
-  # -------------------------------------------------------------------
   branch_binder <- traversal$branch_binder
-
-  # -------------------------------------------------------------------
-  # ψ-grid — use common interval derived by preprocess()
-  # -------------------------------------------------------------------
-  common_interval <- cal$workspace$integrate$common_interval
+  common_interval <- cal$workspace$integrated$cache$common_interval
 
   if (is.null(common_interval)) {
     stop(
@@ -107,9 +97,6 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     psi_upper = common_interval$psi_upper
   )
 
-  # -------------------------------------------------------------------
-  # Execution setup
-  # -------------------------------------------------------------------
   is_parallel <- inherits(execution, "parallel_spec")
 
   if (is_parallel && future::nbrOfWorkers() <= 1L) {
@@ -141,9 +128,6 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     )
   }
 
-  # -------------------------------------------------------------------
-  # Main loop — evaluate all seeds
-  # -------------------------------------------------------------------
   results <- foreach::foreach(
     r = seq_len(n_seeds),
     .options.future = list(
@@ -170,13 +154,11 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
       result$branch_df
     }
 
-  branches <- results
-
   if (verbose) {
     cat("[generate] Complete. Branches: ", n_seeds, ".\n", sep = "")
   }
 
-  cal$workspace$integrate$branches <- branches
+  cal$workspace$integrated$cache$branches <- results
 
   cal
 }
@@ -192,14 +174,8 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
   param_mle <- cal$parameter$param_mle
   psi_mle <- estimand$psi_mle
 
-  # -------------------------------------------------------------------
-  # Profile evaluator fixed at param_mle
-  # -------------------------------------------------------------------
   profile_evaluator <- traversal$branch_binder(param_mle)
 
-  # -------------------------------------------------------------------
-  # ψ-grid — use full psi_interval for profile
-  # -------------------------------------------------------------------
   grid <- psi_grid_anchor(
     psi_mle = psi_mle,
     increment = traversal$increment,
@@ -207,15 +183,11 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     psi_upper = max(estimand$psi_interval)
   )
 
-  # -------------------------------------------------------------------
-  # Branch cutoff
-  # -------------------------------------------------------------------
   alpha_target <- min(1 - traversal$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
   effective_crit <- crit * traversal$cutoff_buffer
   loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
   cutoff <- loglik_at_mle - effective_crit
-
   max_retries <- traversal$max_retries %||% 4L
 
   if (verbose) {
@@ -230,9 +202,6 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     )
   }
 
-  # -------------------------------------------------------------------
-  # Left and right sweeps
-  # -------------------------------------------------------------------
   left <- traverse_profile_side(
     grid = grid,
     k_start = -1L,
@@ -255,30 +224,26 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     eval_at_bounds = TRUE
   )
 
-  # -------------------------------------------------------------------
-  # Assemble and store as plain list — wrapping done in profile()
-  # -------------------------------------------------------------------
-  df <- dplyr::bind_rows(
-    left,
-    tibble::tibble(k = 0L, loglik = loglik_at_mle),
-    right
-  )
-
-  psi_ll_df <- assemble_branch_df(df, grid)
-  attr(psi_ll_df, "type") <- "profile"
+  psi_loglik_df <- left |>
+    dplyr::bind_rows(
+      tibble::tibble(k = 0L, loglik = loglik_at_mle),
+      right
+    ) |>
+    assemble_branch_df(grid) |>
+    magrittr::set_attr("pseudolikelihood", "profile")
 
   if (verbose) {
     cat(
       "[generate] Complete. Profile points: ",
-      nrow(psi_ll_df),
+      nrow(psi_loglik_df),
       ".\n",
       sep = ""
     )
   }
 
   cal$workspace$profile <- list(
-    psi_ll_df = psi_ll_df,
-    psi_mle = psi_mle,
+    psi_loglik_df = psi_loglik_df,
+    psi_hat = psi_mle,
     param_mle = param_mle
   )
 

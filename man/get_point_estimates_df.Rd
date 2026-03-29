@@ -13,7 +13,7 @@ must contain an \code{inference} component with a
 }
 \value{
 A data frame of point estimates with an added
-\code{pseudolikelihood} column indicating the likelihood type.
+\code{pseudolikelihood} column indicating the pseudolikelihood type.
 }
 \description{
 Extracts point estimate data frames from a list of likelihood

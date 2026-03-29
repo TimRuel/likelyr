@@ -1,6 +1,10 @@
 # ================================================================================
 # likelihood-diagnose-integrated.R
-# Integrated log-likelihood diagnostics engine (HPC-safe: compute-only)
+# Integrated likelihood diagnostics engine and plot materialization
+# ================================================================================
+
+# ================================================================================
+# Diagnostics engine (HPC-safe: compute-only)
 # ================================================================================
 
 #' Integrated log-likelihood diagnostics
@@ -9,23 +13,19 @@
 #' Computes Monte Carlo diagnostics for an integrated log-likelihood result.
 #'
 #' This function is **HPC-safe**: it performs **no plotting** and does not
-#' require `ggplot2`. Any plots are materialized later by `plot(diagnostics)`
-#' via `build_diagnostics_plots()`, which is local-only.
+#' require `ggplot2`. Plots are materialized later by `plot(diagnostics)`
+#' via `build_diagnostics_plots_integrated()`, which is local-only.
 #'
 #' @param res An `integrated` result object.
 #'
 #' @return A named list containing diagnostics metrics, warnings, summaries,
-#' and plot-ready inputs (but no ggplot objects).
+#'   and plot-ready inputs (but no ggplot objects).
 #'
 #' @keywords internal
 diagnose_integrated <- function(res) {
   branch_mat <- res$branch_mat
-  psi_ll_df <- res$psi_ll_df
+  psi_loglik_df <- res$psi_loglik_df
   omega_draws <- res$omega_draws %||% res$omega_hats
-
-  # ------------------------------------------------------------------
-  # Basic validation
-  # ------------------------------------------------------------------
 
   stopifnot(
     is.matrix(branch_mat),
@@ -34,59 +34,26 @@ diagnose_integrated <- function(res) {
 
   R <- ncol(branch_mat)
 
-  # ------------------------------------------------------------------
-  # Likelihood-scale metrics
-  # ------------------------------------------------------------------
-
   ll_stats <- compute_integrated_likelihood_stats(branch_mat)
-
-  # ------------------------------------------------------------------
-  # Outliers
-  # ------------------------------------------------------------------
-
   outlier_frac <- compute_integrated_outliers(branch_mat)
-
-  # ------------------------------------------------------------------
-  # ESS
-  # ------------------------------------------------------------------
-
   ess <- compute_integrated_ess(ll_stats$cv2, R)
-
-  # ------------------------------------------------------------------
-  # Core warnings
-  # ------------------------------------------------------------------
-
   warn_core <- compute_integrated_warnings(
     ess = ess,
     outlier_frac = outlier_frac,
     rel_se = ll_stats$rel_se,
     R = R
   )
-
-  # ------------------------------------------------------------------
-  # Omega dispersion
-  # ------------------------------------------------------------------
-
-  omega_res <- compute_integrated_omega_dispersion(
-    omega_draws = omega_draws,
-    R = R
-  )
-
+  omega_res <- compute_integrated_omega_dispersion(omega_draws, R)
   warnings <- c(warn_core, omega_res$warnings)
 
-  # ------------------------------------------------------------------
-  # Plot-ready inputs (no ggplot objects)
-  # ------------------------------------------------------------------
+  psi_vals <- if (!is.null(psi_loglik_df) && "psi" %in% names(psi_loglik_df)) {
+    as.numeric(psi_loglik_df$psi)
+  } else {
+    NULL
+  }
 
   plot_data <- list(
-    omega_branches = list(
-      branch_mat = branch_mat,
-      psi = if (!is.null(psi_ll_df) && "psi" %in% names(psi_ll_df)) {
-        as.numeric(psi_ll_df$psi)
-      } else {
-        NULL
-      }
-    ),
+    omega_branches = list(branch_mat = branch_mat, psi = psi_vals),
     rel_se = ll_stats$rel_se,
     outliers = outlier_frac,
     ess = ess,
@@ -95,11 +62,7 @@ diagnose_integrated <- function(res) {
     omega_matrix = omega_res$omega_matrix %||% NULL
   )
 
-  # ------------------------------------------------------------------
-  # Assemble output
-  # ------------------------------------------------------------------
-
-  out <- list(
+  list(
     supported = TRUE,
     R = R,
     se_L = ll_stats$se_L,
@@ -119,17 +82,22 @@ diagnose_integrated <- function(res) {
     omega_dispersion = omega_res$omega_dispersion,
     plot_data = plot_data
   )
-
-  out
 }
 
 # ================================================================================
 # Plot materialization (local-only)
 # ================================================================================
-# NOTE:
-#   This is called by plot.diagnostics() via build_diagnostics_plots(x).
-#   It assumes .assert_local_plotting() enforces local-only execution.
 
+#' Build diagnostics plots for integrated likelihood
+#'
+#' @description
+#' Called by `build_diagnostic_plots()` and `plot.diagnostic()`.
+#' Assumes `.assert_local_plotting()` has already been enforced.
+#'
+#' @param diag A `diagnostic` result object for integrated likelihood.
+#'
+#' @return A named list of ggplot objects.
+#'
 #' @keywords internal
 #' @noRd
 build_diagnostics_plots_integrated <- function(diag) {
@@ -142,9 +110,6 @@ build_diagnostics_plots_integrated <- function(diag) {
   pd <- diag$plot_data %||% list()
   plots <- list()
 
-  # --------------------------------------------------
-  # Omega-hat branches (requires psi + branch_mat)
-  # --------------------------------------------------
   if (
     !is.null(pd$omega_branches$psi) && !is.null(pd$omega_branches$branch_mat)
   ) {
@@ -154,41 +119,23 @@ build_diagnostics_plots_integrated <- function(diag) {
     )
   }
 
-  # --------------------------------------------------
-  # Relative SE
-  # --------------------------------------------------
   if (!is.null(pd$rel_se)) {
     plots$rel_se <- build_integrated_rel_se_plot(pd$rel_se)
   }
-
-  # --------------------------------------------------
-  # Outliers
-  # --------------------------------------------------
   if (!is.null(pd$outliers)) {
     plots$outliers <- build_integrated_outlier_plot(pd$outliers)
   }
-
-  # --------------------------------------------------
-  # ESS
-  # --------------------------------------------------
   if (!is.null(pd$ess)) {
     plots$ess <- build_integrated_ess_plot(pd$ess)
   }
-
-  # --------------------------------------------------
-  # Omega eigenvalues + PCA
-  # --------------------------------------------------
   if (!is.null(pd$omega_eigenvalues)) {
     plots$omega_eig <- build_integrated_omega_eigen_plot(pd$omega_eigenvalues)
   }
-
   if (!is.null(pd$omega_matrix)) {
     plots$omega_pca <- build_integrated_omega_pca_plot(pd$omega_matrix)
   }
 
-  # drop any NULL plots (defensive)
-  plots <- plots[!vapply(plots, is.null, logical(1))]
-  plots
+  plots[!vapply(plots, is.null, logical(1))]
 }
 
 # ================================================================================

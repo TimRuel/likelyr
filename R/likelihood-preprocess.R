@@ -18,33 +18,34 @@
 #' }
 #'
 #' The common interval is stored on
-#' \code{cal$workspace$integrated$cache$common_interval} for use by
+#' \code{model$workspace$integrated$cache$common_interval} for use by
 #' \code{generate(task = "integrate")}.
 #'
-#' @param cal     A \code{calibrated} model object.
+#' @param model     A calibrated \code{model} object.
 #' @param z       Positive numeric scalar. Multiplier for the
 #'   mode-distribution component of the common interval. Default:
 #'   \code{qnorm(1 - alpha_target / 2)}.
 #' @param verbose Logical. Print diagnostics. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to \code{sieve()}.
 #'
-#' @return The SAME \code{calibrated} model object with
-#'   \code{cal$workspace$profile} and
-#'   \code{cal$workspace$integrated$cache} populated.
+#' @return The same calibrated \code{model} object with
+#'   \code{model$workspace$profile} and
+#'   \code{model$workspace$integrated} populated, marked as
+#'   preprocessed.
 #'
 #' @export
-preprocess <- function(cal, ...) {
+preprocess <- function(model, ...) {
   UseMethod("preprocess")
 }
 
 #' @export
-preprocess.default <- function(cal, ...) {
-  stop("preprocess() requires a 'calibrated' model object.", call. = FALSE)
+preprocess.default <- function(model, ...) {
+  stop("preprocess() requires a calibrated 'model' object.", call. = FALSE)
 }
 
 #' @export
-preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
-  if (!is_calibrated(cal)) {
+preprocess.model <- function(model, verbose = FALSE, ...) {
+  if (!is_calibrated(model)) {
     stop("preprocess() requires a calibrated model.", call. = FALSE)
   }
 
@@ -55,9 +56,9 @@ preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
     cat("[preprocess] Computing profile likelihood...\n")
   }
 
-  cal <- profile(cal, verbose = verbose)
+  model <- profile(model, verbose = verbose)
 
-  if (cal$workspace$profile$status != "success") {
+  if (model$workspace$profile$status != "success") {
     stop(
       "preprocess(): profile likelihood failed.\n",
       "Check model specification before proceeding.",
@@ -72,11 +73,11 @@ preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
     cat("[preprocess] Running sieve...\n")
   }
 
-  cal <- sieve(cal, verbose = verbose, ...)
+  model <- sieve(model, verbose = verbose, ...)
 
   if (verbose) {
-    n_accepted <- cal$workspace$integrated$cache$sieve$total_seeds_accepted
-    n_requested <- cal$workspace$integrated$cache$sieve$total_seeds_requested
+    n_accepted <- model$workspace$integrated$cache$total_seeds_accepted
+    n_requested <- model$workspace$integrated$cache$total_seeds_requested
     cat(
       "[preprocess] Sieve complete: ",
       n_accepted,
@@ -90,12 +91,12 @@ preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # 3. Common interval
   # ------------------------------------------------------------------
-  psi_interval <- cal$estimand$psi_interval %||% NULL
-  alpha_target <- min(1 - cal$traversal$confidence_levels)
+  psi_interval <- model$estimand$psi_interval %||% NULL
+  alpha_target <- min(1 - model$traversal$confidence_levels)
 
   common_interval <- compute_common_interval(
-    psi_loglik_df = cal$workspace$profile$psi_loglik_df,
-    branch_seeds = cal$workspace$integrated$cache$branch_seeds,
+    psi_loglik_df = model$workspace$profile$psi_loglik_df,
+    branch_seeds = model$workspace$integrated$cache$branch_seeds,
     alpha_target = alpha_target,
     psi_interval = psi_interval
   )
@@ -118,7 +119,19 @@ preprocess.calibrated <- function(cal, verbose = FALSE, ...) {
     )
   }
 
-  cal$workspace$integrated$cache$common_interval <- common_interval
+  model$workspace$integrated$cache$common_interval <- common_interval
 
-  cal
+  # ------------------------------------------------------------------
+  # 4. Wrap cache as integrated_cache object
+  # ------------------------------------------------------------------
+  model$workspace$integrated <- new_integrated_cache(
+    model$workspace$integrated
+  )
+
+  # ------------------------------------------------------------------
+  # 5. Mark preprocessed
+  # ------------------------------------------------------------------
+  model <- mark_preprocessed(model)
+
+  model
 }

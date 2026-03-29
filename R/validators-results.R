@@ -42,8 +42,8 @@ validate_integrated_result <- function(x) {
     stop("status must be 'success' or 'failed'.", call. = FALSE)
   }
 
-  if (!is.null(x$psi_ll_df) && !.is_df(x$psi_ll_df)) {
-    stop("psi_ll_df must be a data.frame.", call. = FALSE)
+  if (!is.null(x$psi_loglik_df) && !.is_df(x$psi_loglik_df)) {
+    stop("psi_loglik_df must be a data.frame.", call. = FALSE)
   }
 
   invisible(TRUE)
@@ -65,7 +65,7 @@ validate_profile_result <- function(x) {
     stop("Profile log-likelihood result must be a list.", call. = FALSE)
   }
 
-  required <- c("psi_ll_df", "psi_mle", "param_mle", "status")
+  required <- c("psi_loglik_df", "psi_hat", "status")
   missing <- setdiff(required, names(x))
   if (length(missing)) {
     stop(
@@ -75,16 +75,12 @@ validate_profile_result <- function(x) {
     )
   }
 
-  if (!.is_df(x$psi_ll_df)) {
-    stop("psi_ll_df must be a data.frame.", call. = FALSE)
+  if (!.is_df(x$psi_loglik_df)) {
+    stop("psi_loglik_df must be a data.frame.", call. = FALSE)
   }
 
-  if (!is.numeric(x$psi_mle)) {
-    stop("psi_mle must be numeric.", call. = FALSE)
-  }
-
-  if (!is.numeric(x$param_mle)) {
-    stop("param_mle must be numeric.", call. = FALSE)
+  if (!is.numeric(x$psi_hat)) {
+    stop("psi_hat must be numeric.", call. = FALSE)
   }
 
   if (!x$status %in% c("success", "failed")) {
@@ -98,23 +94,23 @@ validate_profile_result <- function(x) {
 # Validator: diagnostics
 # ======================================================================
 
-#' Validate diagnostics result
+#' Validate diagnostic result
 #'
 #' @param x Result object to validate.
 #' @return Invisibly returns TRUE on success.
 #'
 #' @keywords internal
 #' @noRd
-validate_diagnostics_result <- function(x) {
+validate_diagnostic_result <- function(x) {
   if (!is.list(x)) {
-    stop("Diagnostics result must be a list.", call. = FALSE)
+    stop("Diagnostic result must be a list.", call. = FALSE)
   }
 
   required <- c("supported", "warnings")
   missing <- setdiff(required, names(x))
   if (length(missing)) {
     stop(
-      "Diagnostics result missing required field(s): ",
+      "Diagnostic result missing required field(s): ",
       paste(missing, collapse = ", "),
       call. = FALSE
     )
@@ -148,7 +144,6 @@ validate_inference_result <- function(x) {
   }
 
   required <- c(
-    "zero_max_psi_ll_fn",
     "point_estimate_df",
     "interval_estimate_df"
   )
@@ -160,10 +155,6 @@ validate_inference_result <- function(x) {
       paste(missing, collapse = ", "),
       call. = FALSE
     )
-  }
-
-  if (!is.function(x$zero_max_psi_ll_fn)) {
-    stop("zero_max_psi_ll_fn must be a function.", call. = FALSE)
   }
 
   if (!.is_df(x$point_estimate_df)) {

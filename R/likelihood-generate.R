@@ -19,41 +19,46 @@
 #' \code{task}:
 #' \itemize{
 #'   \item \code{"integrate"} — Monte Carlo branches from pre-sieved
-#'     seeds stored in \code{cal$workspace$integrated$cache$branch_seeds}.
+#'     seeds stored in \code{model$workspace$integrated$cache$branch_seeds}.
 #'     The ψ grid is set from the common interval derived by
 #'     \code{preprocess()}, ensuring full overlap across all branches.
 #'   \item \code{"profile"} — single deterministic branch at
-#'     \code{param_mle}, stored in \code{cal$workspace$profile}.
+#'     \code{param_mle}, stored in \code{model$workspace$profile}.
 #' }
 #'
-#' @param cal     A \code{calibrated} model object.
+#' @param model     A calibrated \code{model} object.
 #' @param task    Character scalar. One of \code{"integrate"} or
 #'   \code{"profile"}. Default: \code{"integrate"}.
 #' @param verbose Logical. Print progress. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to the task-specific
 #'   implementation.
 #'
-#' @return The SAME \code{calibrated} model object with results stored
+#' @return The SAME calibrated \code{model} object with results stored
 #'   on the workspace.
 #'
 #' @export
-generate <- function(cal, ...) {
+generate <- function(model, ...) {
   UseMethod("generate")
 }
 
 #' @export
-generate.default <- function(cal, ...) {
-  stop("generate() requires a 'calibrated' model object.", call. = FALSE)
+generate.default <- function(model, ...) {
+  stop("generate() requires a calibrated 'model' object.", call. = FALSE)
 }
 
 #' @export
-generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
+generate.model <- function(
+  model,
+  task = "integrate",
+  verbose = FALSE,
+  ...
+) {
   task <- match.arg(task, c("integrate", "profile"))
 
   switch(
     task,
-    integrate = .generate_integrate(cal, verbose = verbose, ...),
-    profile = .generate_profile(cal, verbose = verbose, ...)
+    integrate = .generate_integrate(model, verbose = verbose, ...),
+    profile = .generate_profile(model, verbose = verbose, ...)
   )
 }
 
@@ -62,17 +67,17 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
 # ======================================================================
 
 #' @keywords internal
-.generate_integrate <- function(cal, verbose = FALSE, ...) {
-  traversal <- cal$traversal
-  estimand <- cal$estimand
-  execution <- cal$execution
+.generate_integrate <- function(model, verbose = FALSE, ...) {
+  traversal <- model$traversal
+  estimand <- model$estimand
+  execution <- model$execution
 
-  branch_seeds <- cal$workspace$integrated$cache$branch_seeds
+  branch_seeds <- model$workspace$integrated$cache$branch_seeds
 
   if (is.null(branch_seeds) || length(branch_seeds) == 0L) {
     stop(
       "generate(task = 'integrate') requires pre-sieved branch seeds.\n",
-      "Run sieve(cal) before generate().",
+      "Run sieve(model) before generate().",
       call. = FALSE
     )
   }
@@ -80,12 +85,12 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
   n_seeds <- length(branch_seeds)
 
   branch_binder <- traversal$branch_binder
-  common_interval <- cal$workspace$integrated$cache$common_interval
+  common_interval <- model$workspace$integrated$cache$common_interval
 
   if (is.null(common_interval)) {
     stop(
       "generate(task = 'integrate') requires a common interval.\n",
-      "Run preprocess(cal) before generate().",
+      "Run preprocess(model) before generate().",
       call. = FALSE
     )
   }
@@ -158,9 +163,9 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     cat("[generate] Complete. Branches: ", n_seeds, ".\n", sep = "")
   }
 
-  cal$workspace$integrated$cache$branches <- results
+  model$workspace$integrated$cache$branches <- results
 
-  cal
+  model
 }
 
 # ======================================================================
@@ -168,10 +173,10 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
 # ======================================================================
 
 #' @keywords internal
-.generate_profile <- function(cal, verbose = FALSE, ...) {
-  traversal <- cal$traversal
-  estimand <- cal$estimand
-  param_mle <- cal$parameter$param_mle
+.generate_profile <- function(model, verbose = FALSE, ...) {
+  traversal <- model$traversal
+  estimand <- model$estimand
+  param_mle <- model$parameter$param_mle
   psi_mle <- estimand$psi_mle
 
   profile_evaluator <- traversal$branch_binder(param_mle)
@@ -241,11 +246,12 @@ generate.calibrated <- function(cal, task = "integrate", verbose = FALSE, ...) {
     )
   }
 
-  cal$workspace$profile <- list(
+  model$workspace$profile <- list(
     psi_loglik_df = psi_loglik_df,
-    psi_hat = psi_mle,
-    param_mle = param_mle
+    psi_hat = psi_loglik_df |>
+      dplyr::slice(which.max(loglik)) |>
+      dplyr::pull(psi)
   )
 
-  cal
+  model
 }

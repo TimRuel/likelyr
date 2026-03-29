@@ -112,8 +112,10 @@ traverse_branch_topdown <- function(
 
   k_mode <- round((psi_mode - grid$psi_mle) / grid$increment)
 
-  probe_evals_df_left <- probe_evals_df |> dplyr::filter(side == "left")
-  probe_evals_df_right <- probe_evals_df |> dplyr::filter(side == "right")
+  probe_evals_df_left <- probe_evals_df |>
+    dplyr::filter(side == "left")
+  probe_evals_df_right <- probe_evals_df |>
+    dplyr::filter(side == "right")
 
   k_left_edge <- if (nrow(probe_evals_df_left) > 0L) {
     min(probe_evals_df_left$k)
@@ -229,8 +231,9 @@ traverse_branch_leftright <- function(
   psi_hat <- psi_mle + df$k[i_mode] * increment
   branch_cutoff <- ll_mode - effective_crit
 
-  df <- df[df$loglik >= branch_cutoff, ]
-  branch_df <- assemble_branch_df(df, grid)
+  branch_df <- df |>
+    dplyr::filter(loglik > branch_cutoff) |>
+    assemble_branch_df(grid)
 
   list(
     branch_df = branch_df,
@@ -306,7 +309,9 @@ traverse_branch_side <- function(
     k_curr <- k_curr + k_direction
   }
 
-  df |> dplyr::distinct() |> dplyr::arrange(k)
+  df |>
+    dplyr::distinct() |>
+    dplyr::arrange(k)
 }
 
 # ======================================================================
@@ -317,15 +322,16 @@ traverse_branch_side <- function(
 #' @noRd
 assemble_branch_df <- function(df, grid) {
   branch_df <- df |>
-    dplyr::arrange(.data$k) |>
+    dplyr::arrange(k) |>
     dplyr::distinct() |>
-    dplyr::mutate(psi = grid$psi_mle + .data$k * grid$increment) |>
+    dplyr::mutate(psi = grid$psi_mle + k * grid$increment) |>
     dplyr::mutate(
-      loglik_centered = .data$loglik - max(.data$loglik, na.rm = TRUE)
-    )
+      rel_loglik = loglik - max(loglik, na.rm = TRUE)
+    ) |>
+    dplyr::select(k, psi, loglik, rel_loglik)
 
   attr(branch_df, "mode_index") <- which.max(branch_df$loglik)
   attr(branch_df, "n_points") <- nrow(branch_df)
-  attr(branch_df, "psi_MLE") <- grid$psi_mle
+  attr(branch_df, "psi_mle") <- grid$psi_mle
   branch_df
 }

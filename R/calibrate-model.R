@@ -2,7 +2,7 @@
 # Calibration Dispatcher
 # ======================================================================
 
-#' Calibrate a model_spec to data
+#' Calibrate a 'model_spec' object to data
 #'
 #' @description
 #' Prepares a model for computing profile or integrated likelihoods.
@@ -10,31 +10,31 @@
 #' likelihood, estimand, sampler, traversal, execution) is processed
 #' by its own calibration helper.
 #'
-#' @param model   A `model_spec` object.
+#' @param spec   A `model_spec` object.
 #' @param data    User data.
 #' @param verbose Logical; print calibration diagnostics.
 #'
-#' @return A `calibrated` model object.
+#' @return A `model` object that has been calibrated to data.
 #' @export
-calibrate <- function(model, data, verbose = FALSE) {
+calibrate <- function(spec, data, verbose = FALSE) {
   UseMethod("calibrate")
 }
 
 #' @export
-calibrate.default <- function(model, data, verbose = FALSE) {
-  stop("calibrate() requires a model_spec object.", call. = FALSE)
+calibrate.default <- function(spec, data, verbose = FALSE) {
+  stop("calibrate() requires a 'model_spec' object.", call. = FALSE)
 }
 
 # ----------------------------------------------------------------------
 
 #' @export
-calibrate.model_spec <- function(model, data, verbose = FALSE) {
+calibrate.model_spec <- function(spec, data, verbose = FALSE) {
   # -------------------------------------------------------------------
   # 1. Validate structural model specification before calibration
   # -------------------------------------------------------------------
-  validate_calibrate_input(model)
+  validate_calibrate_input(spec)
 
-  model$data <- data
+  spec$data <- data
 
   # -------------------------------------------------------------------
   # 2. Modular calibration of structural components
@@ -46,64 +46,64 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
   #   sampler    — builds omega-hat closures from calibrated quantities
   #   traversal  — builds search interval and branch mode locator
   # -------------------------------------------------------------------
-  model$parameter <- calibrate_parameter(
-    parameter = model$parameter,
+  spec$parameter <- calibrate_parameter(
+    parameter = spec$parameter,
     data = data
   )
 
-  model$likelihood <- calibrate_likelihood(
-    likelihood = model$likelihood,
+  spec$likelihood <- calibrate_likelihood(
+    likelihood = spec$likelihood,
     data = data
   )
 
-  model$estimand <- calibrate_estimand(
-    estimand = model$estimand,
+  spec$estimand <- calibrate_estimand(
+    estimand = spec$estimand,
     data = data,
-    param_mle = model$parameter$param_mle,
-    param_0 = model$parameter$param_0
+    param_mle = spec$parameter$param_mle,
+    param_0 = spec$parameter$param_0
   )
 
-  model$sampler <- calibrate_sampler(
-    sampler = model$sampler,
-    parameter = model$parameter,
-    estimand = model$estimand,
-    solver = model$solver
+  spec$sampler <- calibrate_sampler(
+    sampler = spec$sampler,
+    parameter = spec$parameter,
+    estimand = spec$estimand,
+    solver = spec$solver
   )
 
-  model$traversal <- calibrate_traversal(
-    traversal = model$traversal,
-    parameter = model$parameter,
-    likelihood = model$likelihood,
-    estimand = model$estimand,
-    solver = model$solver,
+  spec$traversal <- calibrate_traversal(
+    traversal = spec$traversal,
+    parameter = spec$parameter,
+    likelihood = spec$likelihood,
+    estimand = spec$estimand,
+    solver = spec$solver,
     data = data
   )
 
   # -------------------------------------------------------------------
   # 3. Optional execution calibration
   # -------------------------------------------------------------------
-  if (!is.null(model$execution)) {
-    model$execution <- calibrate_execution(model$execution)
+  if (!is.null(spec$execution)) {
+    spec$execution <- calibrate_execution(spec$execution)
   }
 
   # -------------------------------------------------------------------
   # 4. Wrap into calibrated model object
   # -------------------------------------------------------------------
-  cal <- new_calibrated_model(model)
+  model <- new_model(spec)
 
   # -------------------------------------------------------------------
   # 5. Initialize results workspace
   # -------------------------------------------------------------------
-  cal$workspace <- new_workspace()
+  model$workspace <- new_workspace()
 
   # -------------------------------------------------------------------
   # 6. Optional console output
   # -------------------------------------------------------------------
   if (verbose) {
-    print(cal)
+    print(model)
   }
 
-  cal
+  model
 }
 
 # ======================================================================
@@ -114,50 +114,50 @@ calibrate.model_spec <- function(model, data, verbose = FALSE) {
 #'
 #' @keywords internal
 #' @noRd
-validate_calibrate_input <- function(model) {
-  if (!inherits(model$parameter, "parameter_spec")) {
+validate_calibrate_input <- function(spec) {
+  if (!inherits(spec$parameter, "parameter_spec")) {
     stop(
-      "model$parameter must be a parameter_spec() before calibration.",
+      "spec$parameter must be a 'parameter_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$likelihood, "likelihood_spec")) {
+  if (!inherits(spec$likelihood, "likelihood_spec")) {
     stop(
-      "model$likelihood must be a likelihood_spec() before calibration.",
+      "spec$likelihood must be a 'likelihood_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$estimand, "estimand_spec")) {
+  if (!inherits(spec$estimand, "estimand_spec")) {
     stop(
-      "model$estimand must be an estimand_spec() before calibration.",
+      "spec$estimand must be an 'estimand_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$sampler, "sampler_spec")) {
+  if (!inherits(spec$sampler, "sampler_spec")) {
     stop(
-      "model$sampler must be a sampler_spec() before calibration.",
+      "spec$sampler must be a 'sampler_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$traversal, "traversal_spec")) {
+  if (!inherits(spec$traversal, "traversal_spec")) {
     stop(
-      "model$traversal must be a traversal_spec() before calibration.",
+      "spec$traversal must be a 'traversal_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  if (!inherits(model$solver, "solver_spec")) {
+  if (!inherits(spec$solver, "solver_spec")) {
     stop(
-      "model$solver must be a solver_spec() before calibration.",
+      "spec$solver must be a 'solver_spec' object before calibration.",
       call. = FALSE
     )
   }
 
-  invisible(model)
+  invisible(spec)
 }
 
 # ======================================================================
@@ -165,40 +165,92 @@ validate_calibrate_input <- function(model) {
 # ======================================================================
 
 #' @export
-print.calibrated <- function(x, ...) {
-  param_mle <- x$parameter$param_mle
-  psi_mle <- x$estimand$psi_mle
+print.model <- function(model, ...) {
+  param_mle <- model$parameter$param_mle
+  param_0 <- model$parameter$param_0
+  psi_mle <- model$estimand$psi_mle
+  psi_0 <- model$estimand$psi_0
+
+  .fmt_scalar <- function(x) format(signif(x, 3), trim = TRUE)
+  .fmt_vec <- function(x) {
+    paste(format(signif(x, 3), trim = TRUE), collapse = ", ")
+  }
+  .fmt_mat <- function(x) {
+    m <- signif(x, 3)
+    if (is.null(rownames(m))) {
+      rownames(m) <- seq_len(nrow(m))
+    }
+    if (is.null(colnames(m))) {
+      colnames(m) <- seq_len(ncol(m))
+    }
+    capture.output(print(format(m), quote = FALSE))
+  }
 
   cat("# Calibrated Model (likelyr)\n\n")
 
-  if (!is.null(param_mle)) {
-    if (is.matrix(param_mle)) {
-      cat("- Full Model Parameter MLE:\n")
-      mat <- param_mle
-      if (is.null(rownames(mat))) {
-        rownames(mat) <- seq_len(nrow(mat))
-      }
-      if (is.null(colnames(mat))) {
-        colnames(mat) <- seq_len(ncol(mat))
-      }
-      pretty <- capture.output(print(format(mat), quote = FALSE))
-      cat(paste0("    ", pretty), sep = "\n")
+  # --- Full model parameter (true) ---
+  if (!is.null(param_0)) {
+    if (is.matrix(param_0)) {
+      cat("- \u03b8\u2080:\n")
+      cat(paste0("    ", .fmt_mat(param_0)), sep = "\n")
       cat("\n")
     } else {
-      cat(
-        "- Full Model Parameter MLE:   (",
-        paste(format(param_mle), collapse = ", "),
-        ")\n",
-        sep = ""
-      )
+      cat("- \u03b8\u2080: (", .fmt_vec(param_0), ")\n", sep = "")
     }
   } else {
-    cat("- Full Model Parameter MLE:   <not available>\n")
+    cat("- \u03b8\u2080:  <not available>\n")
   }
 
-  cat("- Parameter of Interest MLE: ", format(psi_mle), "\n", sep = "")
-  cat("- integrated:   ", if (is_integrated(x)) "✓" else "×", "\n", sep = "")
-  cat("- profiled:     ", if (is_profiled(x)) "✓" else "×", "\n", sep = "")
+  # --- Full model parameter MLE ---
+  if (!is.null(param_mle)) {
+    if (is.matrix(param_mle)) {
+      cat("- \u03b8\u0302:\n")
+      cat(paste0("    ", .fmt_mat(param_mle)), sep = "\n")
+      cat("\n")
+    } else {
+      cat("- \u03b8\u0302:  (", .fmt_vec(param_mle), ")\n", sep = "")
+    }
+  } else {
+    cat("- \u03b8\u0302:  <not available>\n")
+  }
 
-  invisible(x)
+  # --- Parameter of interest ---
+  if (!is.null(psi_0)) {
+    cat("- \u03c8\u2080: ", .fmt_scalar(psi_0), "\n", sep = "")
+  } else {
+    cat("- \u03c8\u2080: <not available>\n")
+  }
+
+  if (!is.null(psi_mle)) {
+    cat("- \u03c8\u0302:  ", .fmt_scalar(psi_mle), "\n", sep = "")
+  } else {
+    cat("- \u03c8\u0302:  <not available>\n")
+  }
+
+  cat("\n")
+
+  # --- Pipeline state ---
+  integrated_status <- if (is_integrated(model)) {
+    "\u2713"
+  } else if (is_preprocessed(model)) {
+    "~ preprocessed"
+  } else {
+    "\u00d7"
+  }
+
+  cat(
+    "- profiled:   ",
+    if (is_profiled(model)) "\u2713" else "\u00d7",
+    "\n",
+    sep = ""
+  )
+  cat("- integrated: ", integrated_status, "\n", sep = "")
+  cat(
+    "- compared:   ",
+    if (is_compared(model)) "\u2713" else "\u00d7",
+    "\n",
+    sep = ""
+  )
+
+  invisible(model)
 }

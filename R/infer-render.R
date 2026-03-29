@@ -58,12 +58,12 @@ render_interval_estimate_table <- function(interval_estimate_df) {
   )
 
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
-  point_estimate <- attr(interval_estimate_df, "point_estimate")
+  psi_hat <- attr(interval_estimate_df, "psi_hat")
   psi_0 <- attr(interval_estimate_df, "psi_0")
 
   stopifnot(
     !is.null(interval_estimate_raw),
-    !is.null(point_estimate),
+    !is.null(psi_hat),
     !is.null(psi_0)
   )
 
@@ -104,7 +104,7 @@ render_interval_estimate_table <- function(interval_estimate_df) {
       pseudolikelihood
     ),
     stripe_bg = stripe_bg,
-    diagram_x = rep(point_estimate, nrow(interval_estimate_raw)),
+    diagram_x = rep(psi_hat, nrow(interval_estimate_raw)),
     diagram_lower = interval_estimate_raw$lower,
     diagram_upper = interval_estimate_raw$upper,
     vline = psi_0,
@@ -133,7 +133,6 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
   )
 
   required_interval_estimate_cols <- c(
-    "psi_0",
     "interval",
     "length",
     "lower_dev",

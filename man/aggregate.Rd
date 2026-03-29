@@ -4,16 +4,16 @@
 \alias{aggregate}
 \title{Aggregate Branches into Integrated Log-Likelihood Curve}
 \usage{
-aggregate(cal, ...)
+aggregate(model, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object.}
+\item{model}{A calibrated \code{model} object.}
 
 \item{verbose}{Logical. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, with
-\code{cal$workspace$integrate$result} updated.
+The SAME calibrated \code{model} object, with
+\code{model$workspace$integrated} updated.
 }
 \description{
 Computes a pointwise average log-likelihood curve from all branches:
@@ -30,7 +30,4 @@ All branches share a common ψ grid derived by \code{preprocess()},
 so every branch contributes at every ψ point. The \code{n_support}
 column in the result records the actual number of contributing
 branches at each point as a diagnostic.
-
-A floor warning is issued when the median \code{n_support} falls
-below \code{cal$execution$min_branches}.
 }

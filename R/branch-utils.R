@@ -257,7 +257,7 @@ check_drop <- function(
 #' exists, so branches never extend beyond the parameter space boundary.
 #'
 #' @param psi_loglik_df        Data frame with a \code{psi} column (the profile
-#'   likelihood result, i.e. \code{cal$workspace$profile$psi_loglik_df}).
+#'   likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).
 #' @param branch_seeds      List of branch seed objects from
 #'   \code{sieve()}, each with a \code{$psi_mode} field.
 #' @param alpha_target      Numeric scalar. Significance level for the

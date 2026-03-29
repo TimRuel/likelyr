@@ -4,10 +4,10 @@
 \alias{profile}
 \title{Profile Log-Likelihood}
 \usage{
-profile(cal, ...)
+profile(model, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object.}
+\item{model}{A calibrated \code{model} object.}
 
 \item{...}{Additional arguments passed to
 \code{generate(task = "profile")}.}
@@ -15,12 +15,12 @@ profile(cal, ...)
 \item{verbose}{Logical. Print diagnostics. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, augmented with
-class \code{profiled} and \code{cal$workspace$profile}.
+The SAME calibrated \code{model} object, augmented with
+class \code{profiled} and \code{model$workspace$profile}.
 }
 \description{
 Computes the profile log-likelihood curve for the calibrated model.
 Nuisance parameters are fixed at the MLE, forming a single
 deterministic branch evaluated along the ψ-grid. The result is
-stored in \code{cal$workspace$profile}.
+stored in \code{model$workspace$profile}.
 }

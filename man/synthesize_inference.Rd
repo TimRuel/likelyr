@@ -4,35 +4,24 @@
 \alias{synthesize_inference}
 \title{Synthesize Likelihood-Based Inference Results}
 \usage{
-synthesize_inference(psi_ll_df, alpha_levels, psi_0)
+synthesize_inference(psi_loglik_df, alpha_levels, psi_0)
 }
 \arguments{
-\item{psi_ll_df}{A data frame containing columns \code{psi} and
-\code{loglik} representing the evaluated log-likelihood curve.}
+\item{psi_loglik_df}{A data frame containing columns \code{psi} and
+\code{loglik}}
 
 \item{alpha_levels}{Numeric vector of significance levels.}
 
-\item{psi_0}{Optional numeric scalar giving the true value of ψ.}
+\item{psi_0}{Optional numeric scalar. True value of ψ.}
 }
 \value{
-A named list containing:
-\describe{
-\item{zero_max_psi_ll_fn}{Shifted/smoothed log-likelihood function
-with max at 0.}
-\item{point_estimate_df}{Data frame with ψ₀, ψ̂, error, and SE(ψ̂).}
-\item{interval_estimate_df}{Confidence interval diagnostics table.}
-}
+A named list with \code{rel_psi_loglik},
+\code{point_estimate_df}, and \code{interval_estimate_df}.
 }
 \description{
-Orchestrates point estimation and confidence interval construction from
-a ψ log-likelihood grid, returning a unified inference object containing
-numeric results and the data required for downstream presentation.
-
-This function performs \strong{no table rendering or plotting}. Tables/plots
-are materialized later by \code{view()} and \code{plot()} (local-only).
-
-This function assumes that likelihood evaluation has already been
-performed and that \code{psi_ll_df} represents a unimodal likelihood
-curve.
+Orchestrates point estimation and confidence interval construction
+from a log-likelihood grid, returning point estimates, interval
+estimates, and the zero-maximized likelihood function needed for
+plotting.
 }
 \keyword{internal}

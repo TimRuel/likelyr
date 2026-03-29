@@ -130,6 +130,8 @@ plot_base <- function(plot = NULL) {
 #' \code{plot-style.R}.
 #'
 #' @param psi_loglik Function computing log-likelihood values for psi.
+#' @param psi_limits Numeric vector of length 2. The display domain
+#'   passed to \code{xlim} in \code{stat_function}.
 #' @param comparison Logical; apply comparison styling?
 #'
 #' @return A ggplot layer.
@@ -138,6 +140,7 @@ plot_base <- function(plot = NULL) {
 #' @noRd
 make_curve_layer <- function(
   psi_loglik,
+  psi_limits,
   comparison = FALSE
 ) {
   psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
@@ -151,7 +154,7 @@ make_curve_layer <- function(
     color = plot_curve_color(pseudolikelihood, comparison),
     linetype = plot_curve_linetype(pseudolikelihood, comparison),
     linewidth = plot_curve_linewidth(pseudolikelihood, comparison),
-    xlim = psi_endpoints
+    xlim = psi_limits
   )
 }
 
@@ -246,14 +249,14 @@ extract_ci_long <- function(interval_estimate_df) {
 
 #' Compute y-axis limits for likelihood plot
 #'
-#' @param psi_ll_df Likelihood evaluation data frame.
+#' @param psi_loglik_df Likelihood evaluation data frame.
 #'
 #' @return Numeric vector of length 2.
 #'
 #' @keywords internal
 #' @noRd
-compute_y_limits <- function(psi_ll_df) {
-  y <- psi_ll_df$loglik - max(psi_ll_df$loglik)
+compute_y_limits <- function(psi_loglik_df) {
+  y <- psi_loglik_df$loglik - max(psi_loglik_df$loglik)
   pad <- 0.1
   range(y) + c(-pad, pad)
 }

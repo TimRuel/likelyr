@@ -4,32 +4,24 @@
 \alias{integrate}
 \title{Integrated Log-Likelihood}
 \usage{
-integrate(cal, ...)
+integrate(model, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object.}
+\item{model}{A calibrated \code{model} object.}
 
 \item{...}{Additional arguments passed to \code{generate()}.}
 
-\item{verbose}{Logical; print diagnostics. Default: \code{FALSE}.}
+\item{verbose}{Logical. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, augmented with
-\code{$workspace$integrate} containing branches and the
-initial aggregation result.
+The SAME calibrated \code{model} object, with
+\code{$workspace$integrated} populated.
 }
 \description{
 Computes the integrated log-likelihood using pre-screened branch seeds
-stored in the calibrated model object by \code{sieve()}.
+stored in \code{model$workspace$integrated$cache} by \code{preprocess()}.
 
-This function assumes \code{sieve()} has already been run and will
-error otherwise. No omega-hat sampling or mode location occurs here.
-
-Requires \code{E_loglik} to be supplied in \code{likelihood_spec()}.
-A clear error is raised if it is absent.
-
-After branch computation, \code{aggregate()} is called with
-default parameters. Call \code{aggregate()} directly on the
-returned model to re-aggregate with different settings without
-repeating branch computation.
+After branch computation, \code{aggregate()} is called with default
+parameters. Call \code{aggregate()} directly on the returned model
+to re-aggregate without repeating branch computation.
 }

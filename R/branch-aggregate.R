@@ -20,32 +20,32 @@
 #' column in the result records the actual number of contributing
 #' branches at each point as a diagnostic.
 #'
-#' @param cal     A \code{calibrated} model object.
+#' @param model   A calibrated \code{model} object.
 #' @param verbose Logical. Default: \code{FALSE}.
 #'
-#' @return The SAME \code{calibrated} model object, with
-#'   \code{cal$workspace$integrated} updated.
+#' @return The SAME calibrated \code{model} object, with
+#'   \code{model$workspace$integrated} updated.
 #'
 #' @importFrom stats median
 #' @export
-aggregate <- function(cal, ...) {
+aggregate <- function(model, ...) {
   UseMethod("aggregate")
 }
 
 #' @export
-aggregate.default <- function(cal, ...) {
-  stop("aggregate() requires a 'calibrated' model object.", call. = FALSE)
+aggregate.default <- function(model, ...) {
+  stop("aggregate() requires a calibrated 'model' object.", call. = FALSE)
 }
 
 #' @export
-aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
-  branches <- cal$workspace$integrated$cache$branches %||% NULL
-  min_branches <- cal$execution$min_branches
+aggregate.model <- function(model, verbose = FALSE, ...) {
+  branches <- model$workspace$integrated$cache$branches %||% NULL
+  min_branches <- model$execution$min_branches
 
   if (is.null(branches) || length(branches) == 0L) {
     stop(
       "aggregate() requires pre-computed branches.\n",
-      "Run integrate(cal) before aggregate().",
+      "Run integrate(model) before aggregate().",
       call. = FALSE
     )
   }
@@ -72,9 +72,9 @@ aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   # -------------------------------------------------------------------
   # 2. Pointwise log-mean-exp
   # -------------------------------------------------------------------
-  alpha_target <- min(1 - cal$traversal$confidence_levels)
+  alpha_target <- min(1 - model$traversal$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
-  effective_crit <- crit * cal$traversal$cutoff_buffer
+  effective_crit <- crit * model$traversal$cutoff_buffer
 
   n_support <- rowSums(is.finite(branch_mat))
   loglik <- matrixStats::rowLogSumExps(branch_mat, na.rm = TRUE) -
@@ -124,14 +124,15 @@ aggregate.calibrated <- function(cal, verbose = FALSE, ...) {
   # -------------------------------------------------------------------
   # 4. Return plain list — wrapping/marking done in integrate()
   # -------------------------------------------------------------------
-  cal$workspace$integrated <- list(
+  model$workspace$integrated <- list(
     psi_loglik_df = psi_loglik_df,
     psi_hat = psi_grid[which.max(loglik)],
+    branch_mat = branch_mat,
     R = R,
     med_support = med_support,
     min_branches = min_branches,
     floor_violated = med_support < min_branches
   )
 
-  cal
+  model
 }

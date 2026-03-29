@@ -1,46 +1,46 @@
 # ======================================================================
 # sieve.R — Branch Seed Accumulator
 #
-# Draws omega-hats from cal$sampler$draw(), expands each to an orbit
-# via cal$sampler$expand_orbit(), and calls probe() on each candidate
+# Draws omega-hats from model$sampler$draw(), expands each to an orbit
+# via model$sampler$expand_orbit(), and calls probe() on each candidate
 # until total_seeds accepted branch seeds have been accumulated.
 #
-# total_seeds is read from cal$execution$total_seeds (derived during
+# total_seeds is read from model$execution$total_seeds (derived during
 # calibration from min_branches + branch_buffer for serial, or
 # num_workers * chunk_size for parallel).
 #
 # Each orbit consists of one base draw plus its expanded candidates.
 # n_orbits counts base draws; n_candidates counts all probed omega-hats.
 #
-# orbit_size is read from cal$sampler$orbit_size. total_seeds need not
+# orbit_size is read from model$sampler$orbit_size. total_seeds need not
 # be a multiple of orbit_size — the final orbit is truncated to fill
 # exactly total_seeds branch seeds.
 #
 # probe() and sieve() arguments default to values stored on
-# cal$traversal, with any directly supplied arguments taking precedence.
+# model$traversal, with any directly supplied arguments taking precedence.
 # ======================================================================
 
 #' @export
 sieve <- function(
-  cal,
+  model,
   n_adjacent = NULL,
   max_mode_shifts = NULL,
   k_recent = NULL,
   drop_multiplier = NULL,
   verbose = FALSE
 ) {
-  if (!is_calibrated(cal)) {
+  if (!is_calibrated(model)) {
     stop("sieve() requires a calibrated model.", call. = FALSE)
   }
 
-  n_adjacent <- n_adjacent %||% cal$traversal$n_adjacent
-  max_mode_shifts <- max_mode_shifts %||% cal$traversal$max_mode_shifts
-  k_recent <- k_recent %||% cal$traversal$k_recent
-  drop_multiplier <- drop_multiplier %||% cal$traversal$drop_multiplier
+  n_adjacent <- n_adjacent %||% model$traversal$n_adjacent
+  max_mode_shifts <- max_mode_shifts %||% model$traversal$max_mode_shifts
+  k_recent <- k_recent %||% model$traversal$k_recent
+  drop_multiplier <- drop_multiplier %||% model$traversal$drop_multiplier
 
-  total_seeds <- as.integer(cal$execution$total_seeds)
-  draw <- cal$sampler$draw
-  expand_orbit <- cal$sampler$expand_orbit
+  total_seeds <- as.integer(model$execution$total_seeds)
+  draw <- model$sampler$draw
+  expand_orbit <- model$sampler$expand_orbit
 
   branch_seeds <- vector("list", total_seeds)
   diag_log <- list()
@@ -113,7 +113,7 @@ sieve <- function(
 
       result <- tryCatch(
         probe(
-          cal = cal,
+          model = model,
           omega_hat = omega,
           n_adjacent = n_adjacent,
           max_mode_shifts = max_mode_shifts,
@@ -150,8 +150,8 @@ sieve <- function(
     integer()
   }
 
-  cal$workspace$integrated$branch_seeds <- branch_seeds
-  cal$workspace$integrated$sieve <- list(
+  model$workspace$integrated$cache <- list(
+    branch_seeds = branch_seeds,
     total_seeds_requested = total_seeds,
     total_seeds_accepted = n_accepted,
     n_orbits = n_orbits,
@@ -177,5 +177,5 @@ sieve <- function(
     }
   }
 
-  cal
+  model
 }

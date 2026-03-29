@@ -1,6 +1,10 @@
 # ================================================================================
 # likelihood-diagnose-profile.R
-# Profile log-likelihood diagnostics engine (skeleton)
+# Profile likelihood diagnostics engine and plot materialization (skeleton)
+# ================================================================================
+
+# ================================================================================
+# Diagnostics engine (HPC-safe: compute-only)
 # ================================================================================
 
 #' Profile log-likelihood diagnostics
@@ -8,14 +12,9 @@
 #' @description
 #' Computes diagnostics for a profile log-likelihood result.
 #'
-#' This is currently a **barebones skeleton** that mirrors the integrated
-#' diagnostics engine. All metric and plotting helpers will be wired in
-#' here once implemented.
-#'
-#' The function exists to:
-#'   • provide a consistent diagnostics interface
-#'   • allow downstream code to rely on diagnostics structure
-#'   • make future implementation drop-in
+#' This is currently a **skeleton** that mirrors the integrated diagnostics
+#' engine interface. All metric and plotting helpers will be wired in once
+#' implemented.
 #'
 #' @param res A `profile` result object.
 #'
@@ -23,7 +22,7 @@
 #'
 #' @keywords internal
 diagnose_profile <- function(res) {
-  out <- list(
+  list(
     supported = FALSE,
     message = "Diagnostics for profile log-likelihood are not yet implemented.",
     warnings = character(),
@@ -31,7 +30,27 @@ diagnose_profile <- function(res) {
     plot_data = list(),
     summary = NULL
   )
-  out
+}
+
+# ================================================================================
+# Plot materialization (local-only, skeleton)
+# ================================================================================
+
+#' Build diagnostics plots for profile likelihood (placeholder)
+#'
+#' @description
+#' Profile likelihood diagnostics currently do not support diagnostic plots.
+#' This function exists to satisfy the `build_diagnostic_plots()` dispatcher
+#' interface and may be expanded in the future.
+#'
+#' @param diag A `diagnostic` result object for profile likelihood.
+#'
+#' @return An empty named list.
+#'
+#' @keywords internal
+#' @noRd
+build_diagnostics_plots_profile <- function(diag) {
+  list()
 }
 
 # ================================================================================

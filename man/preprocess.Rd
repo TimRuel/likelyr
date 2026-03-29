@@ -4,42 +4,39 @@
 \alias{preprocess}
 \title{Preprocess Model for Integrated Likelihood}
 \usage{
-preprocess(cal, ...)
+preprocess(model, ...)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object.}
+\item{model}{A calibrated \code{model} object.}
 
 \item{...}{Additional arguments passed to \code{sieve()}.}
 
-\item{c}{Positive numeric scalar. Multiplier for the
+\item{z}{Positive numeric scalar. Multiplier for the
 mode-distribution component of the common interval. Default:
-\code{qnorm(1 - alpha_target / 2)} where \code{alpha_target}
-is derived from \code{traversal$confidence_levels}.}
+\code{qnorm(1 - alpha_target / 2)}.}
 
 \item{verbose}{Logical. Print diagnostics. Default: \code{FALSE}.}
 }
 \value{
-The SAME \code{calibrated} model object, with
-\code{cal$workspace$profile} and
-\code{cal$workspace$integrate} populated.
+The same calibrated \code{model} object with
+\code{model$workspace$profile} and
+\code{model$workspace$integrated} populated, marked as
+preprocessed.
 }
 \description{
 Orchestrates all preprocessing steps required before
 \code{integrate()} can be run:
 
 \enumerate{
-\item \code{profile()} — computes the profile log-likelihood curve,
-establishing the extent of the ψ-grid.
+\item \code{profile()} — computes the profile log-likelihood curve.
 \item \code{sieve()} — generates and screens branch seeds.
 \item \code{compute_common_interval()} — derives the common ψ
 support interval from the profile extent and the distribution of
 branch seed modes, intersected with the parameter space boundary
-if one exists. This interval is used by all Monte Carlo branches
-in \code{generate()} to ensure full overlap and valid CI
-estimation.
+if one exists.
 }
 
 The common interval is stored on
-\code{cal$workspace$integrate$common_interval} for use by
+\code{model$workspace$integrated$cache$common_interval} for use by
 \code{generate(task = "integrate")}.
 }

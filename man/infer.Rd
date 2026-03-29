@@ -4,26 +4,26 @@
 \alias{infer}
 \title{Likelihood-Based Inference for a Calibrated Model}
 \usage{
-infer(cal, which = NULL, alpha_levels = NULL)
+infer(model, which = NULL, alpha_levels = NULL)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object with at least
-one of \code{profile()} or \code{integrate()} having been run.}
+\item{model}{A calibrated \code{model} object.}
 
 \item{which}{Character vector. Subset of
-\code{c("profile", "integrate")}. Default: all available.}
+\code{c("profile", "integrated")}. Default: all available.}
 
 \item{alpha_levels}{Numeric vector of significance levels. Default:
 derived from \code{traversal$confidence_levels}.}
 }
 \value{
-The SAME \code{calibrated} model object with inference
-results attached to each relevant workspace entry.
+The SAME calibrated \code{model} object with inference
+results attached.
 }
 \description{
 Computes point estimates and confidence intervals from the profile
 and/or integrated log-likelihood curves stored on the model workspace.
-
-Pass \code{which} to restrict inference to a single pseudolikelihood
-type. By default both are inferred if present.
+Inference results are folded directly onto each result object —
+\code{point_estimate_df}, \code{interval_estimate_df}, and
+\code{zero_max_psi_ll_fn} become top-level slots alongside
+\code{pl_df}/\code{il_df}.
 }

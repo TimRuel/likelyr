@@ -2,7 +2,7 @@
 # calibrate-sampler.R — Sampler Calibration (v2.0)
 #
 # Resolves a sampler_spec into closed-over functions ready for use
-# by screen() and inspect_seeds(). After calibration, cal$sampler holds:
+# by screen() and inspect_seeds(). After calibration, model$sampler holds:
 #
 #   $draw          — closure(history = NULL) -> numeric omega-hat
 #   $expand_orbit  — closure(omega_hat)      -> list of numeric vectors

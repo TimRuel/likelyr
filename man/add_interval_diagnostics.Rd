@@ -4,17 +4,11 @@
 \alias{add_interval_diagnostics}
 \title{Add Diagnostic Quantities to Psi Confidence Intervals}
 \usage{
-add_interval_diagnostics(
-  interval_estimate_df,
-  point_estimate,
-  psi_0 = NA_real_
-)
+add_interval_diagnostics(interval_estimate_df, psi_0 = NA_real_)
 }
 \arguments{
 \item{interval_estimate_df}{Data frame with columns \code{alpha},
 \code{lower}, \code{upper}.}
-
-\item{point_estimate}{Numeric scalar. MLE of \eqn{\psi}.}
 
 \item{psi_0}{Optional numeric scalar. True value of \eqn{\psi}.}
 }

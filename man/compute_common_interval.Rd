@@ -5,28 +5,24 @@
 \title{Compute Common ψ Interval for Branch Generation}
 \usage{
 compute_common_interval(
-  profile_psi_ll_df,
+  psi_loglik_df,
   branch_seeds,
   alpha_target,
   psi_interval = NULL
 )
 }
 \arguments{
-\item{profile_psi_ll_df}{Data frame with a \code{psi} column, as
-returned by \code{generate(task = "profile")}.}
+\item{psi_loglik_df}{Data frame with a \code{psi} column (the profile
+likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).}
 
 \item{branch_seeds}{List of branch seed objects from
 \code{sieve()}, each with a \code{$psi_mode} field.}
 
 \item{alpha_target}{Numeric scalar. Significance level for the
-default \code{c} multiplier. Ignored if \code{c} is supplied.}
+default \code{z} multiplier. Ignored if \code{z} is supplied.}
 
 \item{psi_interval}{A \code{sets::interval} object or
 \code{NULL}.}
-
-\item{c}{Positive numeric scalar. Multiplier for the
-mode-distribution interval half-width. Default:
-\code{qnorm(1 - alpha_target / 2)}.}
 }
 \value{
 A named list with:
@@ -35,7 +31,7 @@ A named list with:
 \item \code{$psi_upper}  — numeric scalar upper bound
 \item \code{$mode_mean}  — mean of branch seed modes
 \item \code{$mode_sd}    — sd of branch seed modes
-\item \code{$c}          — multiplier used
+\item \code{$z}          — multiplier used
 }
 }
 \description{
@@ -47,9 +43,9 @@ The interval is the union of two components:
 \item The profile likelihood extent — from its leftmost to rightmost
 ψ value, which by construction reaches
 \code{effective_crit = crit * cutoff_buffer} on both sides.
-\item A mode-distribution interval — \code{[x_bar - c * s,
-    x_bar + c * s]}, where \code{x_bar} and \code{s} are the mean
-and standard deviation of the branch seed modes, and \code{c}
+\item A mode-distribution interval — \code{[x_bar - z * s,
+    x_bar + z * s]}, where \code{x_bar} and \code{s} are the mean
+and standard deviation of the branch seed modes, and \code{z}
 is a user-supplied multiplier (default: \code{qnorm(1 -
     alpha_target / 2)}). This extends coverage into regions where
 branch modes cluster far from the profile MLE.

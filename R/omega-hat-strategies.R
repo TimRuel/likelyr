@@ -2,7 +2,7 @@
 # omega-hat-strategies.R — Built-in Omega-Hat Generation Strategies
 #
 # Houses all built-in constructors for omega-hat generation. Each
-# constructor accepts individual named arguments (not a full cal object)
+# constructor accepts individual named arguments (not a full model object)
 # and returns a closure ready for use by calibrate_pipeline().
 #
 # Constructors:

@@ -9,7 +9,7 @@ curve:
   linetype: solid
   linewidth: 1.5
 
-  by_method:
+  by_pseudolikelihood:
     integrated:
       color: "#052880"
       linetype: solid
@@ -256,7 +256,7 @@ diagnostics:
       alpha: 0.8
       shape: 16
 
-  by_method:
+  by_pseudolikelihood:
 
     integrated:
       line:

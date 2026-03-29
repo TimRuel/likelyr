@@ -12,32 +12,36 @@
 #' \code{zero_max_psi_ll_fn} become top-level slots alongside
 #' \code{pl_df}/\code{il_df}.
 #'
-#' @param cal          A \code{calibrated} model object.
-#' @param which        Character vector. Subset of
-#'   \code{c("profile", "integrate")}. Default: all available.
+#' @param model A calibrated \code{model} object.
+#' @param which Character vector. Subset of
+#'   \code{c("profile", "integrated")}. Default: all available.
 #' @param alpha_levels Numeric vector of significance levels. Default:
 #'   derived from \code{traversal$confidence_levels}.
 #'
-#' @return The SAME \code{calibrated} model object with inference
+#' @return The SAME calibrated \code{model} object with inference
 #'   results attached.
 #'
 #' @export
-infer <- function(cal, which = NULL, alpha_levels = NULL) {
-  which <- validate_infer_input(cal, which)
+infer <- function(model, which = NULL, alpha_levels = NULL) {
+  which <- validate_infer_input(model, which)
 
   if (is.null(alpha_levels)) {
-    alpha_levels <- 1 - cal$traversal$confidence_levels
+    alpha_levels <- 1 - model$traversal$confidence_levels
   }
 
-  psi_0 <- cal$estimand$psi_0
+  psi_0 <- model$estimand$psi_0
 
-  for (name in which) {
-    res <- .get_infer_result(cal, name)
-    res <- infer_result(res, alpha_levels = alpha_levels, psi_0 = psi_0)
-    cal <- .set_infer_result(cal, name, mark_inferred(res))
+  for (pseudolikelihood in which) {
+    res <- .get_workspace_result(model, pseudolikelihood)
+    infer_result <- .get_infer_result(
+      res,
+      alpha_levels = alpha_levels,
+      psi_0 = psi_0
+    )
+    model <- .set_infer_result(model, pseudolikelihood, infer_result)
   }
 
-  cal
+  model
 }
 
 # ---------------------------------------------------------------------
@@ -46,93 +50,58 @@ infer <- function(cal, which = NULL, alpha_levels = NULL) {
 
 #' @keywords internal
 #' @noRd
-.get_infer_result <- function(cal, name) {
-  cal$workspace[[name]]
+.get_workspace_result <- function(model, name) {
+  model$workspace[[name]]
 }
 
 #' @keywords internal
 #' @noRd
-.set_infer_result <- function(cal, name, res) {
-  cal$workspace[[name]] <- res
-  cal
+.set_infer_result <- function(model, name, res) {
+  model$workspace[[name]]$inference <- new_inference_result(res)
+  model$workspace[[name]] <- mark_inferred(model$workspace[[name]])
+  model
 }
 
 # ---------------------------------------------------------------------
-# Result dispatch
+# Inference computation
 # ---------------------------------------------------------------------
 
 #' @keywords internal
 #' @noRd
-infer_result <- function(res, ...) {
-  if (inherits(res, "integrate")) {
-    infer_result.integrate(res, ...)
-  } else if (inherits(res, "profile")) {
-    infer_result.profile(res, ...)
-  } else {
-    stop(
-      "infer(): unsupported result type '",
-      paste(class(res), collapse = "/"),
-      "'.",
-      call. = FALSE
-    )
-  }
-}
-
-# ---------------------------------------------------------------------
-# Integrated likelihood inference
-# ---------------------------------------------------------------------
-
-#' @keywords internal
-#' @noRd
-infer_result.integrate <- function(
-  integrated_result,
+.get_infer_result <- function(
+  workspace_result,
   alpha_levels,
   psi_0,
   ...
 ) {
-  psi_loglik_df <- integrated_result$psi_loglik_df
-
-  if (is.null(psi_loglik_df)) {
-    stop("infer(): integrated_result is missing psi_loglik_df", call. = FALSE)
+  if (
+    !(is_profile_result(workspace_result) ||
+      is_integrated_result(workspace_result))
+  ) {
+    stop(
+      "infer(): unsupported result type '",
+      paste(class(workspace_result), collapse = "/"),
+      "'.",
+      call. = FALSE
+    )
   }
 
-  if (!is.null(psi_loglik_df$above_crit)) {
+  psi_loglik_df <- workspace_result$psi_loglik_df
+
+  if (is.null(psi_loglik_df)) {
+    stop("infer(): workspace_result is missing psi_loglik_df", call. = FALSE)
+  }
+
+  if ("above_crit" %in% names(psi_loglik_df)) {
     psi_loglik_df <- psi_loglik_df |>
       dplyr::filter(above_crit)
   }
 
-  synthesis <- synthesize_inference(
+  synthesize_inference(
     psi_loglik_df = psi_loglik_df,
     alpha_levels = alpha_levels,
     psi_0 = psi_0
   )
-
-  res$point_estimate_df <- synthesis$point_estimate_df
-  res$interval_estimate_df <- synthesis$interval_estimate_df
-  res
-}
-
-# ---------------------------------------------------------------------
-# Profile likelihood inference
-# ---------------------------------------------------------------------
-
-#' @keywords internal
-#' @noRd
-infer_result.profile <- function(profile_result, alpha_levels, psi_0, ...) {
-  if (is.null(profile_result$psi_loglik_df)) {
-    stop("infer(): profile result is missing psi_loglik_df", call. = FALSE)
-  }
-
-  synthesis <- synthesize_inference(
-    psi_loglik_df = profile_result$psi_loglik_df,
-    alpha_levels = alpha_levels,
-    psi_0 = psi_0
-  )
-
-  res$point_estimate_df <- synthesis$point_estimate_df
-  res$interval_estimate_df <- synthesis$interval_estimate_df
-  res$zero_max_psi_ll_fn <- synthesis$zero_max_psi_ll_fn
-  res
 }
 
 # ---------------------------------------------------------------------
@@ -141,12 +110,12 @@ infer_result.profile <- function(profile_result, alpha_levels, psi_0, ...) {
 
 #' @keywords internal
 #' @noRd
-validate_infer_input <- function(cal, which) {
-  if (!is_calibrated(cal)) {
+validate_infer_input <- function(model, which) {
+  if (!is_calibrated(model)) {
     stop("infer() requires a calibrated model.", call. = FALSE)
   }
 
-  if (is.null(cal$workspace)) {
+  if (is.null(model$workspace)) {
     stop(
       "infer(): no pseudolikelihood results present.\n",
       "Run integrate() or profile() first.",
@@ -155,10 +124,10 @@ validate_infer_input <- function(cal, which) {
   }
 
   available <- character(0)
-  if (!is.null(cal$workspace$profile$psi_loglik_df)) {
+  if (!is.null(model$workspace$profile$psi_loglik_df)) {
     available <- c(available, "profile")
   }
-  if (!is.null(cal$workspace$integrated$psi_loglik_df)) {
+  if (!is.null(model$workspace$integrated$psi_loglik_df)) {
     available <- c(available, "integrated")
   }
 
@@ -173,7 +142,7 @@ validate_infer_input <- function(cal, which) {
   if (is.null(which)) {
     which <- available
   } else {
-    which <- match.arg(which, c("profile", "integrate"), several.ok = TRUE)
+    which <- match.arg(which, c("profile", "integrated"), several.ok = TRUE)
     missing <- setdiff(which, available)
     if (length(missing)) {
       stop(
@@ -208,12 +177,12 @@ print.inference <- function(x, ...) {
 # ---------------------------------------------------------------------
 
 #' @export
-summary.inference <- function(object, ...) {
+summary.inference <- function(x, ...) {
   out <- list(
-    pseudolikelihood = paste(class(object), collapse = "/"),
+    pseudolikelihood = attr(x$point_estimate_df, "pseudolikelihood"),
     data_frames = list(
-      estimate = object$point_estimate_df,
-      interval = object$interval_estimate_df
+      estimate = x$point_estimate_df,
+      interval = x$interval_estimate_df
     )
   )
 
@@ -223,13 +192,24 @@ summary.inference <- function(object, ...) {
 
 #' @export
 print.summary_inference <- function(x, ...) {
-  cat("<summary of inference>\n\n")
-  cat("Pseudolikelihood: ", x$pseudolikelihood, "\n\n", sep = "")
+  cat(
+    "<Summary of ",
+    tools::toTitleCase(x$pseudolikelihood),
+    " Log-Likelihood Inference>\n\n",
+    sep = ""
+  )
 
   if (!is.null(x$data_frames$estimate)) {
-    cat("Point + interval estimates:\n")
+    cat("Point estimate:\n")
     print(x$data_frames$estimate)
-  } else {
+  }
+
+  if (!is.null(x$data_frames$interval)) {
+    cat("\nInterval estimates:\n")
+    print(x$data_frames$interval)
+  }
+
+  if (is.null(x$data_frames$estimate) && is.null(x$data_frames$interval)) {
     cat("Estimates: <none>\n")
   }
 
@@ -260,12 +240,6 @@ view.inference <- function(x, ...) {
   )
 }
 
-# ---------------------------------------------------------------------
-# Plot (local-only)
-# ---------------------------------------------------------------------
-
-#' @export
-plot.inference <- function(inference_result, ...) {
-  .assert_local_plotting()
-  plot_pseudolikelihood_curve(inference_result)
-}
+# =====================================================================
+# END likelihood-infer.R
+# =====================================================================

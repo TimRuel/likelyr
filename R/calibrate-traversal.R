@@ -1,7 +1,7 @@
 # ======================================================================
 # calibrate-traversal.R — Traversal Calibration (v2.0)
 #
-# After calibration, cal$traversal holds:
+# After calibration, model$traversal holds:
 #   $branch_binder  — closure(omega_hat) -> branch_evaluator
 #   $locate_mode    — closure(omega_hat, psi_hint) -> mode result
 #                     NULL if traversal_method = "leftright"

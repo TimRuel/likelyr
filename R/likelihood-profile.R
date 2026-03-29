@@ -8,72 +8,72 @@
 #' Computes the profile log-likelihood curve for the calibrated model.
 #' Nuisance parameters are fixed at the MLE, forming a single
 #' deterministic branch evaluated along the ψ-grid. The result is
-#' stored in \code{cal$workspace$profile}.
+#' stored in \code{model$workspace$profile}.
 #'
-#' @param cal     A \code{calibrated} model object.
+#' @param model     A calibrated \code{model} object.
 #' @param verbose Logical. Print diagnostics. Default: \code{FALSE}.
 #' @param ...     Additional arguments passed to
 #'   \code{generate(task = "profile")}.
 #'
-#' @return The SAME \code{calibrated} model object, augmented with
-#'   class \code{profiled} and \code{cal$workspace$profile}.
+#' @return The SAME calibrated \code{model} object, augmented with
+#'   class \code{profiled} and \code{model$workspace$profile}.
 #'
 #' @export
-profile <- function(cal, ...) {
+profile <- function(model, ...) {
   UseMethod("profile")
 }
 
 #' @export
-profile.default <- function(cal, ...) {
-  stop("profile() requires a 'calibrated' model object.", call. = FALSE)
+profile.default <- function(model, ...) {
+  stop("profile() requires a calibrated 'model' object.", call. = FALSE)
 }
 
 #' @export
-profile.calibrated <- function(cal, verbose = FALSE, ...) {
-  if (!is_calibrated(cal)) {
+profile.model <- function(model, verbose = FALSE, ...) {
+  if (!is_calibrated(model)) {
     stop("profile() requires calibrate() first.", call. = FALSE)
   }
 
-  validate_profile_input(cal)
+  validate_profile_input(model)
 
   if (verbose) {
     cat("[profile] Profile Log-Likelihood\n")
   }
 
-  cal <- tryCatch(
-    generate(cal, task = "profile", verbose = verbose, ...),
+  model <- tryCatch(
+    generate(model, task = "profile", verbose = verbose, ...),
     error = function(e) {
       if (verbose) {
         cat("[profile] ERROR during generation.\n")
       }
-      cal$workspace$profile <- new_profile_result(list(
-        pl_df = NULL,
-        psi_hat = NA_real_,
-        param_mle = cal$parameter$param_mle,
-        status = "failed",
-        error_msg = conditionMessage(e)
-      ))
-      cal
+      model$workspace$profile <- new_profile_result(
+        list(
+          status = "failed",
+          error_msg = conditionMessage(e)
+        )
+      )
+      model
     }
   )
 
-  if (!inherits(cal$workspace$profile, "profile")) {
-    raw <- cal$workspace$profile
-    cal$workspace$profile <- new_profile_result(list(
-      pl_df = raw$pl_df,
-      psi_hat = raw$psi_hat,
-      param_mle = raw$param_mle,
-      status = "success"
-    ))
+  if (!inherits(model$workspace$profile, "profile")) {
+    raw <- model$workspace$profile
+    model$workspace$profile <- new_profile_result(
+      list(
+        psi_loglik_df = raw$psi_loglik_df,
+        psi_hat = raw$psi_hat,
+        status = "success"
+      )
+    )
   }
 
-  cal <- mark_profiled(cal)
+  model <- mark_profiled(model)
 
   if (verbose) {
     cat("[profile] Finished.\n")
   }
 
-  cal
+  model
 }
 
 # ======================================================================
@@ -82,20 +82,20 @@ profile.calibrated <- function(cal, verbose = FALSE, ...) {
 
 #' @keywords internal
 #' @noRd
-validate_profile_input <- function(cal) {
-  if (!inherits(cal$parameter, "parameter_spec")) {
+validate_profile_input <- function(model) {
+  if (!inherits(model$parameter, "parameter_spec")) {
     stop("model$parameter must be a 'parameter_spec'.")
   }
-  if (!inherits(cal$likelihood, "likelihood_spec")) {
+  if (!inherits(model$likelihood, "likelihood_spec")) {
     stop("model$likelihood must be a 'likelihood_spec'.")
   }
-  if (!inherits(cal$estimand, "estimand_spec")) {
+  if (!inherits(model$estimand, "estimand_spec")) {
     stop("model$estimand must be an 'estimand_spec'.")
   }
-  if (!inherits(cal$traversal, "traversal_spec")) {
+  if (!inherits(model$traversal, "traversal_spec")) {
     stop("model$traversal must be a 'traversal_spec'.")
   }
-  invisible(cal)
+  invisible(model)
 }
 
 # ======================================================================
@@ -110,31 +110,23 @@ print.profile <- function(x, ...) {
 
   cat("Lifecycle:\n")
   cat(
-    "  inferred:   ",
-    if (!is.null(x$point_estimate_df)) "✓" else "×",
+    "  diagnosed:  ",
+    if (is_diagnosed(x)) "\u2713" else "\u00d7",
     "\n",
     sep = ""
   )
   cat(
-    "  diagnosed:  ",
-    if (!is.null(x$diagnostics)) "✓" else "×",
+    "  inferred:   ",
+    if (is_inferred(x)) "\u2713" else "\u00d7",
     "\n",
     sep = ""
   )
 
   if (!is.null(x$psi_hat)) {
-    cat("psi_hat: ", format(x$psi_hat), "\n", sep = "")
+    cat("\u03c8\u0302: ", format(x$psi_hat), "\n", sep = "")
   }
-  if (!is.null(x$param_mle)) {
-    cat(
-      "param_mle: (",
-      paste(format(x$param_mle), collapse = ", "),
-      ")\n",
-      sep = ""
-    )
-  }
-  if (!is.null(x$pl_df)) {
-    cat("Grid points: ", nrow(x$pl_df), "\n", sep = "")
+  if (!is.null(x$psi_loglik_df)) {
+    cat("Grid points: ", nrow(x$psi_loglik_df), "\n", sep = "")
   }
 
   invisible(x)
@@ -146,20 +138,20 @@ print.profile <- function(x, ...) {
 
 #' @method plot profile
 #' @export
-plot.profile <- function(x, ...) {
+plot.profile <- function(x, points = FALSE, ...) {
   .assert_local_plotting()
 
-  if (!is.null(x$point_estimate_df)) {
-    plot_pseudolikelihood_curve(
-      psi_ll_df = x$pl_df,
-      zero_max_psi_ll_fn = x$zero_max_psi_ll_fn,
-      point_estimate_df = x$point_estimate_df,
-      interval_estimate_df = x$interval_estimate_df
-    )
+  if (is.null(x$psi_loglik_df)) {
+    stop("No pseudolikelihood data available to plot.", call. = FALSE)
+  }
+
+  if (is_inferred(x) && !points) {
+    plot_pseudolikelihood_curve(x$inference, psi_loglik_df = x$psi_loglik_df)
   } else {
-    if (is.null(x$pl_df)) {
-      stop("No pseudolikelihood data available to plot.", call. = FALSE)
-    }
-    plot_pseudolikelihood_points(x$pl_df)
+    plot_pseudolikelihood_points(x)
   }
 }
+
+# ======================================================================
+# END likelihood-profile.R
+# ======================================================================

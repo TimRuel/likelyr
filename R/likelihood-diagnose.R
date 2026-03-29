@@ -1,144 +1,134 @@
 # ================================================================================
 # likelihood-diagnose.R
-# Unified diagnostics for integrated + profile pseudolikelihood results (HPC-safe)
+# Unified diagnostics generic, model dispatcher, and shared S3 methods
 # ================================================================================
 
 # ================================================================================
-# Public API
+# Generic
 # ================================================================================
 
 #' Diagnostics for Likelyr Results
 #'
 #' @description
-#' Attaches diagnostics *data* to each pseudolikelihood result (integrated or profile)
-#' stored in a calibrated model.
+#' Attaches diagnostics data to each pseudolikelihood result (integrated or
+#' profile) stored in a calibrated model. Dispatches to result-type-specific
+#' methods via S3.
 #'
 #' This function performs **no plotting**. All diagnostics plots are
 #' materialized later via `plot()` (local-only).
 #'
 #' Diagnostics are attached at:
 #' \preformatted{
-#'   cal$workspace[[name]]$diagnostics
+#'   model$workspace$<pseudolikelihood>$diagnostics
 #' }
 #'
-#' @param cal A `calibrated` model object with pseudolikelihood results.
+#' @param model A calibrated `model` object with pseudolikelihood results,
+#'   or a pseudolikelihood result object.
 #' @param verbose Logical; print diagnostic summaries.
 #'
-#' @return The same `calibrated` model object, with each pseudolikelihood result
-#'   marked as diagnosed.
+#' @return The input object with diagnostics attached and marked as diagnosed.
 #'
 #' @export
-diagnose <- function(cal, verbose = TRUE) {
+diagnose <- function(model, verbose = FALSE) {
   UseMethod("diagnose")
 }
 
 #' @export
-diagnose.default <- function(cal, ...) {
-  stop("diagnose() requires a 'calibrated' model object.", call. = FALSE)
+diagnose.default <- function(model, ...) {
+  stop("diagnose() requires a calibrated 'model' object.", call. = FALSE)
 }
+
+# ================================================================================
+# Model dispatcher
+# ================================================================================
 
 #' @export
-diagnose.calibrated <- function(cal, verbose = FALSE) {
-  which <- validate_diagnose_input(cal)
+diagnose.model <- function(model, verbose = FALSE) {
+  validate_diagnose_input(model)
 
-  for (pseudolikelihood in which) {
-    res <- cal$workspace[[pseudolikelihood]]
-
-    # --------------------------------------------------
-    # Run diagnostics engine (compute-only)
-    # --------------------------------------------------
-    if (is_integrate(res)) {
-      diag_raw <- diagnose_integrate(res)
-      res$diagnostics <- new_diagnostics_result(
-        diag_raw,
-        pseudolikelihood = "integrated"
-      )
-    } else if (is_profile(res)) {
-      diag_raw <- diagnose_profile(res)
-      res$diagnostics <- new_diagnostics_result(
-        diag_raw,
-        pseudolikelihood = "profile"
-      )
-    } else {
-      stop(
-        "diagnose(): Unsupported result type for '",
-        pseudolikelihood,
-        "'.",
-        call. = FALSE
-      )
+  for (slot in c("profile", "integrated")) {
+    res <- model$workspace[[slot]]
+    if (is.null(res)) {
+      next
     }
 
-    # --------------------------------------------------
-    # Attach diagnostics data only
-    # --------------------------------------------------
-    cal$workspace[[name]] <- mark_diagnosed(res)
-
-    if (verbose) {
-      cat("\n[diagnose] Diagnostics for result:", name, "\n")
-      print(res$diagnostics)
-    }
+    model$workspace[[slot]] <- diagnose(res, verbose = verbose)
   }
 
-  cal
+  model
 }
 
 # ================================================================================
-# Validation
+# Result-type methods
 # ================================================================================
 
-#' Validate inputs prior to running diagnostics
-#'
-#' @keywords internal
-#' @noRd
-validate_diagnose_input <- function(cal) {
-  if (!is_calibrated(cal)) {
-    stop("diagnose() requires a calibrated model.", call. = FALSE)
+#' @export
+diagnose.integrated <- function(x, verbose = FALSE, ...) {
+  if (!is_result(x)) {
+    return(NextMethod())
   }
-
-  if (is.null(cal$workspace) || length(cal$workspace) == 0) {
+  if (!is_integrated_result(x)) {
     stop(
-      "diagnose(): No pseudolikelihood results found. ",
-      "Run integrate() or profile() first.",
+      "diagnose.integrated() requires an integrated result object.",
       call. = FALSE
     )
   }
 
-  available <- names(cal$workspace)
+  diag_raw <- diagnose_integrated(x)
+  x$diagnostics <- new_diagnostic_result(diag_raw)
+  x <- mark_diagnosed(x)
 
-  # --------------------------------------------------
-  # Drop comparison results silently
-  # --------------------------------------------------
-  which <- available[
-    !vapply(cal$workspace, is_comparison, logical(1))
-  ]
+  if (verbose) {
+    print(x$diagnostics)
+  }
 
-  invisible(which)
+  x
+}
+
+#' @export
+diagnose.profile <- function(x, verbose = FALSE, ...) {
+  if (!is_result(x)) {
+    return(NextMethod())
+  }
+  if (!is_profile_result(x)) {
+    stop("diagnose.profile() requires a profile result object.", call. = FALSE)
+  }
+
+  diag_raw <- diagnose_profile(x)
+  x$diagnostics <- new_diagnostic_result(diag_raw)
+  x <- mark_diagnosed(x)
+
+  if (verbose) {
+    print(x$diagnostics)
+  }
+
+  x
 }
 
 # ================================================================================
-# Plot Materialization (local-only)
+# Plot materialization dispatcher (local-only)
 # ================================================================================
 
 #' Build diagnostics plots (dispatcher)
 #'
 #' @description
-#' Materializes diagnostics plots **on demand** from stored diagnostics data.
+#' Materializes diagnostics plots on demand from stored diagnostics data.
 #' Dispatches to pseudolikelihood-specific plot builders.
 #'
-#' @param object A diagnostics result object.
+#' @param object A `diagnostic` result object.
 #'
 #' @return A named list of ggplot objects.
 #'
 #' @keywords internal
 #' @noRd
-build_diagnostics_plots <- function(object) {
-  if (!inherits(object, "diagnostics")) {
-    stop("Expected a diagnostics result object.", call. = FALSE)
+build_diagnostic_plots <- function(object) {
+  if (!is_diagnostic_result(object)) {
+    stop("Expected a 'diagnostic' result object.", call. = FALSE)
   }
 
   if (!isTRUE(object$supported)) {
     stop(
-      "Diagnostics plots not supported for this pseudolikelihood",
+      "Diagnostics plots not supported for this pseudolikelihood.",
       call. = FALSE
     )
   }
@@ -148,7 +138,7 @@ build_diagnostics_plots <- function(object) {
     integrated = build_diagnostics_plots_integrated(object),
     profile = build_diagnostics_plots_profile(object),
     stop(
-      "build_diagnostics_plots(): Unknown diagnostics pseudolikelihood '",
+      "build_diagnostic_plots(): Unknown pseudolikelihood '",
       object$pseudolikelihood,
       "'.",
       call. = FALSE
@@ -157,7 +147,32 @@ build_diagnostics_plots <- function(object) {
 }
 
 # ================================================================================
-# S3 Methods
+# Validation
+# ================================================================================
+
+#' @keywords internal
+#' @noRd
+validate_diagnose_input <- function(model) {
+  if (!is_calibrated(model)) {
+    stop("diagnose() requires a calibrated 'model' object.", call. = FALSE)
+  }
+
+  has_any <- has_profile_result(model$workspace) ||
+    has_integrated_result(model$workspace)
+
+  if (!has_any) {
+    stop(
+      "diagnose(): No pseudolikelihood results found. ",
+      "Run profile() or integrate() first.",
+      call. = FALSE
+    )
+  }
+
+  invisible(model)
+}
+
+# ================================================================================
+# S3 Methods for diagnostic results
 # ================================================================================
 
 # ----------------------------------------------------------------------
@@ -165,8 +180,8 @@ build_diagnostics_plots <- function(object) {
 # ----------------------------------------------------------------------
 
 #' @export
-print.diagnostics <- function(x, ...) {
-  cat("<diagnostics>\n")
+print.diagnostic <- function(x, ...) {
+  cat("<diagnostic>\n")
 
   if (!isTRUE(x$supported)) {
     cat("  Diagnostics not supported.\n")
@@ -174,7 +189,6 @@ print.diagnostics <- function(x, ...) {
     return(invisible(x))
   }
 
-  cat("  Pseudolikelihood:  ", x$pseudolikelihood, "\n", sep = "")
   cat("  R (branches):      ", x$R, "\n", sep = "")
   cat(
     "  ESS (min):         ",
@@ -195,7 +209,7 @@ print.diagnostics <- function(x, ...) {
     sep = ""
   )
   cat(
-    "  Outlier max:  ",
+    "  Outlier max:       ",
     sprintf("%.3f", x$summary$outlier_max),
     "\n",
     sep = ""
@@ -220,7 +234,7 @@ print.diagnostics <- function(x, ...) {
   if (length(x$warnings) > 0) {
     cat("\n  Warnings:\n")
     for (w in x$warnings) {
-      cat("   • ", w, "\n", sep = "")
+      cat("   \u2022 ", w, "\n", sep = "")
     }
   }
 
@@ -232,7 +246,7 @@ print.diagnostics <- function(x, ...) {
 # ----------------------------------------------------------------------
 
 #' @export
-summary.diagnostics <- function(object, ...) {
+summary.diagnostic <- function(object, ...) {
   out <- list(
     pseudolikelihood = object$pseudolikelihood,
     supported = object$supported,
@@ -240,16 +254,16 @@ summary.diagnostics <- function(object, ...) {
     warnings = object$warnings
   )
 
-  class(out) <- "summary_diagnostics"
+  class(out) <- "summary_diagnostic"
   out
 }
 
 #' @export
-print.summary_diagnostics <- function(x, ...) {
-  cat("<summary of diagnostics>\n\n")
+print.summary_diagnostic <- function(x, ...) {
+  cat("<summary of diagnostic>\n\n")
 
   if (!isTRUE(x$supported)) {
-    cat("Diagnostics not supported for this pseudolikelihood\n")
+    cat("Diagnostics not supported for this pseudolikelihood.\n")
     return(invisible(x))
   }
 
@@ -257,14 +271,14 @@ print.summary_diagnostics <- function(x, ...) {
 
   if (!is.null(x$summary)) {
     for (nm in names(x$summary)) {
-      cat("• ", nm, ": ", format(x$summary[[nm]]), "\n", sep = "")
+      cat("\u2022 ", nm, ": ", format(x$summary[[nm]]), "\n", sep = "")
     }
   }
 
   if (length(x$warnings) > 0) {
     cat("\nWarnings:\n")
     for (w in x$warnings) {
-      cat(" • ", w, "\n", sep = "")
+      cat(" \u2022 ", w, "\n", sep = "")
     }
   }
 
@@ -272,14 +286,14 @@ print.summary_diagnostics <- function(x, ...) {
 }
 
 # ----------------------------------------------------------------------
-# Plot (local-only materialization)
+# Plot (local-only)
 # ----------------------------------------------------------------------
 
 #' @export
-plot.diagnostics <- function(x, ...) {
+plot.diagnostic <- function(x, ...) {
   .assert_local_plotting()
 
-  plots <- build_diagnostics_plots(x)
+  plots <- build_diagnostic_plots(x)
 
   for (p in plots) {
     print(p)

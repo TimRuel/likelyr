@@ -15,13 +15,8 @@ A named list containing placeholder diagnostics fields.
 \description{
 Computes diagnostics for a profile log-likelihood result.
 
-This is currently a \strong{barebones skeleton} that mirrors the integrated
-diagnostics engine. All metric and plotting helpers will be wired in
-here once implemented.
-
-The function exists to:
-• provide a consistent diagnostics interface
-• allow downstream code to rely on diagnostics structure
-• make future implementation drop-in
+This is currently a \strong{skeleton} that mirrors the integrated diagnostics
+engine interface. All metric and plotting helpers will be wired in once
+implemented.
 }
 \keyword{internal}

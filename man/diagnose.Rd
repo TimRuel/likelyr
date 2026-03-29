@@ -4,26 +4,27 @@
 \alias{diagnose}
 \title{Diagnostics for Likelyr Results}
 \usage{
-diagnose(cal, verbose = TRUE)
+diagnose(model, verbose = FALSE)
 }
 \arguments{
-\item{cal}{A \code{calibrated} model object with pseudolikelihood results.}
+\item{model}{A calibrated \code{model} object with pseudolikelihood results,
+or a pseudolikelihood result object.}
 
 \item{verbose}{Logical; print diagnostic summaries.}
 }
 \value{
-The same \code{calibrated} model object, with each pseudolikelihood result
-marked as diagnosed.
+The input object with diagnostics attached and marked as diagnosed.
 }
 \description{
-Attaches diagnostics \emph{data} to each pseudolikelihood result (integrated or profile)
-stored in a calibrated model.
+Attaches diagnostics data to each pseudolikelihood result (integrated or
+profile) stored in a calibrated model. Dispatches to result-type-specific
+methods via S3.
 
 This function performs \strong{no plotting}. All diagnostics plots are
 materialized later via \code{plot()} (local-only).
 
 Diagnostics are attached at:
 \preformatted{
-  cal$workspace[[name]]$diagnostics
+  model$workspace$<pseudolikelihood>$diagnostics
 }
 }

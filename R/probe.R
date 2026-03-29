@@ -6,7 +6,7 @@
 #' @importFrom utils tail
 #' @keywords internal
 probe <- function(
-  cal,
+  model,
   omega_hat,
   n_adjacent = NULL,
   max_mode_shifts = NULL,
@@ -14,8 +14,8 @@ probe <- function(
   drop_multiplier = NULL,
   max_drop_fraction = NULL
 ) {
-  traversal <- cal$traversal
-  estimand <- cal$estimand
+  traversal <- model$traversal
+  estimand <- model$estimand
   increment <- traversal$increment
   psi_mle <- estimand$psi_mle
   psi_interval <- estimand$psi_interval

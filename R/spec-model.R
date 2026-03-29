@@ -124,7 +124,7 @@ add.model_spec <- function(model, spec, ...) {
 }
 
 #' @export
-add.calibrated <- function(model, spec, ...) {
+add.model <- function(model, spec, ...) {
   slot <- .identify_model_slot(spec)
 
   # Structural specs remain frozen after calibration

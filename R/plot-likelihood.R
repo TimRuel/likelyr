@@ -17,8 +17,8 @@
 #'
 #' @keywords internal
 #' @noRd
-plot_pseudolikelihood_points <- function(inference_result) {
-  psi_loglik_df <- inference_result$psi_loglik_df
+plot_pseudolikelihood_points <- function(result) {
+  psi_loglik_df <- result$psi_loglik_df
   pseudolikelihood <- attr(psi_loglik_df, "pseudolikelihood")
 
   plot_base(plot = "points") +
@@ -42,8 +42,7 @@ plot_pseudolikelihood_points <- function(inference_result) {
 #' @importFrom stats qchisq
 #' @keywords internal
 #' @noRd
-plot_pseudolikelihood_curve <- function(inference_result) {
-  psi_loglik_df <- inference_result$psi_loglik_df
+plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   point_estimate_df <- inference_result$point_estimate_df
   interval_estimate_df <- inference_result$interval_estimate_df
   pseudolikelihood <- attr(psi_loglik_df, "pseudolikelihood")
@@ -51,8 +50,7 @@ plot_pseudolikelihood_curve <- function(inference_result) {
   psi_hat <- point_estimate_df$psi_hat
 
   ci_long <- extract_ci_long(interval_estimate_df)
-  ci_raw <- ci_long |>
-    dplyr::filter(!is.na(endpoint))
+  ci_raw <- ci_long |> dplyr::filter(!is.na(endpoint))
 
   # --------------------------------------------------
   # PSI limits — contain all relevant psi values
@@ -88,9 +86,9 @@ plot_pseudolikelihood_curve <- function(inference_result) {
   # --------------------------------------------------
   curve_layer <- make_curve_layer(
     psi_loglik = psi_loglik,
+    psi_limits = psi_limits,
     comparison = FALSE
   )
-
   # --------------------------------------------------
   # Labels
   # --------------------------------------------------
@@ -157,16 +155,23 @@ plot_pseudolikelihood_curve <- function(inference_result) {
 
 #' Plot pseudolikelihood comparison curves
 #'
+#' @description
+#' Expects a named list of result objects (e.g. \code{list(profile = ...,
+#' integrated = ...)}), each carrying \code{$psi_loglik_df} and
+#' \code{$inference}.
+#'
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_curves <- function(res_list) {
   .assert_local_plotting()
 
-  psi_mles <- purrr::map_dbl(res_list, \(x) x$point_estimate_df$psi_hat)
-  psi_center <- mean(range(psi_mles))
+  psi_loglik_dfs <- purrr::map(res_list, \(x) x$psi_loglik_df)
+  infer_list <- purrr::map(res_list, \(x) x$inference)
+
+  psi_hats <- purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_hat)
 
   ci_all <- purrr::map_dfr(
-    res_list,
+    infer_list,
     \(x) extract_ci_long(x$interval_estimate_df)
   ) |>
     dplyr::filter(!is.na(endpoint))
@@ -176,14 +181,14 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   psi_anchors <- c(
     ci_all$endpoint,
-    psi_mles,
-    purrr::map_dbl(res_list, \(x) x$point_estimate_df$psi_0),
-    unlist(purrr::map(res_list, \(x) range(x$psi_loglik_df$psi)))
+    psi_hats,
+    purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_0),
+    unlist(purrr::map(psi_loglik_dfs, \(df) range(df$psi)))
   )
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 
   if (length(psi_anchors) == 0L) {
-    psi_anchors <- psi_mles
+    psi_anchors <- psi_hats
   }
 
   padding <- diff(range(psi_anchors)) * 0.05
@@ -203,12 +208,12 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # --------------------------------------------------
   # Curve layers
   # --------------------------------------------------
-  curve_layers <- res_list |>
+  curve_layers <- psi_loglik_dfs |>
     purrr::map(
-      \(x) {
-        psi_loglik <- fit_psi_loglik(x$psi_loglik_df)
+      \(df) {
         make_curve_layer(
-          psi_loglik = psi_loglik,
+          psi_loglik = fit_psi_loglik(df),
+          psi_limits = psi_limits,
           comparison = TRUE
         )
       }
@@ -218,7 +223,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # Labels
   # --------------------------------------------------
   label_data <- purrr::imap_dfr(
-    res_list,
+    infer_list,
     \(x, key) {
       suffix <- ifelse(key == "profile", "PL", "IL")
       data.frame(
@@ -239,7 +244,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # Confidence cutoffs
   # --------------------------------------------------
   crit_df <- purrr::map_dfr(
-    res_list,
+    infer_list,
     \(x) {
       attr(x$interval_estimate_df, "interval_estimate_raw")[,
         "alpha",

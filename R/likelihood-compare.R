@@ -12,19 +12,19 @@
 #' (local-only), using the stored data frames.
 #'
 #' @export
-compare <- function(cal) {
-  validate_compare_input(cal)
+compare <- function(model) {
+  validate_compare_input(model)
 
   # ------------------------------------------------------------------
   # Compute-only comparison synthesis (HPC-safe)
   # ------------------------------------------------------------------
-  comparison <- synthesize_comparison(cal$workspace)
-  attr(comparison, "workspace") <- cal$workspace
+  comparison <- synthesize_comparison(model$workspace)
+  attr(comparison, "workspace") <- model$workspace
 
-  cal$workspace$comparison <- new_comparison_result(comparison)
-  cal$workspace <- mark_compared(cal$workspace)
+  model$workspace$comparison <- new_comparison_result(comparison)
+  model <- mark_compared(model)
 
-  cal
+  model
 }
 
 # ---------------------------------------------------------------------
@@ -35,18 +35,18 @@ compare <- function(cal) {
 #'
 #' @keywords internal
 #' @noRd
-validate_compare_input <- function(cal) {
-  if (!is_calibrated(cal)) {
+validate_compare_input <- function(model) {
+  if (!is_calibrated(model)) {
     stop("compare() requires a model that has been calibrated.", call. = FALSE)
   }
 
-  if (is.null(cal$workspace$profile) || is.null(cal$workspace$integrated)) {
+  if (is.null(model$workspace$profile) || is.null(model$workspace$integrated)) {
     stop("compare() requires profile() and integrate().", call. = FALSE)
   }
 
   if (
-    is.null(cal$workspace$profile$inference) ||
-      is.null(cal$workspace$integrated$inference)
+    is.null(model$workspace$profile$inference) ||
+      is.null(model$workspace$integrated$inference)
   ) {
     stop("compare() requires infer() on both likelihoods.", call. = FALSE)
   }
@@ -67,7 +67,7 @@ print.comparison <- function(x, ...) {
     cat("Data frames:\n")
     for (nm in names(dfs)) {
       df <- dfs[[nm]]
-      cat("•", nm, "(", nrow(df), "x", ncol(df), ")\n")
+      cat("\u2022", nm, "(", nrow(df), "x", ncol(df), ")\n")
     }
   }
 
@@ -98,7 +98,7 @@ print.summary_comparison <- function(x, ...) {
     cat("Data frames:\n")
     for (nm in names(x$data_frames)) {
       df <- x$data_frames[[nm]]
-      cat("•", nm, "(", nrow(df), "x", ncol(df), ")\n")
+      cat("\u2022", nm, "(", nrow(df), "x", ncol(df), ")\n")
     }
   }
 
@@ -113,10 +113,7 @@ print.summary_comparison <- function(x, ...) {
 
 #' @export
 view.comparison <- function(x, ...) {
-  required <- c(
-    "point_estimates_df",
-    "interval_estimates_df"
-  )
+  required <- c("point_estimates_df", "interval_estimates_df")
 
   missing <- setdiff(required, names(x))
   if (length(missing)) {
@@ -131,11 +128,9 @@ view.comparison <- function(x, ...) {
     point_estimates = render_point_estimates_comparison_table(
       x$point_estimates_df
     ),
-
     interval_estimates = render_interval_estimates_comparison_table(
       x$interval_estimates_df
     ),
-
     combined = render_estimates_comparison_table(
       x$point_estimates_df,
       x$interval_estimates_df
@@ -159,7 +154,11 @@ plot.comparison <- function(x, ...) {
   plot_pseudolikelihood_curves(
     list(
       profile = ws$profile,
-      integrate = ws$integrated
+      integrated = ws$integrated
     )
   )
 }
+
+# ======================================================================
+# END likelihood-compare.R
+# ======================================================================

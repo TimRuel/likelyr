@@ -32,13 +32,12 @@ shift_psi_loglik <- function(psi_loglik, shift_val) {
 #' Find Confidence Interval Endpoints by Log-Likelihood Inversion
 #'
 #' @description
-#' Returns endpoints for a \eqn{(1-\alpha) \cdot 100%} likelihood ratio confidence interval for
-#' \eqn{\psi_0} by solving for a root of \deqn{\ell(\psi) - \ell(\hat\psi) + crit = 0}, where
-#' \eqn{crit = \tfrac{1}{2}\chi^2_{1-\alpha,1}}.
+#' Returns endpoints for a \eqn{(1-\alpha) 100%} likelihood ratio confidence interval for
+#' \eqn{\psi_0} by solving for the roots of \deqn{\ell(\psi) - \ell(\hat\psi) + \tfrac{1}{2}\chi^2_{1-\alpha,1} = 0.}
 #' Returns \code{NA_real_} on failure.
 #'
 #' @param psi_loglik Function returning \eqn{\ell(\psi)}.
-#' @param alpha Numeric scalar in (0, 1). Corresponds to a \eqn{(1-\alpha) \cdot 100%} confidence level.
+#' @param alpha Numeric scalar in (0, 1).
 #'
 #' @return Numeric scalar root, or \code{NA_real_}.
 #'

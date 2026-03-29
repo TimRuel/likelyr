@@ -96,7 +96,7 @@ plot_curve_linetype <- function(pseudolikelihood, comparison = FALSE) {
   if (isTRUE(comparison)) {
     node <- .get_style_node(c("curve", "comparison"))
   } else {
-    node <- .get_style_node(c("curve", "by_method"))
+    node <- .get_style_node(c("curve", "by_pseudolikelihood"))
   }
 
   if (is.null(node) || !pseudolikelihood %in% names(node)) {
@@ -130,7 +130,7 @@ plot_curve_linewidth <- function(pseudolikelihood = NULL, comparison = FALSE) {
   }
 
   if (!isTRUE(comparison) && nzchar(pseudolikelihood)) {
-    node <- .get_style_node(c("curve", "by_method"))
+    node <- .get_style_node(c("curve", "by_pseudolikelihood"))
     if (!is.null(node[[pseudolikelihood]]$linewidth)) {
       return(node[[pseudolikelihood]]$linewidth)
     }

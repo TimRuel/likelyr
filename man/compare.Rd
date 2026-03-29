@@ -4,7 +4,7 @@
 \alias{compare}
 \title{Compare Integrated and Profile Likelihood Inference}
 \usage{
-compare(cal)
+compare(model)
 }
 \description{
 Computes \strong{comparison data only} between integrated and profile

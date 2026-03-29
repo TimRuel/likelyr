@@ -2,19 +2,19 @@
 % Please edit documentation in R/calibrate-model.R
 \name{calibrate}
 \alias{calibrate}
-\title{Calibrate a model_spec to data}
+\title{Calibrate a 'model_spec' object to data}
 \usage{
-calibrate(model, data, verbose = FALSE)
+calibrate(spec, data, verbose = FALSE)
 }
 \arguments{
-\item{model}{A \code{model_spec} object.}
+\item{spec}{A \code{model_spec} object.}
 
 \item{data}{User data.}
 
 \item{verbose}{Logical; print calibration diagnostics.}
 }
 \value{
-A \code{calibrated} model object.
+A \code{model} object that has been calibrated to data.
 }
 \description{
 Prepares a model for computing profile or integrated likelihoods.

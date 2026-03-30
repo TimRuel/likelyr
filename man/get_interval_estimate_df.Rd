@@ -4,14 +4,25 @@
 \alias{get_interval_estimate_df}
 \title{Compute Confidence Intervals for a Scalar Parameter Psi}
 \usage{
-get_interval_estimate_df(psi_loglik_df, alpha_levels, psi_0 = NA_real_)
+get_interval_estimate_df(
+  psi_loglik_df,
+  alpha_levels,
+  psi_0 = NA_real_,
+  psi_interval = NULL
+)
 }
 \arguments{
+\item{psi_loglik_df}{A data frame with columns \code{psi} and
+\code{loglik}.}
+
 \item{alpha_levels}{Numeric vector of significance levels.}
 
-\item{psi_0}{Optional numeric scalar. True value of \eqn{\psi}. Default: \code{NA_real_}.}
+\item{psi_0}{Optional numeric scalar. True value of \eqn{\psi}.
+Default: \code{NA_real_}.}
 
-\item{psi_loglik}{Function returning \eqn{\ell(\psi) - \ell(\hat\psi)}.}
+\item{psi_interval}{Optional named list with \code{$lower} and
+\code{$upper} slots. Passed to \code{find_interval_endpoints()} for
+boundary substitution.}
 }
 \value{
 Formatted data frame of confidence interval summaries.

@@ -4,19 +4,30 @@
 \alias{find_interval_endpoints}
 \title{Find Confidence Interval Endpoints by Log-Likelihood Inversion}
 \usage{
-find_interval_endpoints(psi_loglik, alpha)
+find_interval_endpoints(psi_loglik, alpha, psi_interval = NULL)
 }
 \arguments{
 \item{psi_loglik}{Function returning \eqn{\ell(\psi)}.}
 
 \item{alpha}{Numeric scalar in (0, 1).}
+
+\item{psi_interval}{Optional named list with \code{$lower} and
+\code{$upper} slots. When provided, boundary substitution is
+applied on each side independently.}
 }
 \value{
-Numeric scalar root, or \code{NA_real_}.
+A one-row tibble with columns \code{alpha}, \code{lower},
+\code{upper}, and attribute \code{psi_hat}.
 }
 \description{
-Returns endpoints for a \eqn{(1-\alpha) 100\%} likelihood ratio confidence interval for
-\eqn{\psi_0} by solving for the roots of \deqn{\ell(\psi) - \ell(\hat\psi) + \tfrac{1}{2}\chi^2_{1-\alpha,1} = 0.}
-Returns \code{NA_real_} on failure.
+Returns endpoints for a \eqn{(1-\alpha) 100\%} likelihood ratio
+confidence interval for \eqn{\psi} by solving for the roots of
+\deqn{\ell(\psi) - \ell(\hat\psi) + \tfrac{1}{2}\chi^2_{1-\alpha,1} = 0.}
+
+If \code{uniroot} fails on a side because the grid reaches a declared
+parameter space boundary before descending to the critical threshold,
+the boundary value is substituted for that endpoint. If the grid
+simply did not descend far enough without hitting a boundary,
+\code{NA_real_} is returned for that endpoint.
 }
 \keyword{internal}

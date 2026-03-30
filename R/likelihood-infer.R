@@ -30,13 +30,15 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
   }
 
   psi_0 <- model$estimand$psi_0
+  psi_interval <- model$estimand$psi_interval %||% NULL
 
   for (pseudolikelihood in which) {
     res <- .get_workspace_result(model, pseudolikelihood)
     infer_result <- .get_infer_result(
       res,
       alpha_levels = alpha_levels,
-      psi_0 = psi_0
+      psi_0 = psi_0,
+      psi_interval = psi_interval
     )
     model <- .set_infer_result(model, pseudolikelihood, infer_result)
   }
@@ -72,6 +74,7 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
   workspace_result,
   alpha_levels,
   psi_0,
+  psi_interval = NULL,
   ...
 ) {
   if (
@@ -100,7 +103,8 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
   synthesize_inference(
     psi_loglik_df = psi_loglik_df,
     alpha_levels = alpha_levels,
-    psi_0 = psi_0
+    psi_0 = psi_0,
+    psi_interval = psi_interval
   )
 }
 

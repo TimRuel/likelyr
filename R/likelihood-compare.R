@@ -18,7 +18,8 @@ compare <- function(model) {
   # ------------------------------------------------------------------
   # Compute-only comparison synthesis (HPC-safe)
   # ------------------------------------------------------------------
-  comparison <- synthesize_comparison(model$workspace)
+  res_list <- model$workspace[c("profile", "integrated")]
+  comparison <- synthesize_comparison(res_list)
   attr(comparison, "workspace") <- model$workspace
 
   model$workspace$comparison <- new_comparison_result(comparison)
@@ -31,8 +32,6 @@ compare <- function(model) {
 # Validation
 # ---------------------------------------------------------------------
 
-#' Validate inputs prior to likelihood comparison
-#'
 #' @keywords internal
 #' @noRd
 validate_compare_input <- function(model) {
@@ -83,7 +82,10 @@ print.comparison <- function(x, ...) {
 #' @export
 summary.comparison <- function(object, ...) {
   out <- list(
-    data_frames = Filter(is.data.frame, object)
+    data_frames = list(
+      estimate = object$point_estimates_df,
+      interval = object$interval_estimates_df
+    )
   )
 
   class(out) <- "summary_comparison"
@@ -92,17 +94,21 @@ summary.comparison <- function(object, ...) {
 
 #' @export
 print.summary_comparison <- function(x, ...) {
-  cat("<summary of comparison>\n\n")
+  cat("<Summary of Likelihood Comparison>\n\n")
 
-  if (length(x$data_frames)) {
-    cat("Data frames:\n")
-    for (nm in names(x$data_frames)) {
-      df <- x$data_frames[[nm]]
-      cat("\u2022", nm, "(", nrow(df), "x", ncol(df), ")\n")
-    }
+  if (!is.null(x$data_frames$estimate)) {
+    cat("Point estimates:\n")
+    print(x$data_frames$estimate)
   }
 
-  cat("\nUse view() / plot() locally for presentation.\n")
+  if (!is.null(x$data_frames$interval)) {
+    cat("\nInterval estimates:\n")
+    print(x$data_frames$interval)
+  }
+
+  if (is.null(x$data_frames$estimate) && is.null(x$data_frames$interval)) {
+    cat("Estimates: <none>\n")
+  }
 
   invisible(x)
 }
@@ -112,9 +118,14 @@ print.summary_comparison <- function(x, ...) {
 # ---------------------------------------------------------------------
 
 #' @export
-view.comparison <- function(x, ...) {
-  required <- c("point_estimates_df", "interval_estimates_df")
+view.comparison <- function(
+  x,
+  which = c("combined", "point", "interval"),
+  ...
+) {
+  which <- match.arg(which)
 
+  required <- c("point_estimates_df", "interval_estimates_df")
   missing <- setdiff(required, names(x))
   if (length(missing)) {
     stop(
@@ -124,11 +135,10 @@ view.comparison <- function(x, ...) {
     )
   }
 
-  list(
-    point_estimates = render_point_estimates_comparison_table(
-      x$point_estimates_df
-    ),
-    interval_estimates = render_interval_estimates_comparison_table(
+  switch(
+    which,
+    point = render_point_estimates_comparison_table(x$point_estimates_df),
+    interval = render_interval_estimates_comparison_table(
       x$interval_estimates_df
     ),
     combined = render_estimates_comparison_table(

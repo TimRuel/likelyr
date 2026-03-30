@@ -4,7 +4,7 @@
 \alias{get_interval_estimates_df}
 \title{Combine interval estimates across pseudolikelihood results}
 \usage{
-get_interval_estimates_df(res)
+get_interval_estimates_df(res_list)
 }
 \arguments{
 \item{res}{Named list of likelihood result objects. Each element

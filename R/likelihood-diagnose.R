@@ -181,7 +181,7 @@ validate_diagnose_input <- function(model) {
 
 #' @export
 print.diagnostic <- function(x, ...) {
-  cat("<diagnostic>\n")
+  cat("<diagnostics>\n")
 
   if (!isTRUE(x$supported)) {
     cat("  Diagnostics not supported.\n")
@@ -260,7 +260,7 @@ summary.diagnostic <- function(object, ...) {
 
 #' @export
 print.summary_diagnostic <- function(x, ...) {
-  cat("<summary of diagnostic>\n\n")
+  cat("<Summary of diagnostics>\n\n")
 
   if (!isTRUE(x$supported)) {
     cat("Diagnostics not supported for this pseudolikelihood.\n")

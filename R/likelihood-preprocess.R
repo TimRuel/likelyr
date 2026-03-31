@@ -73,7 +73,11 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
     cat("[preprocess] Running sieve...\n")
   }
 
+  t0_sieve <- proc.time()[["elapsed"]]
+
   model <- sieve(model, verbose = verbose, ...)
+
+  sieve_elapsed <- proc.time()[["elapsed"]] - t0_sieve
 
   if (verbose) {
     n_accepted <- model$workspace$integrated$cache$total_seeds_accepted
@@ -83,7 +87,9 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
       n_accepted,
       "/",
       n_requested,
-      " seeds accepted.\n",
+      " seeds accepted in ",
+      round(sieve_elapsed, 2),
+      "s.\n",
       sep = ""
     )
   }
@@ -122,14 +128,21 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
   model$workspace$integrated$cache$common_interval <- common_interval
 
   # ------------------------------------------------------------------
-  # 4. Wrap cache as integrated_cache object
+  # 4. Store sieve runtime on cache
+  # ------------------------------------------------------------------
+  model$workspace$integrated$cache$runtime <- list(
+    sieve_elapsed = sieve_elapsed
+  )
+
+  # ------------------------------------------------------------------
+  # 5. Wrap cache as integrated_cache object
   # ------------------------------------------------------------------
   model$workspace$integrated <- new_integrated_cache(
     model$workspace$integrated
   )
 
   # ------------------------------------------------------------------
-  # 5. Mark preprocessed
+  # 6. Mark preprocessed
   # ------------------------------------------------------------------
   model <- mark_preprocessed(model)
 

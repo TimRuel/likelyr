@@ -225,7 +225,13 @@ print.summary_inference <- function(x, ...) {
 # ---------------------------------------------------------------------
 
 #' @export
-view.inference <- function(x, ...) {
+view.inference <- function(
+  x,
+  which = c("combined", "point", "interval"),
+  ...
+) {
+  which <- match.arg(which)
+
   if (is.null(x$point_estimate_df)) {
     stop(
       "No inference data available to render.\n",
@@ -234,9 +240,10 @@ view.inference <- function(x, ...) {
     )
   }
 
-  list(
-    point_estimate = render_point_estimate_table(x$point_estimate_df),
-    interval_estimate = render_interval_estimate_table(x$interval_estimate_df),
+  switch(
+    which,
+    point = render_point_estimate_table(x$point_estimate_df),
+    interval = render_interval_estimate_table(x$interval_estimate_df),
     combined = render_estimate_table(
       x$point_estimate_df,
       x$interval_estimate_df

@@ -1,6 +1,6 @@
 # ================================================================================
 # likelihood-diagnose-integrated.R
-# Integrated likelihood diagnostics engine and plot materialization
+# Integrated likelihood diagnostics engine and plot dispatcher
 # ================================================================================
 
 # ================================================================================
@@ -26,6 +26,11 @@ diagnose_integrated <- function(res) {
   branch_mat <- res$branch_mat
   psi_loglik_df <- res$psi_loglik_df
   omega_draws <- res$omega_draws %||% res$omega_hats
+
+  # Extract omega hats from branch seeds if not already available
+  if (is.null(omega_draws) && !is.null(res$cache$branch_seeds)) {
+    omega_draws <- purrr::map(res$cache$branch_seeds, \(s) s$omega_hat)
+  }
 
   stopifnot(
     is.matrix(branch_mat),
@@ -64,6 +69,7 @@ diagnose_integrated <- function(res) {
 
   list(
     supported = TRUE,
+    pseudolikelihood = "integrated",
     R = R,
     se_L = ll_stats$se_L,
     rel_se = ll_stats$rel_se,
@@ -85,7 +91,7 @@ diagnose_integrated <- function(res) {
 }
 
 # ================================================================================
-# Plot materialization (local-only)
+# Plot dispatcher (local-only)
 # ================================================================================
 
 #' Build diagnostics plots for integrated likelihood
@@ -93,6 +99,7 @@ diagnose_integrated <- function(res) {
 #' @description
 #' Called by `build_diagnostic_plots()` and `plot.diagnostic()`.
 #' Assumes `.assert_local_plotting()` has already been enforced.
+#' Individual plot builders live in likelihood-diagnose-integrated-plots.R.
 #'
 #' @param diag A `diagnostic` result object for integrated likelihood.
 #'
@@ -117,6 +124,10 @@ build_diagnostics_plots_integrated <- function(diag) {
       pd$omega_branches$branch_mat,
       pd$omega_branches$psi
     )
+    plots$branch_distribution <- build_integrated_branch_distribution_plot(
+      pd$omega_branches$branch_mat,
+      pd$omega_branches$psi
+    )
   }
 
   if (!is.null(pd$rel_se)) {
@@ -131,8 +142,12 @@ build_diagnostics_plots_integrated <- function(diag) {
   if (!is.null(pd$omega_eigenvalues)) {
     plots$omega_eig <- build_integrated_omega_eigen_plot(pd$omega_eigenvalues)
   }
+
   if (!is.null(pd$omega_matrix)) {
     plots$omega_pca <- build_integrated_omega_pca_plot(pd$omega_matrix)
+    plots$omega_mahalanobis <- build_integrated_omega_mahalanobis_plot(
+      pd$omega_matrix
+    )
   }
 
   plots[!vapply(plots, is.null, logical(1))]

@@ -133,7 +133,7 @@ get_se_psi_hat <- function(psi_hat, psi_loglik_df) {
   1 / sqrt(obs_info)
 }
 
-get_point_estimate_df <- function(psi_loglik_df) {
+get_point_estimate_df <- function(psi_loglik_df, psi_0) {
   psi_loglik <- fit_psi_loglik(psi_loglik_df)
   psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
   psi_hat <- psi_loglik_max_point[["argmax"]]

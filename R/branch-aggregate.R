@@ -122,7 +122,7 @@ aggregate.model <- function(model, verbose = FALSE, ...) {
   }
 
   # -------------------------------------------------------------------
-  # 4. Return plain list — wrapping/marking done in integrate()
+  # 4. Return — cache carried forward; wrapping/marking done in integrate()
   # -------------------------------------------------------------------
   model$workspace$integrated <- list(
     psi_loglik_df = psi_loglik_df,
@@ -131,7 +131,8 @@ aggregate.model <- function(model, verbose = FALSE, ...) {
     R = R,
     med_support = med_support,
     min_branches = min_branches,
-    floor_violated = med_support < min_branches
+    floor_violated = med_support < min_branches,
+    cache = model$workspace$integrated$cache
   )
 
   model

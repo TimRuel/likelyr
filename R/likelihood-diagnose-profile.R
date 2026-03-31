@@ -24,6 +24,7 @@
 diagnose_profile <- function(res) {
   list(
     supported = FALSE,
+    pseudolikelihood = "profile",
     message = "Diagnostics for profile log-likelihood are not yet implemented.",
     warnings = character(),
     metrics = list(),

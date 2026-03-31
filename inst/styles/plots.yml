@@ -278,18 +278,33 @@ diagnostics:
   plots:
 
     omega_branches:
-
       color_by_curve: true
-
       line:
         color: "#6FA3D9"
         linewidth: 1
         alpha: 0.8
-
       palette:
         type: discrete
         name: "viridis"
         direction: 1
+
+    branch_distribution:
+      point:
+        color: "#6FA3D9"
+        size: 1.8
+        alpha: 0.5
+        shape: 16
+
+    mahalanobis:
+      hist:
+        fill:  "#6FA3D9"
+        color: "#4A7FAA"
+        alpha: 0.6
+        bins:  30
+      ref:
+        color:     "#E5C07B"   # same gold as default point — visually distinct
+        linewidth: 1.6
+        linetype:  dashed
 
     ess:
       line:

@@ -40,6 +40,8 @@ profile.model <- function(model, verbose = FALSE, ...) {
     cat("[profile] Profile Log-Likelihood\n")
   }
 
+  t0 <- proc.time()[["elapsed"]]
+
   model <- tryCatch(
     generate(model, task = "profile", verbose = verbose, ...),
     error = function(e) {
@@ -56,6 +58,8 @@ profile.model <- function(model, verbose = FALSE, ...) {
     }
   )
 
+  elapsed <- proc.time()[["elapsed"]] - t0
+
   if (!inherits(model$workspace$profile, "profile")) {
     raw <- model$workspace$profile
     model$workspace$profile <- new_profile_result(
@@ -67,10 +71,12 @@ profile.model <- function(model, verbose = FALSE, ...) {
     )
   }
 
+  model$workspace$profile$runtime <- list(elapsed = elapsed)
+
   model <- mark_profiled(model)
 
   if (verbose) {
-    cat("[profile] Finished.\n")
+    cat("[profile] Finished in ", round(elapsed, 2), "s.\n", sep = "")
   }
 
   model
@@ -127,6 +133,9 @@ print.profile <- function(x, ...) {
   }
   if (!is.null(x$psi_loglik_df)) {
     cat("Grid points: ", nrow(x$psi_loglik_df), "\n", sep = "")
+  }
+  if (!is.null(x$runtime)) {
+    cat("Runtime:     ", round(x$runtime$elapsed, 2), "s\n", sep = "")
   }
 
   invisible(x)

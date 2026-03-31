@@ -56,7 +56,6 @@ render_interval_estimate_table <- function(interval_estimate_df) {
     "pseudolikelihood",
     exact = TRUE
   )
-
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
   psi_hat <- attr(interval_estimate_df, "psi_hat")
   psi_0 <- attr(interval_estimate_df, "psi_0")
@@ -68,21 +67,19 @@ render_interval_estimate_table <- function(interval_estimate_df) {
   )
 
   stripe_bg <- .interval_level_bg(interval_estimate_df$level)
+  diagram_x <- rep(psi_hat, nrow(interval_estimate_raw))
+  diagram_lower <- interval_estimate_raw$lower
+  diagram_upper <- interval_estimate_raw$upper
+  diagram_lim <- range(c(diagram_lower, diagram_upper, psi_0), na.rm = TRUE)
 
   df_render <- interval_estimate_df |>
-    dplyr::mutate(
-      psi_0 = round(psi_0, 2),
-      .before = "interval"
-    ) |>
-    dplyr::mutate(
-      diagram = "",
-      .after = "interval"
-    ) |>
+    dplyr::mutate(psi_0 = round(psi_0, 2), .before = "interval") |>
+    dplyr::mutate(diagram = "", .after = "interval") |>
     dplyr::mutate(
       contains_truth = dplyr::case_when(
         is.na(contains_truth) ~ NA_character_,
-        contains_truth ~ "✅",
-        TRUE ~ "❌"
+        contains_truth ~ "\u2705",
+        TRUE ~ "\u274c"
       )
     )
 
@@ -104,9 +101,10 @@ render_interval_estimate_table <- function(interval_estimate_df) {
       pseudolikelihood
     ),
     stripe_bg = stripe_bg,
-    diagram_x = rep(psi_hat, nrow(interval_estimate_raw)),
-    diagram_lower = interval_estimate_raw$lower,
-    diagram_upper = interval_estimate_raw$upper,
+    diagram_x = diagram_x,
+    diagram_lower = diagram_lower,
+    diagram_upper = diagram_upper,
+    diagram_lim = diagram_lim,
     vline = psi_0,
     include_pl = FALSE,
     collapse_cols = 1
@@ -122,17 +120,8 @@ render_interval_estimate_table <- function(interval_estimate_df) {
 #' @keywords internal
 #' @noRd
 render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
-  # --------------------------------------------------
-  # Validate required columns
-  # --------------------------------------------------
-  required_point_estimate_cols <- c(
-    "se_psi_hat",
-    "error",
-    "psi_hat",
-    "psi_0"
-  )
-
-  required_interval_estimate_cols <- c(
+  required_point <- c("se_psi_hat", "error", "psi_hat", "psi_0")
+  required_interval <- c(
     "interval",
     "length",
     "lower_dev",
@@ -141,25 +130,15 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
     "level"
   )
 
-  stopifnot(all(required_point_estimate_cols %in% names(point_estimate_df)))
-  stopifnot(all(
-    required_interval_estimate_cols %in% names(interval_estimate_df)
-  ))
+  stopifnot(all(required_point %in% names(point_estimate_df)))
+  stopifnot(all(required_interval %in% names(interval_estimate_df)))
 
-  # --------------------------------------------------
-  # Extract rendering metadata
-  # --------------------------------------------------
   pseudolikelihood <- attr(point_estimate_df, "pseudolikelihood", exact = TRUE)
-
   interval_estimate_raw <- attr(interval_estimate_df, "interval_estimate_raw")
   stopifnot(!is.null(interval_estimate_raw))
 
   psi_0 <- unique(point_estimate_df$psi_0)
   stopifnot(length(psi_0) == 1)
-
-  # --------------------------------------------------
-  # Prepare render data
-  # --------------------------------------------------
 
   estimate_df <- point_estimate_df |>
     dplyr::bind_cols(interval_estimate_df) |>
@@ -179,32 +158,28 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
   df_render <- estimate_df |>
     dplyr::mutate(
       dplyr::across(
-        c(
-          se_psi_hat,
-          error,
-          psi_hat,
-          psi_0,
-          length,
-          lower_dev,
-          upper_dev
-        ),
+        c(se_psi_hat, error, psi_hat, psi_0, length, lower_dev, upper_dev),
         ~ round(.x, 2)
       )
     ) |>
-    dplyr::mutate(
-      diagram = "",
-      .after = "interval"
-    ) |>
+    dplyr::mutate(diagram = "", .after = "interval") |>
     dplyr::mutate(
       contains_truth = dplyr::case_when(
         is.na(contains_truth) ~ NA_character_,
-        contains_truth ~ "✅",
-        TRUE ~ "❌"
+        contains_truth ~ "\u2705",
+        TRUE ~ "\u274c"
       )
     )
 
   bg_interval <- .interval_level_bg(df_render$level)
   bg_pe <- table_pe_row_bg(pseudolikelihood)
+  diagram_x_raw <- estimate_df$psi_hat
+  diagram_lower_raw <- interval_estimate_raw$lower
+  diagram_upper_raw <- interval_estimate_raw$upper
+  diagram_lim <- range(
+    c(diagram_lower_raw, diagram_upper_raw, psi_0),
+    na.rm = TRUE
+  )
 
   body_spec_fun <- function(tbl) {
     tbl |>
@@ -216,10 +191,11 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
       kableExtra::column_spec(
         6,
         image = kableExtra::spec_pointrange(
-          x = estimate_df$psi_hat,
-          xmin = interval_estimate_raw$lower,
-          xmax = interval_estimate_raw$upper,
+          x = diagram_x_raw,
+          xmin = diagram_lower_raw,
+          xmax = diagram_upper_raw,
           vline = psi_0,
+          lim = diagram_lim,
           line_col = table_text_body("diagram"),
           width = 300,
           height = 150,
@@ -232,9 +208,6 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
       kableExtra::column_spec(11, color = table_text_body("level"))
   }
 
-  # --------------------------------------------------
-  # Render table via shared base
-  # --------------------------------------------------
   .render_estimates_base(
     df_render = df_render,
     caption = .table_caption(
@@ -251,11 +224,7 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
       table_group_header_bg("truth"),
       table_group_header_bg("interval_estimate")
     ),
-    header_cols = list(
-      point = 1:3,
-      truth = 4,
-      interval = 5:11
-    ),
+    header_cols = list(point = 1:3, truth = 4, interval = 5:11),
     body_spec_fun = body_spec_fun,
     stripe_bg = bg_interval,
     collapse_cols = 1:4,
@@ -263,3 +232,7 @@ render_estimate_table <- function(point_estimate_df, interval_estimate_df) {
     pe_bg = bg_pe
   )
 }
+
+# =====================================================================
+# END infer-render.R
+# =====================================================================

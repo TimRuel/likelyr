@@ -32,10 +32,7 @@ integrate.default <- function(model, ...) {
 #' @export
 integrate.model <- function(model, verbose = FALSE, ...) {
   if (!is_calibrated(model)) {
-    stop(
-      "integrate() requires calibrate() first.",
-      call. = FALSE
-    )
+    stop("integrate() requires calibrate() first.", call. = FALSE)
   }
 
   validate_integrate_input(model)
@@ -49,6 +46,10 @@ integrate.model <- function(model, verbose = FALSE, ...) {
       call. = FALSE
     )
   }
+
+  # Carry sieve runtime forward before generate() overwrites the cache slot
+  sieve_elapsed <- model$workspace$integrated$cache$runtime$sieve_elapsed %||%
+    NA_real_
 
   exec <- model$execution
 
@@ -67,6 +68,8 @@ integrate.model <- function(model, verbose = FALSE, ...) {
   # ------------------------------------------------------------------
   # Generate + aggregate with failure handling
   # ------------------------------------------------------------------
+  t0_generate <- proc.time()[["elapsed"]]
+
   model <- tryCatch(
     {
       model <- generate(model, task = "integrate", verbose = verbose, ...)
@@ -80,6 +83,7 @@ integrate.model <- function(model, verbose = FALSE, ...) {
       model$workspace$integrated <- list(
         psi_loglik_df = NULL,
         psi_hat = NA_real_,
+        cache = model$workspace$integrated$cache,
         status = "failed",
         error_msg = conditionMessage(e)
       )
@@ -87,19 +91,45 @@ integrate.model <- function(model, verbose = FALSE, ...) {
     }
   )
 
+  generate_elapsed <- proc.time()[["elapsed"]] - t0_generate
+
   # ------------------------------------------------------------------
   # Wrap and mark
   # ------------------------------------------------------------------
   raw <- model$workspace$integrated
 
+  runtime <- list(
+    sieve_elapsed = sieve_elapsed,
+    generate_elapsed = generate_elapsed,
+    total_elapsed = sieve_elapsed + generate_elapsed
+  )
+
   model$workspace$integrated <- new_integrated_result(
-    c(raw, list(status = raw$status %||% "success"))
+    c(
+      raw,
+      list(
+        status = raw$status %||% "success",
+        runtime = runtime
+      )
+    )
   )
 
   model <- mark_integrated(model)
 
   if (verbose) {
-    cat("[integrate] Finished.\n")
+    cat(
+      "[integrate] Finished.",
+      " Sieve: ",
+      round(sieve_elapsed, 2),
+      "s",
+      " | Generate: ",
+      round(generate_elapsed, 2),
+      "s",
+      " | Total: ",
+      round(runtime$total_elapsed, 2),
+      "s\n",
+      sep = ""
+    )
   }
 
   model
@@ -187,6 +217,11 @@ print.integrated_cache <- function(x, ...) {
     cat("  z:         ", round(ci$z, 3), "\n", sep = "")
   }
 
+  if (!is.null(cache$runtime)) {
+    cat("\nRuntime:\n")
+    cat("  sieve: ", round(cache$runtime$sieve_elapsed, 2), "s\n", sep = "")
+  }
+
   invisible(x)
 }
 
@@ -222,6 +257,12 @@ print.integrated <- function(x, ...) {
   }
   if (!is.null(x$R)) {
     cat("Branches: ", x$R, "\n", sep = "")
+  }
+  if (!is.null(x$runtime)) {
+    cat("Runtime:\n")
+    cat("  sieve:    ", round(x$runtime$sieve_elapsed, 2), "s\n", sep = "")
+    cat("  generate: ", round(x$runtime$generate_elapsed, 2), "s\n", sep = "")
+    cat("  total:    ", round(x$runtime$total_elapsed, 2), "s\n", sep = "")
   }
 
   invisible(x)

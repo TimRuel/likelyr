@@ -39,7 +39,7 @@ synthesize_inference <- function(
     )
   }
 
-  point_estimate_df <- get_point_estimate_df(psi_loglik_df)
+  point_estimate_df <- get_point_estimate_df(psi_loglik_df, psi_0)
 
   interval_estimate_df <- get_interval_estimate_df(
     psi_loglik_df = psi_loglik_df,

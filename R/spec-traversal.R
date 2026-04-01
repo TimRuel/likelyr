@@ -105,7 +105,7 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
   }
 
   if (x$traversal_method == "leftright" && !is.null(x$mode_locator_fn)) {
-    message(
+    cat(
       "traversal_spec: mode_locator_fn is ignored when ",
       "traversal_method = \"leftright\"."
     )

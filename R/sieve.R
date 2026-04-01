@@ -55,7 +55,7 @@ sieve <- function(
       reason = reason
     )
     if (verbose) {
-      message(
+      cat(
         "[sieve] cand ",
         id,
         ": ",
@@ -162,7 +162,7 @@ sieve <- function(
   )
 
   if (verbose) {
-    message(
+    cat(
       "[sieve] Accepted ",
       n_accepted,
       " / ",
@@ -172,7 +172,7 @@ sieve <- function(
       n_orbits
     )
     if (length(failure_tab) > 0) {
-      message("[sieve] Failure summary:")
+      cat("[sieve] Failure summary:")
       print(failure_tab)
     }
   }

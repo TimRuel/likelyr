@@ -33,8 +33,6 @@ sieve <- function(
     stop("sieve() requires a calibrated model.", call. = FALSE)
   }
 
-  cat("[sieve] verbose =", verbose, "\n")
-
   n_adjacent <- n_adjacent %||% model$traversal$n_adjacent
   max_mode_shifts <- max_mode_shifts %||% model$traversal$max_mode_shifts
   k_recent <- k_recent %||% model$traversal$k_recent
@@ -89,6 +87,18 @@ sieve <- function(
     # -------------------------------------------------------------------
     # Probe each candidate
     # -------------------------------------------------------------------
+    cat(
+      "[sieve] orbit",
+      n_orbits,
+      "| n_candidates:",
+      length(candidates),
+      "| n_accepted:",
+      n_accepted,
+      "| total_seeds:",
+      total_seeds,
+      "\n"
+    )
+
     for (omega in candidates) {
       if (n_accepted >= total_seeds) {
         break

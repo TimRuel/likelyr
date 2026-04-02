@@ -33,6 +33,8 @@ sieve <- function(
     stop("sieve() requires a calibrated model.", call. = FALSE)
   }
 
+  cat("[sieve] verbose =", verbose, "\n")
+
   n_adjacent <- n_adjacent %||% model$traversal$n_adjacent
   max_mode_shifts <- max_mode_shifts %||% model$traversal$max_mode_shifts
   k_recent <- k_recent %||% model$traversal$k_recent

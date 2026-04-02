@@ -48,33 +48,6 @@ sieve <- function(
   n_orbits <- 0L
   cand_id <- 0L
 
-  .log <- function(id, accepted, reason) {
-    diag_log[[length(diag_log) + 1L]] <<- list(
-      candidate = id,
-      accepted = accepted,
-      reason = reason
-    )
-    if (verbose) {
-      cat(
-        "[sieve] cand ",
-        id,
-        ": ",
-        if (accepted) "ACCEPT" else "REJECT",
-        " (",
-        reason,
-        ")",
-        if (accepted) {
-          paste0(" — ", n_accepted, "/", total_seeds, " accepted")
-        } else {
-          ""
-        },
-        "\n",
-        sep = "",
-        flush = TRUE
-      )
-    }
-  }
-
   while (n_accepted < total_seeds) {
     n_orbits <- n_orbits + 1L
 
@@ -84,7 +57,14 @@ sieve <- function(
     base <- tryCatch(draw(), error = function(e) NULL)
     if (is.null(base)) {
       cand_id <- cand_id + 1L
-      .log(cand_id, FALSE, "draw_failed")
+      diag_log[[length(diag_log) + 1L]] <- list(
+        candidate = cand_id,
+        accepted = FALSE,
+        reason = "draw_failed"
+      )
+      if (verbose) {
+        cat("[sieve] cand ", cand_id, ": REJECT (draw_failed)\n", sep = "")
+      }
       next
     }
 
@@ -129,9 +109,34 @@ sieve <- function(
       if (isTRUE(result$accepted)) {
         n_accepted <- n_accepted + 1L
         branch_seeds[[n_accepted]] <- result
-        .log(cand_id, TRUE, "ok")
+        diag_log[[length(diag_log) + 1L]] <- list(
+          candidate = cand_id,
+          accepted = TRUE,
+          reason = "ok"
+        )
+        if (verbose) {
+          cat(
+            "[sieve] cand ",
+            cand_id,
+            ": ACCEPT (ok)",
+            " — ",
+            n_accepted,
+            "/",
+            total_seeds,
+            " accepted\n",
+            sep = ""
+          )
+        }
       } else {
-        .log(cand_id, FALSE, result$reason %||% "unknown")
+        reason <- result$reason %||% "unknown"
+        diag_log[[length(diag_log) + 1L]] <- list(
+          candidate = cand_id,
+          accepted = FALSE,
+          reason = reason
+        )
+        if (verbose) {
+          cat("[sieve] cand ", cand_id, ": REJECT (", reason, ")\n", sep = "")
+        }
       }
     }
   }
@@ -173,11 +178,10 @@ sieve <- function(
       " branch seeds | orbits: ",
       n_orbits,
       "\n",
-      sep = "",
-      flush = TRUE
+      sep = ""
     )
     if (length(failure_tab) > 0) {
-      cat("[sieve] Failure summary:\n", flush = TRUE)
+      cat("[sieve] Failure summary:\n")
       print(failure_tab)
     }
   }

@@ -69,7 +69,8 @@ sieve <- function(
           ""
         },
         "\n",
-        sep = ""
+        sep = "",
+        flush = TRUE
       )
     }
   }
@@ -172,10 +173,11 @@ sieve <- function(
       " branch seeds | orbits: ",
       n_orbits,
       "\n",
-      sep = ""
+      sep = "",
+      flush = TRUE
     )
     if (length(failure_tab) > 0) {
-      cat("[sieve] Failure summary:\n")
+      cat("[sieve] Failure summary:\n", flush = TRUE)
       print(failure_tab)
     }
   }

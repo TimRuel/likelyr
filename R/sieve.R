@@ -67,7 +67,9 @@ sieve <- function(
           paste0(" — ", n_accepted, "/", total_seeds, " accepted")
         } else {
           ""
-        }
+        },
+        "\n",
+        sep = ""
       )
     }
   }
@@ -165,14 +167,15 @@ sieve <- function(
     cat(
       "[sieve] Accepted ",
       n_accepted,
-      " / ",
+      "/",
       total_seeds,
-      " branch seeds",
-      " | orbits: ",
-      n_orbits
+      " branch seeds | orbits: ",
+      n_orbits,
+      "\n",
+      sep = ""
     )
     if (length(failure_tab) > 0) {
-      cat("[sieve] Failure summary:")
+      cat("[sieve] Failure summary:\n")
       print(failure_tab)
     }
   }

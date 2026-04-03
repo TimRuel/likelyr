@@ -8,6 +8,8 @@ sampler_spec(
   sampler_fn = NULL,
   orbit_expander_fn = NULL,
   orbit_size = NULL,
+  min_branches,
+  branch_buffer = 0L,
   name = NULL,
   ...
 )
@@ -22,6 +24,13 @@ to \code{orbit_size} permuted variants.}
 
 \item{orbit_size}{Optional positive integer. Number of orbit members
 to generate per base draw. \code{NULL} means no limit.}
+
+\item{min_branches}{Positive integer. Minimum number of branches
+to retain after aggregation filtering.}
+
+\item{branch_buffer}{Non-negative integer. Number of additional seeds
+to evaluate beyond \code{min_branches}. Total seeds evaluated =
+\code{min_branches + branch_buffer}.}
 
 \item{name}{Optional descriptive name.}
 

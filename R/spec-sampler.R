@@ -1,5 +1,5 @@
 # ======================================================================
-# spec-sampler.R — Sampler Specification (v2.0)
+# spec-sampler.R — Sampler Specification (v2.1)
 #
 # Governs how omega-hat candidates are generated during screening.
 #
@@ -11,8 +11,10 @@
 # built-in gaussian initgen + feasibility projection machinery.
 # When orbit_expander_fn is NULL, no orbit expansion is performed.
 #
-# All model-specific tuning (scales, probabilities, method choice) is
-# the responsibility of the user-supplied constructor, not this spec.
+# min_branches, branch_buffer, and total_seeds live here because they
+# govern how many omega-hat candidates are requested — a sampling
+# concern, not an execution concern. total_seeds is computed and stored
+# during calibrate_sampler().
 # ======================================================================
 
 #' Specify the Omega-Hat Sampling Strategy
@@ -53,6 +55,11 @@
 #'   to \code{orbit_size} permuted variants.
 #' @param orbit_size Optional positive integer. Number of orbit members
 #'   to generate per base draw. \code{NULL} means no limit.
+#' @param min_branches Positive integer. Minimum number of branches
+#'   to retain after aggregation filtering.
+#' @param branch_buffer Non-negative integer. Number of additional seeds
+#'   to evaluate beyond \code{min_branches}. Total seeds evaluated =
+#'   \code{min_branches + branch_buffer}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -62,6 +69,8 @@ sampler_spec <- function(
   sampler_fn = NULL,
   orbit_expander_fn = NULL,
   orbit_size = NULL,
+  min_branches,
+  branch_buffer = 0L,
   name = NULL,
   ...
 ) {
@@ -70,6 +79,8 @@ sampler_spec <- function(
     sampler_fn = sampler_fn,
     orbit_expander_fn = orbit_expander_fn,
     orbit_size = orbit_size,
+    min_branches = min_branches,
+    branch_buffer = branch_buffer,
     extra = list(...)
   )
 
@@ -112,6 +123,32 @@ new_sampler_spec <- function(x) .new_spec(x, "sampler_spec")
     x$orbit_size <- as.integer(x$orbit_size)
   }
 
+  if (
+    !is.numeric(x$min_branches) ||
+      length(x$min_branches) != 1L ||
+      !is.finite(x$min_branches) ||
+      x$min_branches < 1 ||
+      x$min_branches != as.integer(x$min_branches)
+  ) {
+    stop(
+      "sampler_spec(): min_branches must be a positive integer.",
+      call. = FALSE
+    )
+  }
+
+  if (
+    !is.numeric(x$branch_buffer) ||
+      length(x$branch_buffer) != 1L ||
+      !is.finite(x$branch_buffer) ||
+      x$branch_buffer < 0 ||
+      x$branch_buffer != as.integer(x$branch_buffer)
+  ) {
+    stop(
+      "sampler_spec(): branch_buffer must be a non-negative integer.",
+      call. = FALSE
+    )
+  }
+
   invisible(x)
 }
 
@@ -122,9 +159,9 @@ new_sampler_spec <- function(x) .new_spec(x, "sampler_spec")
 #' @export
 print.sampler_spec <- function(x, ...) {
   cat("# Sampler Specification\n")
-  cat("- Name:              ", x$name, "\n", sep = "")
+  cat("- Name:           ", x$name, "\n", sep = "")
   cat(
-    "- Sampler:            ",
+    "- Sampler:         ",
     if (!is.null(x$sampler_fn)) {
       "custom (sampler_fn supplied)"
     } else {
@@ -135,13 +172,18 @@ print.sampler_spec <- function(x, ...) {
   )
   if (!is.null(x$orbit_expander_fn)) {
     cat(
-      "- Orbit expansion:    yes (orbit_size = ",
+      "- Orbit expansion: yes (orbit_size = ",
       x$orbit_size %||% "unlimited",
       ")\n",
       sep = ""
     )
   } else {
-    cat("- Orbit expansion:    none\n")
+    cat("- Orbit expansion: none\n")
+  }
+  cat("- Min branches:   ", x$min_branches, "\n", sep = "")
+  cat("- Branch buffer:  ", x$branch_buffer, "\n", sep = "")
+  if (!is.null(x$total_seeds)) {
+    cat("- Total seeds:    ", x$total_seeds, "\n", sep = "")
   }
   invisible(x)
 }

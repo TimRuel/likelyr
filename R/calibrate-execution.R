@@ -1,49 +1,52 @@
 # ======================================================================
-# Execution Calibration (v2.0)
+# calibrate-execution.R — Execution Calibration (v2.1)
 #
-# Changes from v1.0:
-#   • R replaced by min_branches and branch_buffer on both spec types
-#   • serial_spec: stores total_seeds = min_branches + branch_buffer
-#   • parallel_spec: derives chunk_size = ceiling((min_branches +
-#     branch_buffer) / num_workers), stores chunk_size and total_seeds
+# total_seeds lives on the sampler spec and is computed by
+# calibrate_sampler(). calibrate_execution() reads it from there and
+# uses it to derive chunk_size for parallel execution.
+#
+# No "seeds" terminology is stored on the execution spec itself.
 # ======================================================================
 
 #' Calibrate Execution Component
 #'
 #' @description
-#' Derives and stores computed quantities from the execution spec:
+#' Uses \code{sampler$total_seeds} (computed by \code{calibrate_sampler()})
+#' to derive execution-level quantities:
 #' \itemize{
-#'   \item \strong{Serial}: stores \code{total_seeds =
-#'     min_branches + branch_buffer}.
+#'   \item \strong{Serial}: no additional slots needed; \code{total_seeds}
+#'     is read directly from the sampler spec at runtime.
 #'   \item \strong{Parallel}: derives \code{chunk_size} as the smallest
-#'     integer \code{k} such that \code{k * num_workers >=
-#'     min_branches + branch_buffer}, then stores \code{chunk_size} and
-#'     \code{total_seeds = num_workers * chunk_size}.
+#'     integer \code{k} such that \code{k * num_workers >= total_seeds},
+#'     and stores it on the execution spec.
 #' }
 #'
-#' @param exec An \code{execution_spec} object.
+#' @param exec    An \code{execution_spec} object.
+#' @param sampler A calibrated \code{sampler_spec} object carrying
+#'   \code{total_seeds}.
 #'
-#' @return The SAME \code{execution_spec} object, enriched with:
-#'   \itemize{
-#'     \item \code{$total_seeds}  — integer; total seeds to request from
-#'       \code{sieve()}
-#'     \item \code{$chunk_size}   — integer (parallel only); tasks per
-#'       worker
-#'   }
+#' @return The SAME \code{execution_spec} object, with \code{chunk_size}
+#'   added for parallel specs.
 #'
 #' @keywords internal
-calibrate_execution <- function(exec) {
-  stopifnot(inherits(exec, "execution_spec"))
+calibrate_execution <- function(exec, sampler) {
+  stopifnot(
+    inherits(exec, "execution_spec"),
+    inherits(sampler, "sampler_spec")
+  )
 
-  if (inherits(exec, "serial_spec")) {
-    exec$total_seeds <- as.integer(exec$min_branches + exec$branch_buffer)
-  } else if (inherits(exec, "parallel_spec")) {
-    target <- exec$min_branches + exec$branch_buffer
-    chunk_size <- as.integer(ceiling(target / exec$num_workers))
-    exec$chunk_size <- chunk_size
-    exec$total_seeds <- as.integer(exec$num_workers * chunk_size)
-  } else {
-    stop("Unknown execution_spec subtype.", call. = FALSE)
+  if (is.null(sampler$total_seeds)) {
+    stop(
+      "calibrate_execution() requires a calibrated sampler_spec. ",
+      "Run calibrate_sampler() first.",
+      call. = FALSE
+    )
+  }
+
+  if (inherits(exec, "parallel_spec")) {
+    exec$chunk_size <- as.integer(
+      ceiling(sampler$total_seeds / exec$num_workers)
+    )
   }
 
   exec

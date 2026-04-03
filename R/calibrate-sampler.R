@@ -1,12 +1,15 @@
 # ======================================================================
-# calibrate-sampler.R — Sampler Calibration (v2.0)
+# calibrate-sampler.R — Sampler Calibration (v2.1)
 #
 # Resolves a sampler_spec into closed-over functions ready for use
-# by screen() and inspect_seeds(). After calibration, model$sampler holds:
+# by sieve(). After calibration, model$sampler holds:
 #
 #   $draw          — closure(history = NULL) -> numeric omega-hat
 #   $expand_orbit  — closure(omega_hat)      -> list of numeric vectors
 #                    NULL if no orbit_expander_fn supplied
+#   $total_seeds   — integer: min_branches + branch_buffer
+#                    used by sieve() to know how many to collect, and
+#                    by calibrate_execution() to derive chunk_size
 # ======================================================================
 
 #' @keywords internal
@@ -75,7 +78,15 @@ calibrate_sampler <- function(
   }
 
   # -------------------------------------------------------------------
-  # 3. Drop raw constructors — no longer needed after calibration
+  # 3. total_seeds — computed here so sieve() and calibrate_execution()
+  #    can both read it from model$sampler
+  # -------------------------------------------------------------------
+  sampler$total_seeds <- as.integer(
+    sampler$min_branches + sampler$branch_buffer
+  )
+
+  # -------------------------------------------------------------------
+  # 4. Drop raw constructors — no longer needed after calibration
   # -------------------------------------------------------------------
   sampler$sampler_fn <- NULL
   sampler$orbit_expander_fn <- NULL

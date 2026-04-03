@@ -4,24 +4,9 @@
 \alias{serial_spec}
 \title{Serial Execution Specification}
 \usage{
-serial_spec(
-  min_branches,
-  branch_buffer = 0L,
-  seed = TRUE,
-  packages = character(),
-  name = "serial"
-)
+serial_spec(packages = character(), name = "serial")
 }
 \arguments{
-\item{min_branches}{Positive integer. Minimum number of branches
-to retain after aggregation filtering.}
-
-\item{branch_buffer}{Non-negative integer. Number of additional seeds
-to evaluate beyond \code{min_branches}. Total seeds evaluated =
-\code{min_branches + branch_buffer}.}
-
-\item{seed}{Logical or numeric seed for reproducibility.}
-
 \item{packages}{Character vector of packages to load.}
 
 \item{name}{Optional identifier.}

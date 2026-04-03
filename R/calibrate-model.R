@@ -83,7 +83,7 @@ calibrate.model_spec <- function(spec, data, verbose = FALSE) {
   # 3. Optional execution calibration
   # -------------------------------------------------------------------
   if (!is.null(spec$execution)) {
-    spec$execution <- calibrate_execution(spec$execution)
+    spec$execution <- calibrate_execution(spec$execution, spec$sampler)
   }
 
   # -------------------------------------------------------------------

@@ -4,29 +4,27 @@
 \alias{calibrate_execution}
 \title{Calibrate Execution Component}
 \usage{
-calibrate_execution(exec)
+calibrate_execution(exec, sampler)
 }
 \arguments{
 \item{exec}{An \code{execution_spec} object.}
+
+\item{sampler}{A calibrated \code{sampler_spec} object carrying
+\code{total_seeds}.}
 }
 \value{
-The SAME \code{execution_spec} object, enriched with:
-\itemize{
-\item \code{$total_seeds}  — integer; total seeds to request from
-\code{sieve()}
-\item \code{$chunk_size}   — integer (parallel only); tasks per
-worker
-}
+The SAME \code{execution_spec} object, with \code{chunk_size}
+added for parallel specs.
 }
 \description{
-Derives and stores computed quantities from the execution spec:
+Uses \code{sampler$total_seeds} (computed by \code{calibrate_sampler()})
+to derive execution-level quantities:
 \itemize{
-\item \strong{Serial}: stores \code{total_seeds =
-    min_branches + branch_buffer}.
+\item \strong{Serial}: no additional slots needed; \code{total_seeds}
+is read directly from the sampler spec at runtime.
 \item \strong{Parallel}: derives \code{chunk_size} as the smallest
-integer \code{k} such that \code{k * num_workers >=
-    min_branches + branch_buffer}, then stores \code{chunk_size} and
-\code{total_seeds = num_workers * chunk_size}.
+integer \code{k} such that \code{k * num_workers >= total_seeds},
+and stores it on the execution spec.
 }
 }
 \keyword{internal}

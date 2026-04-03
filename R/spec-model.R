@@ -51,7 +51,7 @@
 #'
 #' However, \code{model_spec()} is intentionally permissive at construction:
 #' you may initialize with \code{NULL} components and add them incrementally
-#' via [add()].
+#' via [likelyr::add()].
 #'
 #' After calibration:
 #' \itemize{

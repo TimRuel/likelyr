@@ -5,7 +5,7 @@
 # via model$sampler$expand_orbit(), and calls probe() on each candidate
 # until total_seeds accepted branch seeds have been accumulated.
 #
-# total_seeds is read from model$execution$total_seeds (derived during
+# total_seeds is read from model$sampler$total_seeds (derived during
 # calibration from min_branches + branch_buffer for serial, or
 # num_workers * chunk_size for parallel).
 #
@@ -38,7 +38,7 @@ sieve <- function(
   k_recent <- k_recent %||% model$traversal$k_recent
   drop_multiplier <- drop_multiplier %||% model$traversal$drop_multiplier
 
-  total_seeds <- as.integer(model$execution$total_seeds)
+  total_seeds <- as.integer(model$sampler$total_seeds)
   draw <- model$sampler$draw
   expand_orbit <- model$sampler$expand_orbit
 

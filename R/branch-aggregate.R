@@ -40,7 +40,7 @@ aggregate.default <- function(model, ...) {
 #' @export
 aggregate.model <- function(model, verbose = FALSE, ...) {
   branches <- model$workspace$integrated$cache$branches %||% NULL
-  min_branches <- model$execution$min_branches
+  min_branches <- model$sampler$min_branches
 
   if (is.null(branches) || length(branches) == 0L) {
     stop(

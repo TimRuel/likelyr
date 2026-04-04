@@ -53,13 +53,14 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   ci_raw <- ci_long |> dplyr::filter(!is.na(endpoint))
 
   # --------------------------------------------------
-  # PSI limits — contain all relevant psi values
+  # PSI limits — driven by inferential quantities only.
+  # Excluding range(psi_loglik_df$psi) prevents the integrated
+  # likelihood plot from inheriting the wider common interval extent.
   # --------------------------------------------------
   psi_anchors <- c(
     ci_raw$endpoint,
     psi_hat,
-    point_estimate_df$psi_0,
-    range(psi_loglik_df$psi)
+    point_estimate_df$psi_0
   )
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 
@@ -89,6 +90,7 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
     psi_limits = psi_limits,
     comparison = FALSE
   )
+
   # --------------------------------------------------
   # Labels
   # --------------------------------------------------
@@ -177,13 +179,14 @@ plot_pseudolikelihood_curves <- function(res_list) {
     dplyr::filter(!is.na(endpoint))
 
   # --------------------------------------------------
-  # PSI limits — contain all relevant psi values
+  # PSI limits — driven by inferential quantities only.
+  # Excluding range(psi_loglik_df$psi) prevents the integrated
+  # likelihood's wider common interval from dominating the x range.
   # --------------------------------------------------
   psi_anchors <- c(
     ci_all$endpoint,
     psi_hats,
-    purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_0),
-    unlist(purrr::map(psi_loglik_dfs, \(df) range(df$psi)))
+    purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_0)
   )
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 

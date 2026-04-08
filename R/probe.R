@@ -11,8 +11,7 @@ probe <- function(
   n_adjacent = NULL,
   max_mode_shifts = NULL,
   k_recent = NULL,
-  drop_multiplier = NULL,
-  max_drop_fraction = NULL
+  drop_multiplier = NULL
 ) {
   traversal <- model$traversal
   estimand <- model$estimand
@@ -24,14 +23,15 @@ probe <- function(
   max_mode_shifts <- max_mode_shifts %||% traversal$max_mode_shifts
   k_recent <- k_recent %||% traversal$k_recent
   drop_multiplier <- drop_multiplier %||% traversal$drop_multiplier
-  max_drop_fraction <- max_drop_fraction %||% traversal$max_drop_fraction
 
-  # -------------------------------------------------------------------
-  # Compute effective_crit for absolute drop cap
-  # -------------------------------------------------------------------
-  alpha_target <- min(1 - traversal$confidence_levels)
-  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
-  effective_crit <- crit * traversal$cutoff_buffer
+  max_drop_cap <- traversal$max_drop_cap
+  if (is.null(max_drop_cap)) {
+    stop(
+      "probe() requires model$traversal$max_drop_cap to be set.\n",
+      "Run preprocess() before sieve().",
+      call. = FALSE
+    )
+  }
 
   # -------------------------------------------------------------------
   # 1. Compute restricted grid bounds k_min, k_max
@@ -275,13 +275,7 @@ probe <- function(
       drop_left <- ll_left - new_ll_left
       recent <- tail(drops_left, k_recent)
       if (
-        !check_drop(
-          drop_left,
-          recent,
-          drop_multiplier,
-          model$traversal$max_drop_cap,
-          k_recent
-        )
+        !check_drop(drop_left, recent, drop_multiplier, max_drop_cap, k_recent)
       ) {
         probe_evals_df <- .make_probe_evals_df(
           k_mode,
@@ -314,13 +308,7 @@ probe <- function(
       drop_right <- ll_right - new_ll_right
       recent <- tail(drops_right, k_recent)
       if (
-        !check_drop(
-          drop_left,
-          recent,
-          drop_multiplier,
-          model$traversal$max_drop_cap,
-          k_recent
-        )
+        !check_drop(drop_right, recent, drop_multiplier, max_drop_cap, k_recent)
       ) {
         probe_evals_df <- .make_probe_evals_df(
           k_mode,

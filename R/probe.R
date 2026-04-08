@@ -279,9 +279,8 @@ probe <- function(
           drop_left,
           recent,
           drop_multiplier,
-          effective_crit,
-          k_recent,
-          max_drop_fraction
+          model$traversal$max_drop_cap,
+          k_recent
         )
       ) {
         probe_evals_df <- .make_probe_evals_df(
@@ -316,12 +315,11 @@ probe <- function(
       recent <- tail(drops_right, k_recent)
       if (
         !check_drop(
-          drop_right,
+          drop_left,
           recent,
           drop_multiplier,
-          effective_crit,
-          k_recent,
-          max_drop_fraction
+          model$traversal$max_drop_cap,
+          k_recent
         )
       ) {
         probe_evals_df <- .make_probe_evals_df(

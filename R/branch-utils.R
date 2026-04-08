@@ -185,22 +185,24 @@ make_branch_mode_result <- function(
 #' Applies two checks:
 #' \enumerate{
 #'   \item \strong{Absolute cap}: rejects if the drop exceeds
-#'     \code{max_drop_fraction * effective_crit}, catching catastrophic
-#'     discontinuities regardless of surface curvature.
+#'     \code{max_drop_cap}, which is calibrated from the profile
+#'     likelihood during \code{preprocess()} as
+#'     \code{cap_multiplier * median(profile_drops)}. This catches
+#'     genuine discontinuities while scaling automatically with the
+#'     curvature of the surface.
 #'   \item \strong{Relative check}: once \code{k_recent} drops have
 #'     accumulated, rejects if the drop exceeds \code{drop_multiplier}
-#'     times the recent median. Rarely fires given typical \code{n_adjacent}
-#'     and \code{k_recent} settings.
+#'     times the recent median. Rarely fires given typical
+#'     \code{n_adjacent} and \code{k_recent} settings.
 #' }
 #'
 #' @param drop             Numeric scalar. The new drop to check.
 #' @param recent_drops     Numeric vector. Recent drop history.
 #' @param drop_multiplier  Positive numeric scalar.
-#' @param effective_crit   Numeric scalar. Branch cutoff distance.
+#' @param max_drop_cap     Positive numeric scalar. Absolute cap derived
+#'   from the profile likelihood by \code{preprocess()}.
 #' @param k_recent         Non-negative integer. Minimum history required
 #'   before the relative check applies.
-#' @param max_drop_fraction Numeric scalar in (0, 1]. Absolute cap fraction.
-#'   Default: \code{0.25}.
 #'
 #' @return Logical scalar. \code{TRUE} if the drop is acceptable.
 #'
@@ -209,12 +211,11 @@ check_drop <- function(
   drop,
   recent_drops,
   drop_multiplier,
-  effective_crit,
-  k_recent,
-  max_drop_fraction = 0.25
+  max_drop_cap,
+  k_recent
 ) {
-  # Absolute cap
-  if (drop > max_drop_fraction * effective_crit) {
+  # Absolute cap — calibrated from profile curvature
+  if (drop > max_drop_cap) {
     return(FALSE)
   }
 
@@ -228,7 +229,6 @@ check_drop <- function(
   }
   drop <= drop_multiplier * ref
 }
-
 
 # ----------------------------------------------------------------------
 # Common psi interval

@@ -27,9 +27,15 @@
 #' @param drop_multiplier Positive numeric scalar. A new drop exceeding
 #'   this multiple of the recent median drop is flagged as a jump.
 #'   Default: \code{2.0}.
-#' @param max_drop_fraction Numeric scalar in (0, 1]. A single step drop
-#'   exceeding this fraction of \code{effective_crit} is always flagged,
-#'   regardless of recent drop history. Default: \code{0.25}.
+#' @param cap_multiplier Positive numeric scalar. The absolute drop cap
+#'   is set to \code{cap_multiplier} times the median per-step drop
+#'   observed along the profile likelihood. Computed and stored on
+#'   \code{model$traversal$max_drop_cap} during \code{preprocess()}.
+#'   A step drop exceeding this cap is always rejected regardless of
+#'   recent drop history. Larger values are more permissive; the default
+#'   of \code{10.0} accommodates branch curvature that is moderately
+#'   steeper than the profile without letting through genuine
+#'   discontinuities. Default: \code{10.0}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -45,7 +51,7 @@ traversal_spec <- function(
   max_mode_shifts = 20L,
   k_recent = 3L,
   drop_multiplier = 2.0,
-  max_drop_fraction = 0.25,
+  cap_multiplier = 10.0,
   name = NULL,
   ...
 ) {
@@ -60,7 +66,8 @@ traversal_spec <- function(
     max_mode_shifts = max_mode_shifts,
     k_recent = k_recent,
     drop_multiplier = drop_multiplier,
-    max_drop_fraction = max_drop_fraction,
+    cap_multiplier = cap_multiplier,
+    max_drop_cap = NULL, # populated by preprocess()
     extra = list(...)
   )
 
@@ -174,17 +181,13 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     stop("drop_multiplier must be a positive numeric scalar.", call. = FALSE)
   }
 
-  # max_drop_fraction -------------------------------------------------
+  # cap_multiplier ----------------------------------------------------
   if (
-    !is.numeric(x$max_drop_fraction) ||
-      length(x$max_drop_fraction) != 1L ||
-      x$max_drop_fraction <= 0 ||
-      x$max_drop_fraction > 1
+    !is.numeric(x$cap_multiplier) ||
+      length(x$cap_multiplier) != 1L ||
+      x$cap_multiplier <= 0
   ) {
-    stop(
-      "max_drop_fraction must be a numeric scalar in (0, 1].",
-      call. = FALSE
-    )
+    stop("cap_multiplier must be a positive numeric scalar.", call. = FALSE)
   }
 
   invisible(x)
@@ -221,6 +224,16 @@ print.traversal_spec <- function(x, ...) {
   cat("- max_mode_shifts:   ", x$max_mode_shifts, "\n", sep = "")
   cat("- k_recent:          ", x$k_recent, "\n", sep = "")
   cat("- drop_multiplier:   ", x$drop_multiplier, "\n", sep = "")
-  cat("- max_drop_fraction: ", x$max_drop_fraction, "\n", sep = "")
+  cat("- cap_multiplier:    ", x$cap_multiplier, "\n", sep = "")
+  if (!is.null(x$max_drop_cap)) {
+    cat(
+      "- max_drop_cap:      ",
+      round(x$max_drop_cap, 6),
+      "  (set by preprocess())\n",
+      sep = ""
+    )
+  } else {
+    cat("- max_drop_cap:       NULL  (set by preprocess())\n")
+  }
   invisible(x)
 }

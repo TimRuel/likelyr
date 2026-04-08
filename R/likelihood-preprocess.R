@@ -66,6 +66,21 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
     )
   }
 
+  # Calibrate absolute drop cap from profile curvature
+  profile_df <- model$workspace$profile$psi_loglik_df
+  profile_ll <- profile_df$loglik[order(profile_df$psi)]
+  profile_drops <- diff(-profile_ll)
+  profile_drops <- profile_drops[profile_drops > 0]
+
+  typical_drop <- if (length(profile_drops) > 0L) {
+    median(profile_drops)
+  } else {
+    # fallback: use chi-squared cutoff fraction
+    0.5 * qchisq(0.95, df = 1) * 0.05
+  }
+
+  model$traversal$max_drop_cap <- model$traversal$cap_multiplier * typical_drop
+
   # ------------------------------------------------------------------
   # 2. Sieve
   # ------------------------------------------------------------------

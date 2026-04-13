@@ -81,6 +81,10 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
 
   model$traversal$max_drop_cap <- model$traversal$cap_multiplier * typical_drop
 
+  model$workspace$profile$ll_at_psi_mle <- max(
+    model$workspace$profile$psi_loglik_df$loglik
+  )
+
   # ------------------------------------------------------------------
   # 2. Sieve
   # ------------------------------------------------------------------

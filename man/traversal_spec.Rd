@@ -14,7 +14,8 @@ traversal_spec(
   max_mode_shifts = 20L,
   k_recent = 3L,
   drop_multiplier = 2,
-  max_drop_fraction = 0.25,
+  cap_multiplier = 10,
+  mode_gap_multiplier = 1,
   name = NULL,
   ...
 )
@@ -52,9 +53,16 @@ Default: \code{3L}.}
 this multiple of the recent median drop is flagged as a jump.
 Default: \code{2.0}.}
 
-\item{max_drop_fraction}{Numeric scalar in (0, 1]. A single step drop
-exceeding this fraction of \code{effective_crit} is always flagged,
-regardless of recent drop history. Default: \code{0.25}.}
+\item{cap_multiplier}{Positive numeric scalar. The absolute drop cap
+is set to \code{cap_multiplier} times the median per-step drop
+observed along the profile likelihood. Computed and stored on
+\code{model$traversal$max_drop_cap} during \code{preprocess()}.
+Default: \code{10.0}.}
+
+\item{mode_gap_multiplier}{Positive numeric scalar. A branch whose
+mode log-likelihood is more than \code{mode_gap_multiplier *
+  effective_crit} below the profile log-likelihood at the MLE is
+rejected as uninformative. Default: \code{1.0}.}
 
 \item{name}{Optional descriptive name.}
 

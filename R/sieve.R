@@ -1,20 +1,23 @@
 # ======================================================================
 # sieve.R — Branch Seed Accumulator
 #
-# Draws omega-hats from model$sampler$draw(), expands each to an orbit
-# via model$sampler$expand_orbit(), and calls probe() on each candidate
-# until total_seeds accepted branch seeds have been accumulated.
+# Draws omega-hats from model$sampler$draw(), expands each to its full
+# orbit via model$sampler$expand_orbit(), and calls probe() on each
+# candidate until total_seeds accepted branch seeds have been accumulated.
 #
 # total_seeds is read from model$sampler$total_seeds (derived during
 # calibration from min_branches + branch_buffer for serial, or
 # num_workers * chunk_size for parallel).
 #
-# Each orbit consists of one base draw plus its expanded candidates.
-# n_orbits counts base draws; n_candidates counts all probed omega-hats.
+# Each orbit consists of one base draw plus all of its expanded
+# candidates. If orbit_sample_size is set on model$sampler,
+# orbit_sample_size candidates are sampled at random from the full orbit
+# (including the base draw) and screened in a random order. Otherwise
+# the full orbit is screened in a random order.
 #
-# orbit_size is read from model$sampler$orbit_size. total_seeds need not
-# be a multiple of orbit_size — the final orbit is truncated to fill
-# exactly total_seeds branch seeds.
+# n_orbits counts base draws; n_candidates counts all probed omega-hats.
+# Screening stops immediately once total_seeds have been accepted, even
+# if the current orbit has not been fully processed.
 #
 # probe() and sieve() arguments default to values stored on
 # model$traversal, with any directly supplied arguments taking precedence.
@@ -69,16 +72,15 @@ sieve <- function(
     }
 
     # -------------------------------------------------------------------
-    # Expand to orbit, truncating to however many seeds still needed
+    # Expand to full orbit, sample orbit_sample_size candidates,
+    # and shuffle screening order
     # -------------------------------------------------------------------
     candidates <- if (!is.null(expand_orbit)) {
       orbit <- tryCatch(expand_orbit(base), error = function(e) NULL)
       if (is.null(orbit)) {
         list(base)
       } else {
-        n_remaining <- total_seeds - n_accepted
-        n_take <- min(length(orbit), n_remaining)
-        c(list(base), orbit[seq_len(n_take)])
+        orbit[sample.int(length(orbit))]
       }
     } else {
       list(base)
@@ -87,17 +89,19 @@ sieve <- function(
     # -------------------------------------------------------------------
     # Probe each candidate
     # -------------------------------------------------------------------
-    cat(
-      "[sieve] orbit",
-      n_orbits,
-      "| n_candidates:",
-      length(candidates),
-      "| n_accepted:",
-      n_accepted,
-      "| total_seeds:",
-      total_seeds,
-      "\n"
-    )
+    if (verbose) {
+      cat(
+        "[sieve] orbit",
+        n_orbits,
+        "| n_candidates:",
+        length(candidates),
+        "| n_accepted:",
+        n_accepted,
+        "| total_seeds:",
+        total_seeds,
+        "\n"
+      )
+    }
 
     for (omega in candidates) {
       if (n_accepted >= total_seeds) {

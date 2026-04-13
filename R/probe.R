@@ -33,6 +33,20 @@ probe <- function(
     )
   }
 
+  ll_at_psi_mle <- model$workspace$profile$ll_at_psi_mle
+  if (is.null(ll_at_psi_mle)) {
+    stop(
+      "probe() requires model$workspace$profile$ll_at_psi_mle to be set.\n",
+      "Run preprocess() before sieve().",
+      call. = FALSE
+    )
+  }
+
+  alpha_target <- min(1 - traversal$confidence_levels)
+  crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * traversal$cutoff_buffer
+  ll_threshold <- ll_at_psi_mle - traversal$mode_gap_multiplier * effective_crit
+
   # -------------------------------------------------------------------
   # 1. Compute restricted grid bounds k_min, k_max
   # -------------------------------------------------------------------
@@ -151,6 +165,21 @@ probe <- function(
 
   param_mode <- mode_eval$param_hat
   ll_mode <- mode_eval$branch_val
+
+  # -------------------------------------------------------------------
+  # 4b. Reject if branch mode log-likelihood is too far below profile MLE
+  # -------------------------------------------------------------------
+  if (ll_mode < ll_threshold) {
+    return(list(
+      accepted = FALSE,
+      reason = paste("mode too low:", ll_mode, "<", ll_threshold),
+      psi_mode = psi_mode,
+      ll_mode = ll_mode,
+      ll_threshold = ll_threshold,
+      ll_at_psi_mle = ll_at_psi_mle,
+      omega_hat = omega_hat
+    ))
+  }
 
   # -------------------------------------------------------------------
   # 5. Evaluate in lockstep along restricted grid

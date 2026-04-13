@@ -7,6 +7,11 @@
 #   $draw          — closure(history = NULL) -> numeric omega-hat
 #   $expand_orbit  — closure(omega_hat)      -> list of numeric vectors
 #                    NULL if no orbit_expander_fn supplied
+#   $orbit_sample_size — integer or NULL: number of candidates to sample
+#                    and screen per orbit (including the base draw).
+#                    NULL means screen all candidates returned by the
+#                    expander. Subsampling is handled inside the
+#                    orbit_expander_fn closure, not in sieve().
 #   $total_seeds   — integer: min_branches + branch_buffer
 #                    used by sieve() to know how many to collect, and
 #                    by calibrate_execution() to derive chunk_size
@@ -17,7 +22,8 @@ calibrate_sampler <- function(
   sampler,
   parameter,
   estimand,
-  solver
+  solver,
+  data
 ) {
   stopifnot(
     inherits(sampler, "sampler_spec"),
@@ -43,7 +49,9 @@ calibrate_sampler <- function(
     eq_jac = parameter$eq_jac,
     ineq_fn = parameter$ineq,
     ineq_jac = parameter$ineq_jac,
-    solver = solver
+    solver = solver,
+    orbit_sample_size = sampler$orbit_sample_size,
+    counts = data$count
   )
 
   .call_constructor <- function(fn, extra = list()) {
@@ -69,10 +77,7 @@ calibrate_sampler <- function(
   # 2. expand_orbit (optional)
   # -------------------------------------------------------------------
   sampler$expand_orbit <- if (!is.null(sampler$orbit_expander_fn)) {
-    .call_constructor(
-      sampler$orbit_expander_fn,
-      list(orbit_size = sampler$orbit_size)
-    )
+    .call_constructor(sampler$orbit_expander_fn)
   } else {
     NULL
   }

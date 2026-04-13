@@ -7,7 +7,7 @@
 sampler_spec(
   sampler_fn = NULL,
   orbit_expander_fn = NULL,
-  orbit_size = NULL,
+  orbit_sample_size = NULL,
   min_branches,
   branch_buffer = 0L,
   name = NULL,
@@ -19,11 +19,13 @@ sampler_spec(
 replaces the built-in sampling machinery entirely.}
 
 \item{orbit_expander_fn}{Optional constructor function for orbit
-expansion. When supplied, each accepted base omega-hat is expanded
-to \code{orbit_size} permuted variants.}
+expansion. When supplied, each base draw is expanded to its full
+orbit and \code{orbit_sample_size} candidates are sampled and
+screened.}
 
-\item{orbit_size}{Optional positive integer. Number of orbit members
-to generate per base draw. \code{NULL} means no limit.}
+\item{orbit_sample_size}{Optional positive integer. Number of
+candidates to sample and screen per orbit, including the base
+draw. \code{NULL} means screen the full orbit.}
 
 \item{min_branches}{Positive integer. Minimum number of branches
 to retain after aggregation filtering.}
@@ -68,7 +70,14 @@ initgen + feasibility projection sampler is used.
 \code{orbit_expander_fn} must be a constructor accepting the same
 named arguments as \code{sampler_fn} and returning a closure
 \code{function(omega_hat) -> list of numeric vectors}.
-\code{orbit_size} controls how many orbit members are returned per
-base draw. \code{NULL} means no limit.
+
+Each orbit consists of a base draw plus all of its permuted variants.
+\code{orbit_sample_size} controls how many candidates — including the
+base draw — are randomly selected from the full orbit and screened
+per base draw. \code{NULL} means the full orbit is screened.
+Candidates within each orbit are screened in a random order.
+Once \code{total_seeds} candidates have been accepted across all
+orbits, screening stops immediately even if the current orbit has
+not been fully processed.
 }
 

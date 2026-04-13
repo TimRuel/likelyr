@@ -4,14 +4,7 @@
 \alias{check_drop}
 \title{Drop Check}
 \usage{
-check_drop(
-  drop,
-  recent_drops,
-  drop_multiplier,
-  effective_crit,
-  k_recent,
-  max_drop_fraction = 0.25
-)
+check_drop(drop, recent_drops, drop_multiplier, max_drop_cap, k_recent)
 }
 \arguments{
 \item{drop}{Numeric scalar. The new drop to check.}
@@ -20,13 +13,11 @@ check_drop(
 
 \item{drop_multiplier}{Positive numeric scalar.}
 
-\item{effective_crit}{Numeric scalar. Branch cutoff distance.}
+\item{max_drop_cap}{Positive numeric scalar. Absolute cap derived
+from the profile likelihood by \code{preprocess()}.}
 
 \item{k_recent}{Non-negative integer. Minimum history required
 before the relative check applies.}
-
-\item{max_drop_fraction}{Numeric scalar in (0, 1]. Absolute cap fraction.
-Default: \code{0.25}.}
 }
 \value{
 Logical scalar. \code{TRUE} if the drop is acceptable.
@@ -36,12 +27,15 @@ Used during \code{probe()} to decide whether to reject an omega-hat.
 Applies two checks:
 \enumerate{
 \item \strong{Absolute cap}: rejects if the drop exceeds
-\code{max_drop_fraction * effective_crit}, catching catastrophic
-discontinuities regardless of surface curvature.
+\code{max_drop_cap}, which is calibrated from the profile
+likelihood during \code{preprocess()} as
+\code{cap_multiplier * median(profile_drops)}. This catches
+genuine discontinuities while scaling automatically with the
+curvature of the surface.
 \item \strong{Relative check}: once \code{k_recent} drops have
 accumulated, rejects if the drop exceeds \code{drop_multiplier}
-times the recent median. Rarely fires given typical \code{n_adjacent}
-and \code{k_recent} settings.
+times the recent median. Rarely fires given typical
+\code{n_adjacent} and \code{k_recent} settings.
 }
 }
 \keyword{internal}

@@ -31,11 +31,11 @@
 #'   is set to \code{cap_multiplier} times the median per-step drop
 #'   observed along the profile likelihood. Computed and stored on
 #'   \code{model$traversal$max_drop_cap} during \code{preprocess()}.
-#'   A step drop exceeding this cap is always rejected regardless of
-#'   recent drop history. Larger values are more permissive; the default
-#'   of \code{10.0} accommodates branch curvature that is moderately
-#'   steeper than the profile without letting through genuine
-#'   discontinuities. Default: \code{10.0}.
+#'   Default: \code{10.0}.
+#' @param mode_gap_multiplier Positive numeric scalar. A branch whose
+#'   mode log-likelihood is more than \code{mode_gap_multiplier *
+#'   effective_crit} below the profile log-likelihood at the MLE is
+#'   rejected as uninformative. Default: \code{1.0}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -52,6 +52,7 @@ traversal_spec <- function(
   k_recent = 3L,
   drop_multiplier = 2.0,
   cap_multiplier = 10.0,
+  mode_gap_multiplier = 1.0,
   name = NULL,
   ...
 ) {
@@ -67,6 +68,7 @@ traversal_spec <- function(
     k_recent = k_recent,
     drop_multiplier = drop_multiplier,
     cap_multiplier = cap_multiplier,
+    mode_gap_multiplier = mode_gap_multiplier,
     max_drop_cap = NULL, # populated by preprocess()
     extra = list(...)
   )
@@ -190,6 +192,18 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     stop("cap_multiplier must be a positive numeric scalar.", call. = FALSE)
   }
 
+  # mode_gap_multiplier -----------------------------------------------
+  if (
+    !is.numeric(x$mode_gap_multiplier) ||
+      length(x$mode_gap_multiplier) != 1L ||
+      x$mode_gap_multiplier <= 0
+  ) {
+    stop(
+      "mode_gap_multiplier must be a positive numeric scalar.",
+      call. = FALSE
+    )
+  }
+
   invisible(x)
 }
 
@@ -200,11 +214,11 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
 #' @export
 print.traversal_spec <- function(x, ...) {
   cat("# Traversal Specification\n")
-  cat("- Name:              ", x$name, "\n", sep = "")
-  cat("- Increment:         ", x$increment, "\n", sep = "")
-  cat("- Traversal method:  ", x$traversal_method, "\n", sep = "")
+  cat("- Name:                ", x$name, "\n", sep = "")
+  cat("- Increment:           ", x$increment, "\n", sep = "")
+  cat("- Traversal method:    ", x$traversal_method, "\n", sep = "")
   cat(
-    "- Mode locator:       ",
+    "- Mode locator:        ",
     if (!is.null(x$mode_locator_fn)) {
       "custom (mode_locator_fn supplied)"
     } else {
@@ -214,26 +228,27 @@ print.traversal_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "- CI levels:          ",
+    "- CI levels:           ",
     paste(format(x$confidence_levels), collapse = ", "),
     "\n",
     sep = ""
   )
-  cat("- Cutoff buffer:     ", x$cutoff_buffer, "\n", sep = "")
-  cat("- n_adjacent:        ", x$n_adjacent, "\n", sep = "")
-  cat("- max_mode_shifts:   ", x$max_mode_shifts, "\n", sep = "")
-  cat("- k_recent:          ", x$k_recent, "\n", sep = "")
-  cat("- drop_multiplier:   ", x$drop_multiplier, "\n", sep = "")
-  cat("- cap_multiplier:    ", x$cap_multiplier, "\n", sep = "")
+  cat("- Cutoff buffer:       ", x$cutoff_buffer, "\n", sep = "")
+  cat("- n_adjacent:          ", x$n_adjacent, "\n", sep = "")
+  cat("- max_mode_shifts:     ", x$max_mode_shifts, "\n", sep = "")
+  cat("- k_recent:            ", x$k_recent, "\n", sep = "")
+  cat("- drop_multiplier:     ", x$drop_multiplier, "\n", sep = "")
+  cat("- cap_multiplier:      ", x$cap_multiplier, "\n", sep = "")
+  cat("- mode_gap_multiplier: ", x$mode_gap_multiplier, "\n", sep = "")
   if (!is.null(x$max_drop_cap)) {
     cat(
-      "- max_drop_cap:      ",
+      "- max_drop_cap:        ",
       round(x$max_drop_cap, 6),
       "  (set by preprocess())\n",
       sep = ""
     )
   } else {
-    cat("- max_drop_cap:       NULL  (set by preprocess())\n")
+    cat("- max_drop_cap:         NULL  (set by preprocess())\n")
   }
   invisible(x)
 }

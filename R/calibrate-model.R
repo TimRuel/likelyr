@@ -67,7 +67,8 @@ calibrate.model_spec <- function(spec, data, verbose = FALSE) {
     sampler = spec$sampler,
     parameter = spec$parameter,
     estimand = spec$estimand,
-    solver = spec$solver
+    solver = spec$solver,
+    data = data
   )
 
   spec$traversal <- calibrate_traversal(

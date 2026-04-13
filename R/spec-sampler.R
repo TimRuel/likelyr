@@ -45,16 +45,25 @@
 #' \code{orbit_expander_fn} must be a constructor accepting the same
 #' named arguments as \code{sampler_fn} and returning a closure
 #' \code{function(omega_hat) -> list of numeric vectors}.
-#' \code{orbit_size} controls how many orbit members are returned per
-#' base draw. \code{NULL} means no limit.
+#'
+#' Each orbit consists of a base draw plus all of its permuted variants.
+#' \code{orbit_sample_size} controls how many candidates — including the
+#' base draw — are randomly selected from the full orbit and screened
+#' per base draw. \code{NULL} means the full orbit is screened.
+#' Candidates within each orbit are screened in a random order.
+#' Once \code{total_seeds} candidates have been accepted across all
+#' orbits, screening stops immediately even if the current orbit has
+#' not been fully processed.
 #'
 #' @param sampler_fn Optional constructor function. When supplied,
 #'   replaces the built-in sampling machinery entirely.
 #' @param orbit_expander_fn Optional constructor function for orbit
-#'   expansion. When supplied, each accepted base omega-hat is expanded
-#'   to \code{orbit_size} permuted variants.
-#' @param orbit_size Optional positive integer. Number of orbit members
-#'   to generate per base draw. \code{NULL} means no limit.
+#'   expansion. When supplied, each base draw is expanded to its full
+#'   orbit and \code{orbit_sample_size} candidates are sampled and
+#'   screened.
+#' @param orbit_sample_size Optional positive integer. Number of
+#'   candidates to sample and screen per orbit, including the base
+#'   draw. \code{NULL} means screen the full orbit.
 #' @param min_branches Positive integer. Minimum number of branches
 #'   to retain after aggregation filtering.
 #' @param branch_buffer Non-negative integer. Number of additional seeds
@@ -68,7 +77,7 @@
 sampler_spec <- function(
   sampler_fn = NULL,
   orbit_expander_fn = NULL,
-  orbit_size = NULL,
+  orbit_sample_size = NULL,
   min_branches,
   branch_buffer = 0L,
   name = NULL,
@@ -78,7 +87,7 @@ sampler_spec <- function(
     name = name %||% "<sampler>",
     sampler_fn = sampler_fn,
     orbit_expander_fn = orbit_expander_fn,
-    orbit_size = orbit_size,
+    orbit_sample_size = orbit_sample_size,
     min_branches = min_branches,
     branch_buffer = branch_buffer,
     extra = list(...)
@@ -112,15 +121,18 @@ new_sampler_spec <- function(x) .new_spec(x, "sampler_spec")
     stop("orbit_expander_fn must be a function.", call. = FALSE)
   }
 
-  if (!is.null(x$orbit_size)) {
+  if (!is.null(x$orbit_sample_size)) {
     if (
-      !is.numeric(x$orbit_size) ||
-        length(x$orbit_size) != 1L ||
-        x$orbit_size < 1L
+      !is.numeric(x$orbit_sample_size) ||
+        length(x$orbit_sample_size) != 1L ||
+        x$orbit_sample_size < 1L
     ) {
-      stop("orbit_size must be a positive integer scalar.", call. = FALSE)
+      stop(
+        "orbit_sample_size must be a positive integer scalar.",
+        call. = FALSE
+      )
     }
-    x$orbit_size <- as.integer(x$orbit_size)
+    x$orbit_sample_size <- as.integer(x$orbit_sample_size)
   }
 
   if (
@@ -159,9 +171,9 @@ new_sampler_spec <- function(x) .new_spec(x, "sampler_spec")
 #' @export
 print.sampler_spec <- function(x, ...) {
   cat("# Sampler Specification\n")
-  cat("- Name:           ", x$name, "\n", sep = "")
+  cat("- Name:                ", x$name, "\n", sep = "")
   cat(
-    "- Sampler:         ",
+    "- Sampler:              ",
     if (!is.null(x$sampler_fn)) {
       "custom (sampler_fn supplied)"
     } else {
@@ -172,18 +184,18 @@ print.sampler_spec <- function(x, ...) {
   )
   if (!is.null(x$orbit_expander_fn)) {
     cat(
-      "- Orbit expansion: yes (orbit_size = ",
-      x$orbit_size %||% "unlimited",
+      "- Orbit expansion:      yes (orbit_sample_size = ",
+      x$orbit_sample_size %||% "unlimited",
       ")\n",
       sep = ""
     )
   } else {
-    cat("- Orbit expansion: none\n")
+    cat("- Orbit expansion:      none\n")
   }
-  cat("- Min branches:   ", x$min_branches, "\n", sep = "")
-  cat("- Branch buffer:  ", x$branch_buffer, "\n", sep = "")
+  cat("- Min branches:        ", x$min_branches, "\n", sep = "")
+  cat("- Branch buffer:       ", x$branch_buffer, "\n", sep = "")
   if (!is.null(x$total_seeds)) {
-    cat("- Total seeds:    ", x$total_seeds, "\n", sep = "")
+    cat("- Total seeds:         ", x$total_seeds, "\n", sep = "")
   }
   invisible(x)
 }

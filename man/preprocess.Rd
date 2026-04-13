@@ -11,10 +11,6 @@ preprocess(model, ...)
 
 \item{...}{Additional arguments passed to \code{sieve()}.}
 
-\item{z}{Positive numeric scalar. Multiplier for the
-mode-distribution component of the common interval. Default:
-\code{qnorm(1 - alpha_target / 2)}.}
-
 \item{verbose}{Logical. Print diagnostics. Default: \code{FALSE}.}
 }
 \value{

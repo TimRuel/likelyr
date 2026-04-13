@@ -16,6 +16,8 @@ traversal_spec(
   drop_multiplier = 2,
   cap_multiplier = 10,
   mode_gap_multiplier = 1,
+  extend_to_lower = FALSE,
+  extend_to_upper = FALSE,
   name = NULL,
   ...
 )
@@ -63,6 +65,17 @@ Default: \code{10.0}.}
 mode log-likelihood is more than \code{mode_gap_multiplier *
   effective_crit} below the profile log-likelihood at the MLE is
 rejected as uninformative. Default: \code{1.0}.}
+
+\item{extend_to_lower}{Logical. If \code{TRUE} and
+\code{psi_interval} has a finite lower bound, the common ψ
+interval computed by \code{preprocess()} is snapped to that bound
+regardless of the profile extent or branch seed modes. Useful when
+the estimand has a natural lower boundary that the integrated
+likelihood should always reach (e.g. Simpson's index at
+\code{1/J}). Default: \code{FALSE}.}
+
+\item{extend_to_upper}{Logical. Analogous to \code{extend_to_lower}
+for the upper bound. Default: \code{FALSE}.}
 
 \item{name}{Optional descriptive name.}
 

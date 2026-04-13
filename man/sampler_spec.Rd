@@ -6,8 +6,6 @@
 \usage{
 sampler_spec(
   sampler_fn = NULL,
-  orbit_expander_fn = NULL,
-  orbit_sample_size = NULL,
   min_branches,
   branch_buffer = 0L,
   name = NULL,
@@ -18,15 +16,6 @@ sampler_spec(
 \item{sampler_fn}{Optional constructor function. When supplied,
 replaces the built-in sampling machinery entirely.}
 
-\item{orbit_expander_fn}{Optional constructor function for orbit
-expansion. When supplied, each base draw is expanded to its full
-orbit and \code{orbit_sample_size} candidates are sampled and
-screened.}
-
-\item{orbit_sample_size}{Optional positive integer. Number of
-candidates to sample and screen per orbit, including the base
-draw. \code{NULL} means screen the full orbit.}
-
 \item{min_branches}{Positive integer. Minimum number of branches
 to retain after aggregation filtering.}
 
@@ -36,7 +25,8 @@ to evaluate beyond \code{min_branches}. Total seeds evaluated =
 
 \item{name}{Optional descriptive name.}
 
-\item{...}{Additional metadata stored but unused internally.}
+\item{...}{Additional arguments forwarded to \code{sampler_fn} by
+\code{calibrate_sampler()} when building the draw closure.}
 }
 \value{
 A \code{sampler_spec} object.
@@ -44,7 +34,7 @@ A \code{sampler_spec} object.
 \description{
 Defines how candidate nuisance parameter vectors (omega-hats) are
 generated during screening. The spec is intentionally minimal —
-all sampling logic lives in the constructor functions supplied by
+all sampling logic lives in the constructor function supplied by
 the user, not in the spec itself.
 }
 \section{Sampler constructor}{
@@ -55,7 +45,13 @@ named arguments from the calibrated model (any subset of
 \code{psi_mle}, \code{param_lower}, \code{param_upper},
 \code{eq_fn}, \code{eq_jac}, \code{ineq_fn}, \code{ineq_jac},
 \code{solver}) and returns a closure
-\code{function(history = NULL) -> numeric vector}.
+\code{function(history = NULL) -> list(candidate, diag)}.
+
+\code{$candidate} is a numeric vector (omega-hat in logit space).
+\code{$diag} is a named list of draw-level metadata that
+\code{sieve()} merges into its diagnostics log alongside the
+accept/reject outcome. Samplers with nothing to report should
+return \code{diag = list()}.
 
 The \code{history} argument receives a list of previously accepted
 omega-hats, which the sampler may use for adaptive exploration.
@@ -63,21 +59,5 @@ It should be ignored if not needed.
 
 When \code{sampler_fn} is \code{NULL}, the built-in gaussian
 initgen + feasibility projection sampler is used.
-}
-
-\section{Orbit expander constructor}{
-
-\code{orbit_expander_fn} must be a constructor accepting the same
-named arguments as \code{sampler_fn} and returning a closure
-\code{function(omega_hat) -> list of numeric vectors}.
-
-Each orbit consists of a base draw plus all of its permuted variants.
-\code{orbit_sample_size} controls how many candidates — including the
-base draw — are randomly selected from the full orbit and screened
-per base draw. \code{NULL} means the full orbit is screened.
-Candidates within each orbit are screened in a random order.
-Once \code{total_seeds} candidates have been accepted across all
-orbits, screening stops immediately even if the current orbit has
-not been fully processed.
 }
 

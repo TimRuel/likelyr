@@ -8,7 +8,9 @@ compute_common_interval(
   psi_loglik_df,
   branch_seeds,
   alpha_target,
-  psi_interval = NULL
+  psi_interval = NULL,
+  extend_to_lower = FALSE,
+  extend_to_upper = FALSE
 )
 }
 \arguments{
@@ -21,8 +23,15 @@ likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).}
 \item{alpha_target}{Numeric scalar. Significance level for the
 default \code{z} multiplier. Ignored if \code{z} is supplied.}
 
-\item{psi_interval}{A \code{sets::interval} object or
-\code{NULL}.}
+\item{psi_interval}{A \code{sets::interval} object or \code{NULL}.}
+
+\item{extend_to_lower}{Logical. If \code{TRUE} and \code{psi_interval}
+has a finite lower bound, snap \code{psi_lower} to that bound.
+Default: \code{FALSE}.}
+
+\item{extend_to_upper}{Logical. If \code{TRUE} and \code{psi_interval}
+has a finite upper bound, snap \code{psi_upper} to that bound.
+Default: \code{FALSE}.}
 }
 \value{
 A named list with:
@@ -53,5 +62,10 @@ branch modes cluster far from the profile MLE.
 
 The union is then intersected with \code{psi_interval} if one
 exists, so branches never extend beyond the parameter space boundary.
+
+If \code{extend_to_lower = TRUE} and \code{psi_interval} has a
+finite lower bound, \code{psi_lower} is snapped to that bound
+regardless of the profile extent or mode distribution. Likewise
+for \code{extend_to_upper = TRUE}.
 }
 \keyword{internal}

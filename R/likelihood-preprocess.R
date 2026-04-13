@@ -21,12 +21,9 @@
 #' \code{model$workspace$integrated$cache$common_interval} for use by
 #' \code{generate(task = "integrate")}.
 #'
-#' @param model     A calibrated \code{model} object.
-#' @param z       Positive numeric scalar. Multiplier for the
-#'   mode-distribution component of the common interval. Default:
-#'   \code{qnorm(1 - alpha_target / 2)}.
-#' @param verbose Logical. Print diagnostics. Default: \code{FALSE}.
-#' @param ...     Additional arguments passed to \code{sieve()}.
+#' @param model            A calibrated \code{model} object.
+#' @param verbose          Logical. Print diagnostics. Default: \code{FALSE}.
+#' @param ...              Additional arguments passed to \code{sieve()}.
 #'
 #' @return The same calibrated \code{model} object with
 #'   \code{model$workspace$profile} and
@@ -44,10 +41,17 @@ preprocess.default <- function(model, ...) {
 }
 
 #' @export
-preprocess.model <- function(model, verbose = FALSE, ...) {
+preprocess.model <- function(
+  model,
+  verbose = FALSE,
+  ...
+) {
   if (!is_calibrated(model)) {
     stop("preprocess() requires a calibrated model.", call. = FALSE)
   }
+
+  extend_to_lower <- model$traversal$extend_to_lower %||% FALSE
+  extend_to_upper <- model$traversal$extend_to_upper %||% FALSE
 
   # ------------------------------------------------------------------
   # 1. Profile likelihood
@@ -123,7 +127,9 @@ preprocess.model <- function(model, verbose = FALSE, ...) {
     psi_loglik_df = model$workspace$profile$psi_loglik_df,
     branch_seeds = model$workspace$integrated$cache$branch_seeds,
     alpha_target = alpha_target,
-    psi_interval = psi_interval
+    psi_interval = psi_interval,
+    extend_to_lower = extend_to_lower,
+    extend_to_upper = extend_to_upper
   )
 
   if (verbose) {

@@ -1,20 +1,16 @@
 # ======================================================================
-# calibrate-sampler.R — Sampler Calibration (v2.1)
+# calibrate-sampler.R — Sampler Calibration (v2.3)
 #
-# Resolves a sampler_spec into closed-over functions ready for use
-# by sieve(). After calibration, model$sampler holds:
+# Resolves a sampler_spec into a closed-over draw function ready for
+# use by sieve(). After calibration, model$sampler holds:
 #
-#   $draw          — closure(history = NULL) -> numeric omega-hat
-#   $expand_orbit  — closure(omega_hat)      -> list of numeric vectors
-#                    NULL if no orbit_expander_fn supplied
-#   $orbit_sample_size — integer or NULL: number of candidates to sample
-#                    and screen per orbit (including the base draw).
-#                    NULL means screen all candidates returned by the
-#                    expander. Subsampling is handled inside the
-#                    orbit_expander_fn closure, not in sieve().
-#   $total_seeds   — integer: min_branches + branch_buffer
-#                    used by sieve() to know how many to collect, and
-#                    by calibrate_execution() to derive chunk_size
+#   $draw        — closure(history = NULL) ->
+#                  list(candidate, diag)
+#                  where $candidate is a numeric omega-hat and $diag
+#                  is a named list of draw-level metadata (may be empty)
+#   $total_seeds — integer: min_branches + branch_buffer
+#                  used by sieve() to know how many to collect, and
+#                  by calibrate_execution() to derive chunk_size
 # ======================================================================
 
 #' @keywords internal
@@ -50,7 +46,6 @@ calibrate_sampler <- function(
     ineq_fn = parameter$ineq,
     ineq_jac = parameter$ineq_jac,
     solver = solver,
-    orbit_sample_size = sampler$orbit_sample_size,
     counts = data$count
   )
 
@@ -68,22 +63,13 @@ calibrate_sampler <- function(
   # 1. draw
   # -------------------------------------------------------------------
   sampler$draw <- if (!is.null(sampler$sampler_fn)) {
-    .call_constructor(sampler$sampler_fn)
+    .call_constructor(sampler$sampler_fn, extra = sampler$extra)
   } else {
     .build_default_sampler(base_args)
   }
 
   # -------------------------------------------------------------------
-  # 2. expand_orbit (optional)
-  # -------------------------------------------------------------------
-  sampler$expand_orbit <- if (!is.null(sampler$orbit_expander_fn)) {
-    .call_constructor(sampler$orbit_expander_fn)
-  } else {
-    NULL
-  }
-
-  # -------------------------------------------------------------------
-  # 3. total_seeds — computed here so sieve() and calibrate_execution()
+  # 2. total_seeds — computed here so sieve() and calibrate_execution()
   #    can both read it from model$sampler
   # -------------------------------------------------------------------
   sampler$total_seeds <- as.integer(
@@ -91,10 +77,9 @@ calibrate_sampler <- function(
   )
 
   # -------------------------------------------------------------------
-  # 4. Drop raw constructors — no longer needed after calibration
+  # 3. Drop raw constructors — no longer needed after calibration
   # -------------------------------------------------------------------
   sampler$sampler_fn <- NULL
-  sampler$orbit_expander_fn <- NULL
 
   sampler
 }
@@ -118,6 +103,6 @@ calibrate_sampler <- function(
 
   function(history = NULL) {
     init <- initgen(history = history)
-    proj(init)
+    list(candidate = proj(init), diag = list())
   }
 }

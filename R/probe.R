@@ -149,6 +149,21 @@ probe <- function(
   }
 
   # -------------------------------------------------------------------
+  # 3b. Reject if mode sits on a psi boundary
+  # -------------------------------------------------------------------
+  if (k_mode == k_min || k_mode == k_max) {
+    return(list(
+      accepted = FALSE,
+      reason = "mode_on_psi_boundary",
+      psi_mode = psi_mode,
+      k_mode = k_mode,
+      k_min = k_min,
+      k_max = k_max,
+      omega_hat = omega_hat
+    ))
+  }
+
+  # -------------------------------------------------------------------
   # 4. Re-evaluate at snapped mode
   # -------------------------------------------------------------------
   branch_evaluator <- traversal$branch_binder(omega_hat)
@@ -284,6 +299,18 @@ probe <- function(
         param_mode <- res_right$param_hat
         ll_mode <- new_ll_right
         k_mode <- k_right
+      }
+
+      if (k_mode == k_min || k_mode == k_max) {
+        return(list(
+          accepted = FALSE,
+          reason = "mode_on_psi_boundary",
+          psi_mode = psi_mode,
+          k_mode = k_mode,
+          k_min = k_min,
+          k_max = k_max,
+          omega_hat = omega_hat
+        ))
       }
 
       ll_left <- ll_mode

@@ -256,14 +256,24 @@ check_drop <- function(
 #' The union is then intersected with \code{psi_interval} if one
 #' exists, so branches never extend beyond the parameter space boundary.
 #'
-#' @param psi_loglik_df        Data frame with a \code{psi} column (the profile
+#' If \code{extend_to_lower = TRUE} and \code{psi_interval} has a
+#' finite lower bound, \code{psi_lower} is snapped to that bound
+#' regardless of the profile extent or mode distribution. Likewise
+#' for \code{extend_to_upper = TRUE}.
+#'
+#' @param psi_loglik_df    Data frame with a \code{psi} column (the profile
 #'   likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).
-#' @param branch_seeds      List of branch seed objects from
+#' @param branch_seeds     List of branch seed objects from
 #'   \code{sieve()}, each with a \code{$psi_mode} field.
-#' @param alpha_target      Numeric scalar. Significance level for the
+#' @param alpha_target     Numeric scalar. Significance level for the
 #'   default \code{z} multiplier. Ignored if \code{z} is supplied.
-#' @param psi_interval      A \code{sets::interval} object or
-#'   \code{NULL}.
+#' @param psi_interval     A \code{sets::interval} object or \code{NULL}.
+#' @param extend_to_lower  Logical. If \code{TRUE} and \code{psi_interval}
+#'   has a finite lower bound, snap \code{psi_lower} to that bound.
+#'   Default: \code{FALSE}.
+#' @param extend_to_upper  Logical. If \code{TRUE} and \code{psi_interval}
+#'   has a finite upper bound, snap \code{psi_upper} to that bound.
+#'   Default: \code{FALSE}.
 #'
 #' @return A named list with:
 #'   \itemize{
@@ -280,7 +290,9 @@ compute_common_interval <- function(
   psi_loglik_df,
   branch_seeds,
   alpha_target,
-  psi_interval = NULL
+  psi_interval = NULL,
+  extend_to_lower = FALSE,
+  extend_to_upper = FALSE
 ) {
   if (is.null(psi_loglik_df) || nrow(psi_loglik_df) == 0L) {
     stop(
@@ -317,14 +329,41 @@ compute_common_interval <- function(
   # -------------------------------------------------------------------
   # Intersect with psi_interval if it exists
   # -------------------------------------------------------------------
-  if (!is.null(psi_interval)) {
-    domain_lower <- min(psi_interval)
-    domain_upper <- max(psi_interval)
+  domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else NULL
+  domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else NULL
 
-    if (is.finite(domain_lower)) {
-      psi_lower <- max(psi_lower, domain_lower)
+  if (!is.null(domain_lower) && is.finite(domain_lower)) {
+    psi_lower <- max(psi_lower, domain_lower)
+  }
+  if (!is.null(domain_upper) && is.finite(domain_upper)) {
+    psi_upper <- min(psi_upper, domain_upper)
+  }
+
+  # -------------------------------------------------------------------
+  # Snap to boundary endpoints if requested
+  # -------------------------------------------------------------------
+  if (isTRUE(extend_to_lower)) {
+    if (!is.null(domain_lower) && is.finite(domain_lower)) {
+      psi_lower <- domain_lower
+    } else {
+      warning(
+        "compute_common_interval(): extend_to_lower = TRUE but ",
+        "psi_interval has no finite lower bound. Ignoring.",
+        call. = FALSE
+      )
     }
-    if (is.finite(domain_upper)) psi_upper <- min(psi_upper, domain_upper)
+  }
+
+  if (isTRUE(extend_to_upper)) {
+    if (!is.null(domain_upper) && is.finite(domain_upper)) {
+      psi_upper <- domain_upper
+    } else {
+      warning(
+        "compute_common_interval(): extend_to_upper = TRUE but ",
+        "psi_interval has no finite upper bound. Ignoring.",
+        call. = FALSE
+      )
+    }
   }
 
   if (psi_lower >= psi_upper) {

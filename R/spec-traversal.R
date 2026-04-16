@@ -36,15 +36,13 @@
 #'   mode log-likelihood is more than \code{mode_gap_multiplier *
 #'   effective_crit} below the profile log-likelihood at the MLE is
 #'   rejected as uninformative. Default: \code{1.0}.
-#' @param extend_to_lower Logical. If \code{TRUE} and
-#'   \code{psi_interval} has a finite lower bound, the common ψ
-#'   interval computed by \code{preprocess()} is snapped to that bound
-#'   regardless of the profile extent or branch seed modes. Useful when
-#'   the estimand has a natural lower boundary that the integrated
-#'   likelihood should always reach (e.g. Simpson's index at
-#'   \code{1/J}). Default: \code{FALSE}.
-#' @param extend_to_upper Logical. Analogous to \code{extend_to_lower}
-#'   for the upper bound. Default: \code{FALSE}.
+#' @param interval_buffer Positive numeric scalar. Multiplicative
+#'   expansion factor applied to the profile likelihood half-width
+#'   when computing the common ψ interval during \code{preprocess()}.
+#'   A value of \code{1.0} uses the profile extent as-is. Values
+#'   above \code{1.0} expand the interval symmetrically around the
+#'   profile midpoint, providing additional margin for the IL tails
+#'   to reach the cutoff. Default: \code{1.0}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -62,8 +60,7 @@ traversal_spec <- function(
   drop_multiplier = 2.0,
   cap_multiplier = 10.0,
   mode_gap_multiplier = 1.0,
-  extend_to_lower = FALSE,
-  extend_to_upper = FALSE,
+  interval_buffer = 1.0,
   name = NULL,
   ...
 ) {
@@ -80,8 +77,7 @@ traversal_spec <- function(
     drop_multiplier = drop_multiplier,
     cap_multiplier = cap_multiplier,
     mode_gap_multiplier = mode_gap_multiplier,
-    extend_to_lower = extend_to_lower,
-    extend_to_upper = extend_to_upper,
+    interval_buffer = interval_buffer,
     max_drop_cap = NULL, # populated by preprocess()
     extra = list(...)
   )
@@ -217,14 +213,13 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     )
   }
 
-  # extend_to_lower ---------------------------------------------------
-  if (!is.logical(x$extend_to_lower) || length(x$extend_to_lower) != 1L) {
-    stop("extend_to_lower must be a logical scalar.", call. = FALSE)
-  }
-
-  # extend_to_upper ---------------------------------------------------
-  if (!is.logical(x$extend_to_upper) || length(x$extend_to_upper) != 1L) {
-    stop("extend_to_upper must be a logical scalar.", call. = FALSE)
+  # interval_buffer ---------------------------------------------------
+  if (
+    !is.numeric(x$interval_buffer) ||
+      length(x$interval_buffer) != 1L ||
+      x$interval_buffer <= 0
+  ) {
+    stop("interval_buffer must be a positive numeric scalar.", call. = FALSE)
   }
 
   invisible(x)
@@ -263,8 +258,7 @@ print.traversal_spec <- function(x, ...) {
   cat("- drop_multiplier:     ", x$drop_multiplier, "\n", sep = "")
   cat("- cap_multiplier:      ", x$cap_multiplier, "\n", sep = "")
   cat("- mode_gap_multiplier: ", x$mode_gap_multiplier, "\n", sep = "")
-  cat("- extend_to_lower:     ", x$extend_to_lower, "\n", sep = "")
-  cat("- extend_to_upper:     ", x$extend_to_upper, "\n", sep = "")
+  cat("- interval_buffer:     ", x$interval_buffer, "\n", sep = "")
   if (!is.null(x$max_drop_cap)) {
     cat(
       "- max_drop_cap:        ",

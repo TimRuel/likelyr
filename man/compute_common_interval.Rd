@@ -6,66 +6,50 @@
 \usage{
 compute_common_interval(
   psi_loglik_df,
-  branch_seeds,
-  alpha_target,
   psi_interval = NULL,
-  extend_to_lower = FALSE,
-  extend_to_upper = FALSE
+  increment,
+  interval_buffer = 1
 )
 }
 \arguments{
-\item{psi_loglik_df}{Data frame with a \code{psi} column (the profile
-likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).}
-
-\item{branch_seeds}{List of branch seed objects from
-\code{sieve()}, each with a \code{$psi_mode} field.}
-
-\item{alpha_target}{Numeric scalar. Significance level for the
-default \code{z} multiplier. Ignored if \code{z} is supplied.}
+\item{psi_loglik_df}{Data frame with \code{psi} and \code{loglik}
+columns (i.e. \code{model$workspace$profile$psi_loglik_df}).}
 
 \item{psi_interval}{A \code{sets::interval} object or \code{NULL}.}
 
-\item{extend_to_lower}{Logical. If \code{TRUE} and \code{psi_interval}
-has a finite lower bound, snap \code{psi_lower} to that bound.
-Default: \code{FALSE}.}
+\item{increment}{Positive numeric scalar. Grid spacing, used as
+the tolerance for boundary proximity detection.}
 
-\item{extend_to_upper}{Logical. If \code{TRUE} and \code{psi_interval}
-has a finite upper bound, snap \code{psi_upper} to that bound.
-Default: \code{FALSE}.}
+\item{interval_buffer}{Positive numeric scalar. Multiplicative
+expansion factor applied to the profile half-width before
+intersecting with \code{psi_interval}. A value of \code{1.0}
+uses the profile extent as-is. Default: \code{1.0}.}
 }
 \value{
 A named list with:
 \itemize{
-\item \code{$psi_lower}  — numeric scalar lower bound
-\item \code{$psi_upper}  — numeric scalar upper bound
-\item \code{$mode_mean}  — mean of branch seed modes
-\item \code{$mode_sd}    — sd of branch seed modes
-\item \code{$z}          — multiplier used
+\item \code{$psi_lower}         — numeric scalar lower bound
+\item \code{$psi_upper}         — numeric scalar upper bound
+\item \code{$snapped_to_lower}  — logical; TRUE if lower bound
+was snapped to the domain boundary
+\item \code{$snapped_to_upper}  — logical; TRUE if upper bound
+was snapped to the domain boundary
 }
 }
 \description{
 Derives the common ψ support interval to be used across all Monte
 Carlo branches, ensuring full overlap and valid CI estimation.
 
-The interval is the union of two components:
-\enumerate{
-\item The profile likelihood extent — from its leftmost to rightmost
-ψ value, which by construction reaches
-\code{effective_crit = crit * cutoff_buffer} on both sides.
-\item A mode-distribution interval — \code{[x_bar - z * s,
-    x_bar + z * s]}, where \code{x_bar} and \code{s} are the mean
-and standard deviation of the branch seed modes, and \code{z}
-is a user-supplied multiplier (default: \code{qnorm(1 -
-    alpha_target / 2)}). This extends coverage into regions where
-branch modes cluster far from the profile MLE.
-}
+The interval starts from the profile likelihood extent, optionally
+expanded by \code{interval_buffer}, then intersected with
+\code{psi_interval}.
 
-The union is then intersected with \code{psi_interval} if one
-exists, so branches never extend beyond the parameter space boundary.
-
-If \code{extend_to_lower = TRUE} and \code{psi_interval} has a
-finite lower bound, \code{psi_lower} is snapped to that bound
-regardless of the profile extent or mode distribution. Likewise
-for \code{extend_to_upper = TRUE}.
+Additionally, if the profile reached a finite parameter space boundary
+without dropping to its cutoff — detected by checking whether
+\code{profile_lower} is within one grid step of \code{domain_lower}
+(and analogously for the upper side) — the corresponding common
+interval bound is automatically snapped to that boundary. This
+handles the case where the likelihood is flat near the boundary and
+the IL tails may not drop to the CI cutoff before reaching it.
 }
 \keyword{internal}

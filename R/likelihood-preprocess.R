@@ -50,9 +50,6 @@ preprocess.model <- function(
     stop("preprocess() requires a calibrated model.", call. = FALSE)
   }
 
-  extend_to_lower <- model$traversal$extend_to_lower %||% FALSE
-  extend_to_upper <- model$traversal$extend_to_upper %||% FALSE
-
   # ------------------------------------------------------------------
   # 1. Profile likelihood
   # ------------------------------------------------------------------
@@ -121,30 +118,26 @@ preprocess.model <- function(
   # 3. Common interval
   # ------------------------------------------------------------------
   psi_interval <- model$estimand$psi_interval %||% NULL
-  alpha_target <- min(1 - model$traversal$confidence_levels)
 
   common_interval <- compute_common_interval(
     psi_loglik_df = model$workspace$profile$psi_loglik_df,
-    branch_seeds = model$workspace$integrated$cache$branch_seeds,
-    alpha_target = alpha_target,
     psi_interval = psi_interval,
-    extend_to_lower = extend_to_lower,
-    extend_to_upper = extend_to_upper
+    increment = model$traversal$increment,
+    interval_buffer = model$traversal$interval_buffer %||% 1.0
   )
 
   if (verbose) {
+    snap_note <- paste0(
+      if (common_interval$snapped_to_lower) " [snapped lower]" else "",
+      if (common_interval$snapped_to_upper) " [snapped upper]" else ""
+    )
     cat(
       "[preprocess] Common interval: [",
-      common_interval$psi_lower,
+      round(common_interval$psi_lower, 4),
       ", ",
-      common_interval$psi_upper,
+      round(common_interval$psi_upper, 4),
       "]",
-      " | mode_mean = ",
-      round(common_interval$mode_mean, 4),
-      " | mode_sd = ",
-      round(common_interval$mode_sd, 4),
-      " | z = ",
-      round(common_interval$z, 3),
+      snap_note,
       "\n",
       sep = ""
     )

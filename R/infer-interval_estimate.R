@@ -96,11 +96,11 @@ find_interval_endpoints <- function(psi_loglik, alpha, psi_interval = NULL) {
       # Boundary substitution: grid right edge is at declared upper bound
       # and the likelihood is still above the critical threshold there
       if (
-        !is.null(psi_interval$upper) &&
-          abs(psi_range[2] - psi_interval$upper) < tol &&
+        !is.null(max(psi_interval)) &&
+          abs(psi_range[2] - max(psi_interval)) < tol &&
           psi_loglik_shifted(psi_range[2]) > 0
       ) {
-        psi_interval$upper
+        max(psi_interval)
       } else {
         NA_real_
       }

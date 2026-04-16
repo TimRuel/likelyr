@@ -240,59 +240,44 @@ check_drop <- function(
 #' Derives the common ψ support interval to be used across all Monte
 #' Carlo branches, ensuring full overlap and valid CI estimation.
 #'
-#' The interval is the union of two components:
-#' \enumerate{
-#'   \item The profile likelihood extent — from its leftmost to rightmost
-#'     ψ value, which by construction reaches
-#'     \code{effective_crit = crit * cutoff_buffer} on both sides.
-#'   \item A mode-distribution interval — \code{[x_bar - z * s,
-#'     x_bar + z * s]}, where \code{x_bar} and \code{s} are the mean
-#'     and standard deviation of the branch seed modes, and \code{z}
-#'     is a user-supplied multiplier (default: \code{qnorm(1 -
-#'     alpha_target / 2)}). This extends coverage into regions where
-#'     branch modes cluster far from the profile MLE.
-#' }
+#' The interval starts from the profile likelihood extent, optionally
+#' expanded by \code{interval_buffer}, then intersected with
+#' \code{psi_interval}.
 #'
-#' The union is then intersected with \code{psi_interval} if one
-#' exists, so branches never extend beyond the parameter space boundary.
+#' Additionally, if the profile reached a finite parameter space boundary
+#' without dropping to its cutoff — detected by checking whether
+#' \code{profile_lower} is within one grid step of \code{domain_lower}
+#' (and analogously for the upper side) — the corresponding common
+#' interval bound is automatically snapped to that boundary. This
+#' handles the case where the likelihood is flat near the boundary and
+#' the IL tails may not drop to the CI cutoff before reaching it.
 #'
-#' If \code{extend_to_lower = TRUE} and \code{psi_interval} has a
-#' finite lower bound, \code{psi_lower} is snapped to that bound
-#' regardless of the profile extent or mode distribution. Likewise
-#' for \code{extend_to_upper = TRUE}.
-#'
-#' @param psi_loglik_df    Data frame with a \code{psi} column (the profile
-#'   likelihood result, i.e. \code{model$workspace$profile$psi_loglik_df}).
-#' @param branch_seeds     List of branch seed objects from
-#'   \code{sieve()}, each with a \code{$psi_mode} field.
-#' @param alpha_target     Numeric scalar. Significance level for the
-#'   default \code{z} multiplier. Ignored if \code{z} is supplied.
-#' @param psi_interval     A \code{sets::interval} object or \code{NULL}.
-#' @param extend_to_lower  Logical. If \code{TRUE} and \code{psi_interval}
-#'   has a finite lower bound, snap \code{psi_lower} to that bound.
-#'   Default: \code{FALSE}.
-#' @param extend_to_upper  Logical. If \code{TRUE} and \code{psi_interval}
-#'   has a finite upper bound, snap \code{psi_upper} to that bound.
-#'   Default: \code{FALSE}.
+#' @param psi_loglik_df   Data frame with \code{psi} and \code{loglik}
+#'   columns (i.e. \code{model$workspace$profile$psi_loglik_df}).
+#' @param psi_interval    A \code{sets::interval} object or \code{NULL}.
+#' @param increment       Positive numeric scalar. Grid spacing, used as
+#'   the tolerance for boundary proximity detection.
+#' @param interval_buffer Positive numeric scalar. Multiplicative
+#'   expansion factor applied to the profile half-width before
+#'   intersecting with \code{psi_interval}. A value of \code{1.0}
+#'   uses the profile extent as-is. Default: \code{1.0}.
 #'
 #' @return A named list with:
 #'   \itemize{
-#'     \item \code{$psi_lower}  — numeric scalar lower bound
-#'     \item \code{$psi_upper}  — numeric scalar upper bound
-#'     \item \code{$mode_mean}  — mean of branch seed modes
-#'     \item \code{$mode_sd}    — sd of branch seed modes
-#'     \item \code{$z}          — multiplier used
+#'     \item \code{$psi_lower}         — numeric scalar lower bound
+#'     \item \code{$psi_upper}         — numeric scalar upper bound
+#'     \item \code{$snapped_to_lower}  — logical; TRUE if lower bound
+#'       was snapped to the domain boundary
+#'     \item \code{$snapped_to_upper}  — logical; TRUE if upper bound
+#'       was snapped to the domain boundary
 #'   }
 #'
-#' @importFrom stats qnorm sd
 #' @keywords internal
 compute_common_interval <- function(
   psi_loglik_df,
-  branch_seeds,
-  alpha_target,
   psi_interval = NULL,
-  extend_to_lower = FALSE,
-  extend_to_upper = FALSE
+  increment,
+  interval_buffer = 1.0
 ) {
   if (is.null(psi_loglik_df) || nrow(psi_loglik_df) == 0L) {
     stop(
@@ -303,73 +288,58 @@ compute_common_interval <- function(
   }
 
   # -------------------------------------------------------------------
-  # Component 1: profile extent
+  # Profile extent
   # -------------------------------------------------------------------
   profile_lower <- min(psi_loglik_df$psi)
   profile_upper <- max(psi_loglik_df$psi)
 
   # -------------------------------------------------------------------
-  # Component 2: mode-distribution interval
+  # Apply multiplicative buffer around profile half-width
   # -------------------------------------------------------------------
-  psi_modes <- vapply(branch_seeds, `[[`, "psi_mode", FUN.VALUE = numeric(1))
-  mode_mean <- mean(psi_modes)
-  mode_sd <- sd(psi_modes)
+  center <- (profile_lower + profile_upper) / 2
+  half_width <- (profile_upper - profile_lower) / 2
 
-  z <- qnorm(1 - alpha_target / 2)
-
-  mode_lower <- mode_mean - z * mode_sd
-  mode_upper <- mode_mean + z * mode_sd
+  psi_lower <- center - half_width * interval_buffer
+  psi_upper <- center + half_width * interval_buffer
 
   # -------------------------------------------------------------------
-  # Union of profile extent and mode-distribution interval
-  # -------------------------------------------------------------------
-  psi_lower <- min(profile_lower, mode_lower)
-  psi_upper <- max(profile_upper, mode_upper)
-
-  # -------------------------------------------------------------------
-  # Intersect with psi_interval if it exists
+  # Domain bounds
   # -------------------------------------------------------------------
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else NULL
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else NULL
 
-  if (!is.null(domain_lower) && is.finite(domain_lower)) {
-    psi_lower <- max(psi_lower, domain_lower)
-  }
-  if (!is.null(domain_upper) && is.finite(domain_upper)) {
-    psi_upper <- min(psi_upper, domain_upper)
-  }
+  # -------------------------------------------------------------------
+  # Boundary proximity detection:
+  # If the profile reached a finite boundary without dropping to its
+  # cutoff (detected as profile endpoint within one grid step of the
+  # domain boundary), snap the common interval to that boundary so
+  # branches are evaluated all the way to it.
+  # -------------------------------------------------------------------
+  snapped_to_lower <- FALSE
+  snapped_to_upper <- FALSE
 
-  # -------------------------------------------------------------------
-  # Snap to boundary endpoints if requested
-  # -------------------------------------------------------------------
-  if (isTRUE(extend_to_lower)) {
-    if (!is.null(domain_lower) && is.finite(domain_lower)) {
+  if (!is.null(domain_lower) && is.finite(domain_lower)) {
+    if (profile_lower <= domain_lower + increment) {
       psi_lower <- domain_lower
+      snapped_to_lower <- TRUE
     } else {
-      warning(
-        "compute_common_interval(): extend_to_lower = TRUE but ",
-        "psi_interval has no finite lower bound. Ignoring.",
-        call. = FALSE
-      )
+      psi_lower <- max(psi_lower, domain_lower)
     }
   }
 
-  if (isTRUE(extend_to_upper)) {
-    if (!is.null(domain_upper) && is.finite(domain_upper)) {
+  if (!is.null(domain_upper) && is.finite(domain_upper)) {
+    if (profile_upper >= domain_upper - increment) {
       psi_upper <- domain_upper
+      snapped_to_upper <- TRUE
     } else {
-      warning(
-        "compute_common_interval(): extend_to_upper = TRUE but ",
-        "psi_interval has no finite upper bound. Ignoring.",
-        call. = FALSE
-      )
+      psi_upper <- min(psi_upper, domain_upper)
     }
   }
 
   if (psi_lower >= psi_upper) {
     stop(
-      "compute_common_interval(): lower bound >= upper bound after intersection.\n",
-      "Check profile extent, branch seed modes, and psi_interval.",
+      "compute_common_interval(): lower bound >= upper bound.\n",
+      "Check profile extent and psi_interval.",
       call. = FALSE
     )
   }
@@ -377,8 +347,7 @@ compute_common_interval <- function(
   list(
     psi_lower = psi_lower,
     psi_upper = psi_upper,
-    mode_mean = mode_mean,
-    mode_sd = mode_sd,
-    z = z
+    snapped_to_lower = snapped_to_lower,
+    snapped_to_upper = snapped_to_upper
   )
 }

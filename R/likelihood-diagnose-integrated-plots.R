@@ -139,7 +139,8 @@ build_integrated_omega_branch_plot <- function(branch_mat, psi_vals) {
         data = df_long,
         ggplot2::aes(x = psi, y = value, group = CurveID, color = CurveID),
         linewidth = style$line$linewidth,
-        alpha = style$line$alpha
+        alpha = style$line$alpha,
+        na.rm = TRUE
       )
   } else {
     p <- p +
@@ -148,7 +149,8 @@ build_integrated_omega_branch_plot <- function(branch_mat, psi_vals) {
         ggplot2::aes(x = psi, y = value, group = CurveID),
         color = style$line$color,
         linewidth = style$line$linewidth,
-        alpha = style$line$alpha
+        alpha = style$line$alpha,
+        na.rm = TRUE
       )
   }
 
@@ -193,7 +195,6 @@ build_integrated_branch_distribution_plot <- function(branch_mat, psi_vals) {
     tibble::tibble(psi = psi_vals[i], loglik = branch_mat[i, ])
   })
 
-  jitter_width <- diff(range(psi_vals[idx])) / n_show * 0.35
   style <- plot_diagnostics_style("integrated", "branch_distribution")
 
   plot_base(plot = "branch_distribution") +
@@ -204,7 +205,7 @@ build_integrated_branch_distribution_plot <- function(branch_mat, psi_vals) {
       size = style$point$size,
       alpha = style$point$alpha,
       shape = style$point$shape,
-      position = ggplot2::position_jitter(width = jitter_width, height = 0)
+      na.rm = TRUE
     ) +
     ggplot2::labs(
       title = "Branch Value Distribution",

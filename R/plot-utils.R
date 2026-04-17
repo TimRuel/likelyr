@@ -389,7 +389,8 @@ make_diagnostics_line <- function(mapping, style) {
     color = style$line$color,
     linewidth = style$line$linewidth,
     linetype = style$line$linetype,
-    alpha = style$line$alpha
+    alpha = style$line$alpha,
+    na.rm = TRUE
   )
 }
 
@@ -408,6 +409,7 @@ make_diagnostics_point <- function(mapping, style) {
     color = style$point$color,
     size = style$point$size,
     alpha = style$point$alpha,
-    shape = style$point$shape
+    shape = style$point$shape,
+    na.rm = TRUE
   )
 }

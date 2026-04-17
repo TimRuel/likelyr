@@ -160,7 +160,7 @@ add_interval_diagnostics <- function(interval_estimate_df, psi_0 = NA_real_) {
 #' @return Formatted data frame suitable for display.
 #'
 #' @keywords internal
-format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
+format_interval_estimate_df <- function(interval_estimate_df) {
   formatted_df <- interval_estimate_df |>
     dplyr::mutate(
       level = scales::percent(1 - alpha),
@@ -177,8 +177,7 @@ format_interval_estimate_df <- function(interval_estimate_df, digits = 2) {
       upper_dev,
       contains_truth,
       level
-    ) |>
-    dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, digits)))
+    )
 
   attr(formatted_df, "interval_estimate_raw") <- interval_estimate_df |>
     dplyr::select(alpha, lower, upper)
@@ -233,6 +232,8 @@ get_interval_estimate_df <- function(
     psi_loglik_df,
     "pseudolikelihood"
   )
+
+  attr(interval_estimate_df, "psi_interval") <- psi_interval
 
   interval_estimate_df
 }

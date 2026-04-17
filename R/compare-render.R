@@ -18,7 +18,8 @@ render_point_estimates_comparison_table <- function(point_estimates_df) {
   bg <- .pe_row_bg(point_estimates_df$pseudolikelihood)
 
   .render_point_estimate_base(
-    df = point_estimates_df,
+    df = point_estimates_df |>
+      dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2))),
     col_names = c(
       "$\\psi_0$",
       "$\\hat{\\psi}$",
@@ -81,7 +82,8 @@ render_interval_estimates_comparison_table <- function(interval_estimates_df) {
         contains_truth ~ "\u2705",
         TRUE ~ "\u274c"
       )
-    )
+    ) |>
+    dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2)))
 
   bg <- .interval_level_bg(df_render$level)
 
@@ -160,6 +162,7 @@ render_estimates_comparison_table <- function(
 
   df_render <- estimates_df |>
     dplyr::mutate(diagram = "", .after = "pseudolikelihood") |>
+    dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2))) |>
     dplyr::mutate(
       dplyr::across(
         c(psi_hat, error, se_psi_hat),

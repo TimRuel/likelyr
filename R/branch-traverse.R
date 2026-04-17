@@ -68,6 +68,7 @@ traverse_branch <- function(
     method,
     topdown = traverse_branch_topdown(
       branch_seed = branch_seed,
+      traversal = traversal,
       grid = grid,
       branch_evaluator = branch_evaluator
     ),
@@ -104,6 +105,7 @@ traverse_branch <- function(
 #' @keywords internal
 traverse_branch_topdown <- function(
   branch_seed,
+  traversal,
   grid,
   branch_evaluator
 ) {
@@ -111,6 +113,14 @@ traverse_branch_topdown <- function(
   probe_evals_df <- branch_seed$probe_evals_df
 
   k_mode <- round((psi_mode - grid$psi_mle) / grid$increment)
+
+  # Compute branch_cutoff for closed-boundary evaluation
+  alpha_target <- min(1 - traversal$confidence_levels)
+  crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+  effective_crit <- crit * traversal$cutoff_buffer
+  branch_cutoff <- branch_seed$ll_mode - effective_crit
+
+  psi_interval <- traversal$psi_interval %||% NULL
 
   probe_evals_df_left <- probe_evals_df |>
     dplyr::filter(side == "left")
@@ -139,7 +149,9 @@ traverse_branch_topdown <- function(
       k_direction = -1L,
       k_start = k_left_edge - 1L,
       init_guess = branch_seed$param_left_edge,
-      branch_evaluator = branch_evaluator
+      branch_evaluator = branch_evaluator,
+      branch_cutoff = branch_cutoff,
+      psi_interval = psi_interval
     )
   }
 
@@ -154,7 +166,9 @@ traverse_branch_topdown <- function(
       k_direction = +1L,
       k_start = k_right_edge + 1L,
       init_guess = branch_seed$param_right_edge,
-      branch_evaluator = branch_evaluator
+      branch_evaluator = branch_evaluator,
+      branch_cutoff = branch_cutoff,
+      psi_interval = psi_interval
     )
   }
 
@@ -251,9 +265,18 @@ traverse_branch_leftright <- function(
 #' @description
 #' Sweeps outward from \code{k_start} in the given direction, evaluating
 #' the branch at each grid point. Stops when the common interval boundary
-#' is reached. Points where the solver returns a non-finite value are
-#' skipped; if \code{max_consecutive_skips} such failures occur in a
-#' row, the side stops early.
+#' is reached.
+#'
+#' If the next step would cross a finite, closed parameter space
+#' boundary and the CI cutoff has not yet been reached at the last
+#' evaluated point, one additional evaluation is performed at the
+#' exact boundary value before stopping. This ensures the branch
+#' extends to the boundary when the likelihood is still above the
+#' cutoff there.
+#'
+#' Points where the solver returns a non-finite value are skipped; if
+#' \code{max_consecutive_skips} such failures occur in a row, the side
+#' stops early.
 #'
 #' @param grid                  ψ-grid object. \code{psi_lower} and
 #'   \code{psi_upper} define the stopping boundaries.
@@ -261,6 +284,11 @@ traverse_branch_leftright <- function(
 #' @param k_start               Integer starting grid index.
 #' @param init_guess            Numeric vector warm-start parameter.
 #' @param branch_evaluator      Function (psi, param_init) -> list.
+#' @param branch_cutoff         Numeric scalar. The log-likelihood value
+#'   below which the branch is considered to have reached its CI cutoff.
+#'   Used to decide whether to evaluate at a closed boundary.
+#' @param psi_interval          A \code{sets::interval} object or
+#'   \code{NULL}. Used to determine whether each boundary is closed.
 #' @param max_consecutive_skips Integer. Stop side after this many
 #'   consecutive solver failures. Default: \code{2L}.
 #'
@@ -271,10 +299,13 @@ traverse_branch_side <- function(
   k_start,
   init_guess,
   branch_evaluator,
+  branch_cutoff = -Inf,
+  psi_interval = NULL,
   max_consecutive_skips = 2L
 ) {
   k_curr <- k_start
   current_par <- init_guess
+  current_ll <- Inf
   consecutive_skips <- 0L
 
   psi_lower <- grid$psi_lower
@@ -282,13 +313,44 @@ traverse_branch_side <- function(
 
   df <- tibble::tibble(k = integer(), loglik = numeric())
 
+  # Determine whether each boundary is closed
+  lower_closed <- !is.null(psi_interval) &&
+    is.finite(min(psi_interval)) &&
+    sets::interval_is_left_closed(psi_interval)
+
+  upper_closed <- !is.null(psi_interval) &&
+    is.finite(max(psi_interval)) &&
+    sets::interval_is_right_closed(psi_interval)
+
   repeat {
     psi_k <- grid$psi_mle + k_curr * grid$increment
 
-    if (!is.null(psi_lower) && psi_k < psi_lower) {
-      break
-    }
-    if (!is.null(psi_upper) && psi_k > psi_upper) {
+    # -------------------------------------------------------------------
+    # Boundary check: would this step cross the common interval limit?
+    # If so, and the cutoff hasn't been reached yet, and the boundary is
+    # closed, evaluate exactly at the boundary value before stopping.
+    # -------------------------------------------------------------------
+    hit_lower <- !is.null(psi_lower) && psi_k < psi_lower
+    hit_upper <- !is.null(psi_upper) && psi_k > psi_upper
+
+    if (hit_lower || hit_upper) {
+      cutoff_not_reached <- current_ll > branch_cutoff
+      boundary_val <- if (hit_lower) psi_lower else psi_upper
+      boundary_closed <- if (hit_lower) lower_closed else upper_closed
+
+      if (cutoff_not_reached && boundary_closed) {
+        eval <- tryCatch(
+          branch_evaluator(boundary_val, current_par),
+          error = function(e) NULL
+        )
+        if (!is.null(eval) && is.finite(eval$branch_val)) {
+          # Use a sentinel k value: the boundary mapped to the grid anchor
+          k_boundary <- round(
+            (boundary_val - grid$psi_mle) / grid$increment
+          )
+          df <- dplyr::add_row(df, k = k_boundary, loglik = eval$branch_val)
+        }
+      }
       break
     }
 
@@ -302,6 +364,7 @@ traverse_branch_side <- function(
       if (consecutive_skips >= max_consecutive_skips) break
     } else {
       df <- dplyr::add_row(df, k = k_curr, loglik = eval$branch_val)
+      current_ll <- eval$branch_val
       consecutive_skips <- 0L
       current_par <- eval$param_hat
     }

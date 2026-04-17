@@ -10,6 +10,83 @@
 #   Enforcement is via .assert_local_plotting() at entry.
 
 # ---------------------------------------------------------------------
+# Internal: boundary shading layers
+# ---------------------------------------------------------------------
+
+#' Build boundary shading and label layers for a psi plot
+#'
+#' @param psi_interval A sets::interval object or NULL.
+#' @param psi_limits   Numeric length-2 vector of full plot x limits
+#'   (may extend beyond the domain boundary).
+#'
+#' @return A list of ggplot2 layers (may be empty).
+#'
+#' @keywords internal
+#' @noRd
+make_boundary_layers <- function(psi_interval, psi_limits) {
+  if (is.null(psi_interval)) {
+    return(list())
+  }
+
+  domain_lower <- min(psi_interval)
+  domain_upper <- max(psi_interval)
+
+  boundary_fill <- "#888888"
+  boundary_alpha <- 0.12
+
+  layers <- list()
+
+  # Only shade when boundary falls strictly inside the plot range
+  if (is.finite(domain_lower) && domain_lower > psi_limits[1]) {
+    layers <- c(
+      layers,
+      list(
+        ggplot2::annotate(
+          "rect",
+          xmin = psi_limits[1],
+          xmax = domain_lower,
+          ymin = -Inf,
+          ymax = Inf,
+          fill = boundary_fill,
+          alpha = boundary_alpha
+        ),
+        ggplot2::geom_vline(
+          xintercept = domain_lower,
+          linetype = "dashed",
+          linewidth = 0.4,
+          colour = "black"
+        )
+      )
+    )
+  }
+
+  if (is.finite(domain_upper) && domain_upper < psi_limits[2]) {
+    layers <- c(
+      layers,
+      list(
+        ggplot2::annotate(
+          "rect",
+          xmin = domain_upper,
+          xmax = psi_limits[2],
+          ymin = -Inf,
+          ymax = Inf,
+          fill = boundary_fill,
+          alpha = boundary_alpha
+        ),
+        ggplot2::geom_vline(
+          xintercept = domain_upper,
+          linetype = "dashed",
+          linewidth = 0.4,
+          colour = "black"
+        )
+      )
+    )
+  }
+
+  layers
+}
+
+# ---------------------------------------------------------------------
 # Point cloud visualization
 # ---------------------------------------------------------------------
 
@@ -53,9 +130,16 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   ci_raw <- ci_long |> dplyr::filter(!is.na(endpoint))
 
   # --------------------------------------------------
+  # PSI interval — parameter space boundaries
+  # --------------------------------------------------
+  psi_interval <- attr(interval_estimate_df, "psi_interval")
+  domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
+  domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
+
+  # --------------------------------------------------
   # PSI limits — driven by inferential quantities only.
-  # Excluding range(psi_loglik_df$psi) prevents the integrated
-  # likelihood plot from inheriting the wider common interval extent.
+  # Full plot range extends beyond domain for padding;
+  # curve is clipped separately to the domain boundary.
   # --------------------------------------------------
   psi_anchors <- c(
     ci_raw$endpoint,
@@ -73,7 +157,15 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
     padding <- 0.01
   }
 
-  psi_limits <- c(min(psi_anchors) - padding, max(psi_anchors) + padding)
+  psi_limits <- c(
+    min(psi_anchors) - padding,
+    max(psi_anchors) + padding
+  )
+
+  curve_limits <- c(
+    max(psi_limits[1], domain_lower),
+    min(psi_limits[2], domain_upper)
+  )
 
   # --------------------------------------------------
   # Y limits
@@ -83,11 +175,16 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   y_limits <- c(y_lower * 1.05, 0)
 
   # --------------------------------------------------
+  # Boundary shading
+  # --------------------------------------------------
+  boundary_layers <- make_boundary_layers(psi_interval, psi_limits)
+
+  # --------------------------------------------------
   # Curve layer
   # --------------------------------------------------
   curve_layer <- make_curve_layer(
     psi_loglik = psi_loglik,
-    psi_limits = psi_limits,
+    psi_limits = curve_limits,
     comparison = FALSE
   )
 
@@ -111,6 +208,7 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   # Assemble plot
   # --------------------------------------------------
   plot_base(plot = "single_curve") +
+    boundary_layers +
     curve_layer +
     loglik_reference_line() +
 
@@ -179,9 +277,19 @@ plot_pseudolikelihood_curves <- function(res_list) {
     dplyr::filter(!is.na(endpoint))
 
   # --------------------------------------------------
+  # PSI interval — take from first inference result that has one
+  # --------------------------------------------------
+  psi_interval <- purrr::detect(
+    purrr::map(infer_list, \(x) attr(x$interval_estimate_df, "psi_interval")),
+    \(x) !is.null(x)
+  )
+  domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
+  domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
+
+  # --------------------------------------------------
   # PSI limits — driven by inferential quantities only.
-  # Excluding range(psi_loglik_df$psi) prevents the integrated
-  # likelihood's wider common interval from dominating the x range.
+  # Full plot range extends beyond domain for padding;
+  # curves are clipped separately to the domain boundary.
   # --------------------------------------------------
   psi_anchors <- c(
     ci_all$endpoint,
@@ -199,7 +307,15 @@ plot_pseudolikelihood_curves <- function(res_list) {
     padding <- 0.01
   }
 
-  psi_limits <- c(min(psi_anchors) - padding, max(psi_anchors) + padding)
+  psi_limits <- c(
+    min(psi_anchors) - padding,
+    max(psi_anchors) + padding
+  )
+
+  curve_limits <- c(
+    max(psi_limits[1], domain_lower),
+    min(psi_limits[2], domain_upper)
+  )
 
   # --------------------------------------------------
   # Y limits
@@ -209,6 +325,11 @@ plot_pseudolikelihood_curves <- function(res_list) {
   y_limits <- c(y_lower * 1.05, 0)
 
   # --------------------------------------------------
+  # Boundary shading
+  # --------------------------------------------------
+  boundary_layers <- make_boundary_layers(psi_interval, psi_limits)
+
+  # --------------------------------------------------
   # Curve layers
   # --------------------------------------------------
   curve_layers <- psi_loglik_dfs |>
@@ -216,7 +337,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
       \(df) {
         make_curve_layer(
           psi_loglik = fit_psi_loglik(df),
-          psi_limits = psi_limits,
+          psi_limits = curve_limits,
           comparison = TRUE
         )
       }
@@ -269,6 +390,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   # Assemble plot
   # --------------------------------------------------
   plot_base(plot = "comparison") +
+    boundary_layers +
     curve_layers +
     loglik_reference_line() +
 

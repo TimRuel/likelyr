@@ -4,7 +4,7 @@
 \alias{traverse_branch_topdown}
 \title{Traverse a Branch Outward from a Pre-Located Mode}
 \usage{
-traverse_branch_topdown(branch_seed, grid, branch_evaluator)
+traverse_branch_topdown(branch_seed, traversal, grid, branch_evaluator)
 }
 \arguments{
 \item{branch_seed}{A named list from \code{probe()}, containing:
@@ -14,6 +14,8 @@ traverse_branch_topdown(branch_seed, grid, branch_evaluator)
 \code{param_left_edge}, \code{param_right_edge},
 \code{left_boundary}, \code{right_boundary}
 }}
+
+\item{traversal}{A calibrated \code{traversal_spec} object.}
 
 \item{grid}{A ψ-grid object from \code{psi_grid_anchor()}.
 The \code{psi_lower} and \code{psi_upper} slots define the common

@@ -5,6 +5,7 @@
 #   $branch_binder  — closure(omega_hat) -> branch_evaluator
 #   $locate_mode    — closure(omega_hat, psi_hint) -> mode result
 #                     NULL if traversal_method = "leftright"
+#   $psi_interval   — sets::interval or NULL, copied from estimand
 # ======================================================================
 
 #' @keywords internal
@@ -25,7 +26,12 @@ calibrate_traversal <- function(
   )
 
   # -------------------------------------------------------------------
-  # 1. Build branch binder — shared by locate_mode and sieve()
+  # 1. Store psi_interval from estimand for use during traversal
+  # -------------------------------------------------------------------
+  traversal$psi_interval <- estimand$psi_interval %||% NULL
+
+  # -------------------------------------------------------------------
+  # 2. Build branch binder — shared by locate_mode and sieve()
   # -------------------------------------------------------------------
   traversal$branch_binder <- branch_binder_constructor(
     parameter = parameter,
@@ -35,7 +41,7 @@ calibrate_traversal <- function(
   )
 
   # -------------------------------------------------------------------
-  # 2. Build locate_mode (topdown only)
+  # 3. Build locate_mode (topdown only)
   # -------------------------------------------------------------------
   if (traversal$traversal_method == "leftright") {
     traversal$locate_mode <- NULL

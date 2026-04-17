@@ -4,7 +4,7 @@
 \alias{format_interval_estimate_df}
 \title{Format Psi Confidence Interval Table for Display}
 \usage{
-format_interval_estimate_df(interval_estimate_df, digits = 2)
+format_interval_estimate_df(interval_estimate_df)
 }
 \arguments{
 \item{interval_estimate_df}{Data frame of CI bounds and diagnostics.}

@@ -81,7 +81,8 @@ render_interval_estimate_table <- function(interval_estimate_df) {
         contains_truth ~ "\u2705",
         TRUE ~ "\u274c"
       )
-    )
+    ) |>
+    dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2)))
 
   .render_interval_estimate_base(
     df = df_render,

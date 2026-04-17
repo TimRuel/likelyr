@@ -145,8 +145,7 @@ get_point_estimate_df <- function(psi_loglik_df, psi_0) {
     psi_hat = psi_hat,
     error = psi_hat - psi_0,
     se_psi_hat = se_psi_hat
-  ) |>
-    round(2)
+  )
 
   attr(point_estimate_df, "pseudolikelihood") <- attr(
     psi_loglik_df,

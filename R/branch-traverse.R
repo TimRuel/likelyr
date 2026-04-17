@@ -338,21 +338,18 @@ traverse_branch_side <- function(
       boundary_val <- if (hit_lower) psi_lower else psi_upper
       boundary_closed <- if (hit_lower) lower_closed else upper_closed
 
-      # Only evaluate at boundary if cutoff not yet reached, boundary is
-      # closed, and the last grid point wasn't already at the boundary
-      last_psi <- grid$psi_mle + (k_curr - k_direction) * grid$increment
-      already_at_boundary <- abs(last_psi - boundary_val) < grid$increment / 2
+      if (cutoff_not_reached && boundary_closed) {
+        k_boundary <- round((boundary_val - grid$psi_mle) / grid$increment)
 
-      if (cutoff_not_reached && boundary_closed && !already_at_boundary) {
-        eval <- tryCatch(
-          branch_evaluator(boundary_val, current_par),
-          error = function(e) NULL
-        )
-        if (!is.null(eval) && is.finite(eval$branch_val)) {
-          k_boundary <- round(
-            (boundary_val - grid$psi_mle) / grid$increment
+        # Only evaluate if this k isn't already in the branch
+        if (!k_boundary %in% df$k) {
+          eval <- tryCatch(
+            branch_evaluator(boundary_val, current_par),
+            error = function(e) NULL
           )
-          df <- dplyr::add_row(df, k = k_boundary, loglik = eval$branch_val)
+          if (!is.null(eval) && is.finite(eval$branch_val)) {
+            df <- dplyr::add_row(df, k = k_boundary, loglik = eval$branch_val)
+          }
         }
       }
       break

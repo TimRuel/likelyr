@@ -311,7 +311,7 @@ traverse_branch_side <- function(
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
 
-  df <- tibble::tibble(k = integer(), loglik = numeric())
+  df <- tibble::tibble(k = numeric(), loglik = numeric())
 
   # Determine whether each boundary is closed
   lower_closed <- !is.null(psi_interval) &&
@@ -339,7 +339,7 @@ traverse_branch_side <- function(
       boundary_closed <- if (hit_lower) lower_closed else upper_closed
 
       if (cutoff_not_reached && boundary_closed) {
-        k_boundary <- round((boundary_val - grid$psi_mle) / grid$increment)
+        k_boundary <- (boundary_val - grid$psi_mle) / grid$increment
 
         # Only evaluate if this k isn't already in the branch
         if (!k_boundary %in% df$k) {

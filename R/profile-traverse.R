@@ -34,11 +34,14 @@
 #' @param max_retries      Non-negative integer. Maximum jitter retries
 #'   when monotonicity is violated. If all retries are exhausted, the
 #'   point is skipped.
-#' @param drop_multiplier  Positive numeric scalar. A step whose drop
-#'   exceeds this multiple of the recent median drop is skipped as
-#'   implausibly large (optimizer jumped to a different local minimum).
-#'   Only applied once at least 3 accepted steps have accumulated.
-#'   Default: \code{5.0}.
+#' @param spline_tol       Positive numeric scalar. A candidate point
+#'   is skipped if it falls more than this many log-likelihood units
+#'   below the spline prediction at that ψ value. Only applied once
+#'   \code{spline_min_pts} accepted points have accumulated.
+#'   Default: \code{1.0}.
+#' @param spline_min_pts   Positive integer. Minimum number of accepted
+#'   points required before the spline prediction check is applied.
+#'   Default: \code{8L}.
 #' @param stop_at_bounds   Logical. Stop when a ψ bound is reached.
 #'   Default: \code{TRUE}.
 #' @param eval_at_bounds   Logical. Evaluate once at the ψ bound before
@@ -57,7 +60,8 @@ traverse_profile_side <- function(
   init_guess,
   profile_evaluator,
   max_retries,
-  drop_multiplier = 5.0,
+  spline_tol = 1.0,
+  spline_min_pts = 8L,
   stop_at_bounds = TRUE,
   eval_at_bounds = TRUE
 ) {
@@ -65,7 +69,8 @@ traverse_profile_side <- function(
   k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
-  recent_drops <- numeric(0)
+  accepted_psi <- numeric(0)
+  accepted_ll <- numeric(0)
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
@@ -106,18 +111,30 @@ traverse_profile_side <- function(
     }
 
     # -------------------------------------------------------------------
-    # If retries exhausted and still non-monotone: skip this point.
-    # Also skip if the drop is implausibly large relative to recent
-    # steps — this catches cases where the optimizer jumped to a
-    # different local minimum while still satisfying monotonicity.
-    # Only apply the drop check once enough history has accumulated.
+    # Skip if retries exhausted and still non-monotone.
+    # Also skip if a spline fitted to recent accepted points predicts
+    # the value at psi_k and the candidate falls more than spline_tol
+    # below that prediction — this catches optimizer jumps to a bad
+    # local minimum that happen to be monotone.
+    # The spline check only fires once spline_min_pts points have been
+    # accepted, so it doesn't trigger in the early sweep.
     # -------------------------------------------------------------------
-    drop <- current_val - eval$branch_val # positive = downward step
-
     is_non_monotone <- eval$branch_val >= current_val && retry >= max_retries
-    is_implausible <- if (length(recent_drops) >= 3L) {
-      ref <- median(recent_drops)
-      ref > 0 && drop > drop_multiplier * ref
+
+    is_implausible <- if (
+      !is_non_monotone &&
+        length(accepted_psi) >= spline_min_pts
+    ) {
+      spline_fit <- tryCatch(
+        stats::smooth.spline(accepted_psi, accepted_ll),
+        error = function(e) NULL
+      )
+      if (!is.null(spline_fit)) {
+        predicted <- stats::predict(spline_fit, psi_k)$y
+        eval$branch_val < predicted - spline_tol
+      } else {
+        FALSE
+      }
     } else {
       FALSE
     }
@@ -138,11 +155,11 @@ traverse_profile_side <- function(
     current_val <- eval$branch_val
     current_par <- eval$param_hat
 
-    if (drop > 0) {
-      recent_drops <- c(recent_drops, drop)
-      if (length(recent_drops) > 10L) {
-        recent_drops <- tail(recent_drops, 10L)
-      }
+    accepted_psi <- c(accepted_psi, psi_k)
+    accepted_ll <- c(accepted_ll, current_val)
+    if (length(accepted_psi) > spline_min_pts * 3L) {
+      accepted_psi <- tail(accepted_psi, spline_min_pts * 3L)
+      accepted_ll <- tail(accepted_ll, spline_min_pts * 3L)
     }
 
     df <- dplyr::add_row(df, k = k_curr, loglik = current_val)

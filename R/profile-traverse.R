@@ -4,6 +4,7 @@
 # Provides:
 #   traverse_profile_side() — one-sided profile sweep with
 #                             monotonicity enforcement via jitter retries
+#                             and skip-on-exhaustion
 # ======================================================================
 
 #' One-Sided Profile Log-Likelihood Sweep Along the ψ-Grid
@@ -12,30 +13,36 @@
 #' Performs a one-sided continuation sweep of the profile log-likelihood
 #' by moving outward from the MLE ψ̂ along a fixed ψ-grid. At each grid
 #' point ψ_k, the constrained optimization is solved using the previous
-#' solution as a warm start.
+#' accepted solution as a warm start.
 #'
 #' Monotonicity is enforced via jitter retries: if a proposed step
-#' increases the log-likelihood relative to the previous value, the
-#' initial conditions are perturbed and the evaluation retried up to
-#' \code{max_retries} times.
+#' increases the log-likelihood relative to the previous accepted value,
+#' the initial conditions are perturbed and the evaluation retried up to
+#' \code{max_retries} times. If retries are exhausted and the value is
+#' still non-monotone, the point is skipped entirely — no value is
+#' recorded and the warm start is not updated. This leaves a small hole
+#' in the profile rather than a flat plateau, which is more honest and
+#' does not distort spline fitting.
 #'
-#' @param grid           ψ-grid object from \code{psi_grid_anchor()}.
-#' @param k_start        Integer. Starting grid index (+1 or -1).
-#' @param cutoff         Numeric scalar. Stopping threshold — sweep
+#' @param grid             ψ-grid object from \code{psi_grid_anchor()}.
+#' @param k_start          Integer. Starting grid index (+1 or -1).
+#' @param cutoff           Numeric scalar. Stopping threshold — sweep
 #'   terminates once log-likelihood falls below this value.
-#' @param init_guess     Numeric vector. Warm-start parameter at ψ̂.
-#' @param branch_evaluator Function \code{(psi, param_init) ->
+#' @param init_guess       Numeric vector. Warm-start parameter at ψ̂.
+#' @param profile_evaluator Function \code{(psi, param_init) ->
 #'   list(param_hat, branch_val)}.
-#' @param max_retries    Non-negative integer. Maximum jitter retries
-#'   when monotonicity is violated.
-#' @param stop_at_bounds Logical. Stop when a ψ bound is reached.
+#' @param max_retries      Non-negative integer. Maximum jitter retries
+#'   when monotonicity is violated. If all retries are exhausted, the
+#'   point is skipped.
+#' @param stop_at_bounds   Logical. Stop when a ψ bound is reached.
 #'   Default: \code{TRUE}.
-#' @param eval_at_bounds Logical. Evaluate once at the ψ bound before
+#' @param eval_at_bounds   Logical. Evaluate once at the ψ bound before
 #'   stopping. Requires \code{stop_at_bounds = TRUE}.
 #'   Default: \code{TRUE}.
 #'
 #' @return A tibble with columns \code{k} and \code{loglik}, sorted by
-#'   \code{k}, with duplicate indices removed.
+#'   \code{k}, with duplicate indices removed. Skipped points produce
+#'   no row.
 #'
 #' @keywords internal
 traverse_profile_side <- function(
@@ -75,32 +82,33 @@ traverse_profile_side <- function(
       }
     }
 
-    # Evaluate with monotonicity enforcement
+    # -------------------------------------------------------------------
+    # Evaluate with strict monotonicity enforcement via jitter retries.
+    # Keep the last-accepted param as warm start for retries so that
+    # perturbations are anchored to a known-good point.
+    # -------------------------------------------------------------------
+    retry_par <- current_par
     repeat {
-      eval <- profile_evaluator(psi_k, current_par)
+      eval <- profile_evaluator(psi_k, retry_par)
       if (eval$branch_val < current_val || retry >= max_retries) {
         break
       }
       retry <- retry + 1L
-      current_par <- current_par +
+      retry_par <- current_par +
         stats::rnorm(length(current_par), sd = 0.1 * retry)
     }
 
-    if (eval$branch_val > current_val && max_retries > 0L) {
-      warning(
-        sprintf(
-          "traverse_profile_side(): monotonicity violation at k=%d after %d retries.",
-          k_curr,
-          retry
-        ),
-        call. = FALSE
-      )
-      eval <- profile_evaluator(psi_k, current_par)
+    # -------------------------------------------------------------------
+    # If retries exhausted and still non-monotone: skip this point.
+    # Do not record a value and do not update current_par — keep the
+    # last accepted warm start for the next grid point.
+    # -------------------------------------------------------------------
+    if (eval$branch_val >= current_val && retry >= max_retries) {
+      k_curr <- k_curr + k_direction
+      next
     }
 
-    current_val <- eval$branch_val
-
-    if (!is.finite(current_val)) {
+    if (!is.finite(eval$branch_val)) {
       stop(
         "traverse_profile_side(): non-finite log-likelihood at k = ",
         k_curr,
@@ -108,11 +116,10 @@ traverse_profile_side <- function(
       )
     }
 
-    df <- df |>
-      dplyr::add_row(
-        k = k_curr,
-        loglik = current_val
-      )
+    current_val <- eval$branch_val
+    current_par <- eval$param_hat
+
+    df <- dplyr::add_row(df, k = k_curr, loglik = current_val)
 
     if (!is.null(cutoff) && current_val < cutoff) {
       break
@@ -121,7 +128,6 @@ traverse_profile_side <- function(
       break
     }
 
-    current_par <- eval$param_hat
     k_curr <- k_curr + k_direction
   }
 

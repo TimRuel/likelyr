@@ -174,6 +174,7 @@ generate.model <- function(
 
 #' @keywords internal
 .generate_profile <- function(model, verbose = FALSE, ...) {
+  solver <- model$solver
   traversal <- model$traversal
   estimand <- model$estimand
   param_mle <- model$parameter$param_mle
@@ -193,7 +194,7 @@ generate.model <- function(
   effective_crit <- crit * traversal$cutoff_buffer
   loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
   cutoff <- loglik_at_mle - effective_crit
-  max_retries <- traversal$max_retries %||% 4L
+  max_retries <- solver$max_retries %||% 4L
 
   if (verbose) {
     cat(

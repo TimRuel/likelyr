@@ -78,7 +78,7 @@ traverse_profile_side <- function(
     # Evaluate with monotonicity enforcement
     repeat {
       eval <- profile_evaluator(psi_k, current_par)
-      if (eval$branch_val <= current_val || retry >= max_retries) {
+      if (eval$branch_val < current_val || retry >= max_retries) {
         break
       }
       retry <- retry + 1L

@@ -195,6 +195,7 @@ generate.model <- function(
   loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
   cutoff <- loglik_at_mle - effective_crit
   max_retries <- solver$max_retries %||% 4L
+  drop_multiplier <- traversal$drop_multiplier %||% 5.0
 
   if (verbose) {
     cat(
@@ -215,6 +216,7 @@ generate.model <- function(
     init_guess = param_mle,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
+    drop_multiplier = drop_multiplier,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE
   )
@@ -226,6 +228,7 @@ generate.model <- function(
     init_guess = param_mle,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
+    drop_multiplier = drop_multiplier,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE
   )

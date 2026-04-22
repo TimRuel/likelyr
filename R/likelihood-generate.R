@@ -175,6 +175,7 @@ generate.model <- function(
 #' @keywords internal
 .generate_profile <- function(model, verbose = FALSE, ...) {
   traversal <- model$traversal
+  solver <- model$solver
   estimand <- model$estimand
   param_mle <- model$parameter$param_mle
   psi_mle <- estimand$psi_mle

@@ -174,7 +174,6 @@ generate.model <- function(
 
 #' @keywords internal
 .generate_profile <- function(model, verbose = FALSE, ...) {
-  solver <- model$solver
   traversal <- model$traversal
   estimand <- model$estimand
   param_mle <- model$parameter$param_mle
@@ -195,8 +194,6 @@ generate.model <- function(
   loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
   cutoff <- loglik_at_mle - effective_crit
   max_retries <- solver$max_retries %||% 4L
-  spline_tol <- solver$spline_tol %||% 1.0
-  spline_min_points <- solver$spline_min_points %||% 8L
 
   if (verbose) {
     cat(
@@ -217,8 +214,6 @@ generate.model <- function(
     init_guess = param_mle,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
-    spline_tol = spline_tol,
-    spline_min_points = spline_min_points,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE
   )
@@ -230,8 +225,6 @@ generate.model <- function(
     init_guess = param_mle,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
-    spline_tol = spline_tol,
-    spline_min_points = spline_min_points,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE
   )

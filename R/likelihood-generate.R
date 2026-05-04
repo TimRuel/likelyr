@@ -181,6 +181,7 @@ generate.model <- function(
   psi_mle <- estimand$psi_mle
 
   profile_evaluator <- traversal$branch_binder(param_mle)
+  warmstart_fn <- traversal$warmstart_fn
 
   grid <- psi_grid_anchor(
     psi_mle = psi_mle,
@@ -216,7 +217,8 @@ generate.model <- function(
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
-    eval_at_bounds = TRUE
+    eval_at_bounds = TRUE,
+    warmstart_fn = warmstart_fn
   )
 
   right <- traverse_profile_side(
@@ -227,7 +229,8 @@ generate.model <- function(
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
-    eval_at_bounds = TRUE
+    eval_at_bounds = TRUE,
+    warmstart_fn = warmstart_fn
   )
 
   psi_loglik_df <- left |>

@@ -136,6 +136,7 @@
 
 load_spec_env <- function(dir) {
   env <- new.env(parent = globalenv())
+
   for (f in c(
     "parameter.R",
     "likelihood.R",
@@ -143,13 +144,58 @@ load_spec_env <- function(dir) {
     "sampler.R",
     "traversal.R",
     "solver.R",
-    "execution.R"
+    "execution.R",
+    "data.R"
   )) {
-    path <- file.path(dir, f)
-    if (file.exists(path)) source(path, local = env)
+    source(file.path(dir, f), local = env)
   }
-  for (nm in ls(env, pattern = "^make_")) {
-    environment(env[[nm]]) <- asNamespace("likelyr")
+
+  spec_search_env <- new.env(parent = asNamespace("likelyr"))
+
+  # Set environments first, then copy into spec_search_env
+  for (nm in ls(env)) {
+    if (is.function(env[[nm]])) {
+      environment(env[[nm]]) <- spec_search_env
+    }
   }
+
+  # Now copy — functions in spec_search_env already have correct environments
+  for (nm in ls(env)) {
+    spec_search_env[[nm]] <- env[[nm]]
+  }
+
+  env
+}
+
+function(dir) {
+  env <- new.env(parent = globalenv())
+
+  for (f in c(
+    "parameter.R",
+    "likelihood.R",
+    "estimand.R",
+    "sampler.R",
+    "traversal.R",
+    "solver.R",
+    "execution.R",
+    "data.R"
+  )) {
+    source(file.path(dir, f), local = env)
+  }
+
+  spec_search_env <- new.env(parent = asNamespace("likelyr"))
+
+  # Set environments first, then copy into spec_search_env
+  for (nm in ls(env)) {
+    if (is.function(env[[nm]])) {
+      environment(env[[nm]]) <- spec_search_env
+    }
+  }
+
+  # Now copy — functions in spec_search_env already have correct environments
+  for (nm in ls(env)) {
+    spec_search_env[[nm]] <- env[[nm]]
+  }
+
   env
 }

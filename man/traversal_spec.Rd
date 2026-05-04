@@ -7,6 +7,7 @@
 traversal_spec(
   increment,
   traversal_method = "topdown",
+  warmstart_fn = NULL,
   mode_locator_fn = NULL,
   confidence_levels = c(0.9, 0.95, 0.99),
   cutoff_buffer = 1.5,
@@ -26,6 +27,19 @@ traversal_spec(
 
 \item{traversal_method}{Character scalar. One of \code{"topdown"},
 \code{"leftright"}. Default: \code{"topdown"}.}
+
+\item{warmstart_fn}{Optional function
+\code{(psi_curr, psi_next, param_curr) -> numeric vector}.
+When supplied, called at each profile traversal step to predict a
+warm start for the next constrained optimization. A typical choice
+is the implicit function theorem tangent predictor:
+\deqn{
+    \hat{\theta}_{k+1} \approx \hat{\theta}_k +
+    \frac{\delta\psi}{\|\nabla\psi(\hat{\theta}_k)\|^2}
+    \nabla\psi(\hat{\theta}_k)
+  }
+When \code{NULL} (default), the previous \code{param_hat} is used
+directly as the warm start.}
 
 \item{mode_locator_fn}{Optional constructor function returning a
 closure \code{function(omega_hat) -> mode result}. When \code{NULL},

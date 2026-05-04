@@ -52,6 +52,11 @@ branch_binder_constructor <- function(
   lower <- parameter$param_lower %||% rep(-Inf, J)
   upper <- parameter$param_upper %||% rep(Inf, J)
 
+  # Only pass bounds to the solver when at least one is finite.
+  # Passing explicit -Inf/Inf vectors to auglag/SLSQP can behave
+  # differently from passing NULL and degrade optimizer performance.
+  use_bounds <- any(is.finite(lower)) || any(is.finite(upper))
+
   eq_fn <- parameter$eq
   eq_jac <- parameter$eq_jac
   hin_fn <- parameter$ineq
@@ -167,8 +172,11 @@ branch_binder_constructor <- function(
         )
         x0 <- omega_hat
       }
-      x0 <- pmax(x0, lower)
-      x0 <- pmin(x0, upper)
+
+      if (use_bounds) {
+        x0 <- pmax(x0, lower)
+        x0 <- pmin(x0, upper)
+      }
 
       res <- nloptr::auglag(
         x0 = x0,
@@ -178,8 +186,8 @@ branch_binder_constructor <- function(
         heqjac = heqjac,
         hin = hin_fn,
         hinjac = hin_jac,
-        lower = lower,
-        upper = upper,
+        lower = if (use_bounds) lower else NULL,
+        upper = if (use_bounds) upper else NULL,
         localsolver = localsolver,
         localtol = localtol,
         control = control,

@@ -12,7 +12,8 @@ traverse_profile_side(
   profile_evaluator,
   max_retries,
   stop_at_bounds = TRUE,
-  eval_at_bounds = TRUE
+  eval_at_bounds = TRUE,
+  warmstart_fn = NULL
 )
 }
 \arguments{
@@ -25,6 +26,9 @@ terminates once log-likelihood falls below this value.}
 
 \item{init_guess}{Numeric vector. Warm-start parameter at ψ̂.}
 
+\item{profile_evaluator}{Function \code{(psi, param_init) ->
+list(param_hat, branch_val)}.}
+
 \item{max_retries}{Non-negative integer. Maximum jitter retries
 when monotonicity is violated.}
 
@@ -35,8 +39,11 @@ Default: \code{TRUE}.}
 stopping. Requires \code{stop_at_bounds = TRUE}.
 Default: \code{TRUE}.}
 
-\item{branch_evaluator}{Function \code{(psi, param_init) ->
-list(param_hat, branch_val)}.}
+\item{warmstart_fn}{Optional function
+\code{(psi_curr, psi_next, param_curr) -> numeric vector}.
+When supplied, called at each step to predict a warm start for
+the next constrained optimization. When \code{NULL} (default),
+the previous \code{param_hat} is used directly.}
 }
 \value{
 A tibble with columns \code{k} and \code{loglik}, sorted by
@@ -45,12 +52,27 @@ A tibble with columns \code{k} and \code{loglik}, sorted by
 \description{
 Performs a one-sided continuation sweep of the profile log-likelihood
 by moving outward from the MLE ψ̂ along a fixed ψ-grid. At each grid
-point ψ_k, the constrained optimization is solved using the previous
-solution as a warm start.
+point ψ_k, the constrained optimization is solved using a warm start
+derived from the previous solution.
 
 Monotonicity is enforced via jitter retries: if a proposed step
 increases the log-likelihood relative to the previous value, the
 initial conditions are perturbed and the evaluation retried up to
 \code{max_retries} times.
+
+An optional \code{warmstart_fn} may be supplied to improve the warm
+start at each step. When provided, it is called before each optimizer
+evaluation to predict a better initial parameter vector based on the
+previous solution and the step in ψ. A typical use case is a tangent
+predictor derived from the implicit function theorem:
+\deqn{
+  \hat{\theta}_{k+1} \approx \hat{\theta}_k +
+  \frac{\delta\psi}{\|\nabla\psi(\hat{\theta}_k)\|^2}
+  \nabla\psi(\hat{\theta}_k)
+}
+which moves the parameter along the gradient of ψ by the amount
+needed to reach ψ_{k+1} to first order. If \code{warmstart_fn}
+throws an error, the sweep falls back to using the previous
+\code{param_hat} directly.
 }
 \keyword{internal}

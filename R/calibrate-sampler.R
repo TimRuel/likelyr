@@ -1,5 +1,5 @@
 # ======================================================================
-# calibrate-sampler.R — Sampler Calibration (v2.3)
+# calibrate-sampler.R — Sampler Calibration (v2.4)
 #
 # Resolves a sampler_spec into a closed-over draw function ready for
 # use by sieve(). After calibration, model$sampler holds:
@@ -11,6 +11,11 @@
 #   $total_seeds — integer: min_branches + branch_buffer
 #                  used by sieve() to know how many to collect, and
 #                  by calibrate_execution() to derive chunk_size
+#
+# The base_args pool passes all calibrated quantities to the constructor.
+# Constructors declare only the arguments they need — matching is done
+# via formals(). The pool is application-agnostic; application-specific
+# logic belongs entirely in the sampler_fn, not here.
 # ======================================================================
 
 #' @keywords internal
@@ -29,7 +34,10 @@ calibrate_sampler <- function(
   )
 
   # -------------------------------------------------------------------
-  # Shared pool of calibrated quantities available to constructors
+  # Shared pool of calibrated quantities available to constructors.
+  # Constructors receive only the arguments they declare in formals().
+  # Application-specific extraction (e.g. counts, design matrices)
+  # belongs in the sampler_fn, not here.
   # -------------------------------------------------------------------
   base_args <- list(
     param_mle = parameter$param_mle,
@@ -46,7 +54,7 @@ calibrate_sampler <- function(
     ineq_fn = parameter$ineq,
     ineq_jac = parameter$ineq_jac,
     solver = solver,
-    counts = data$count
+    data = data
   )
 
   .call_constructor <- function(fn, extra = list()) {

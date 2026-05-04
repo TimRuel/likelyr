@@ -1,5 +1,5 @@
 # ======================================================================
-# spec-traversal.R — Traversal Specification (v2.0)
+# spec-traversal.R — Traversal Specification (v2.1)
 # ======================================================================
 
 #' Specify the Branch Traversal Strategy
@@ -7,6 +7,18 @@
 #' @param increment Required. Positive numeric scalar, ψ-grid spacing.
 #' @param traversal_method Character scalar. One of \code{"topdown"},
 #'   \code{"leftright"}. Default: \code{"topdown"}.
+#' @param warmstart_fn Optional function
+#'   \code{(psi_curr, psi_next, param_curr) -> numeric vector}.
+#'   When supplied, called at each profile traversal step to predict a
+#'   warm start for the next constrained optimization. A typical choice
+#'   is the implicit function theorem tangent predictor:
+#'   \deqn{
+#'     \hat{\theta}_{k+1} \approx \hat{\theta}_k +
+#'     \frac{\delta\psi}{\|\nabla\psi(\hat{\theta}_k)\|^2}
+#'     \nabla\psi(\hat{\theta}_k)
+#'   }
+#'   When \code{NULL} (default), the previous \code{param_hat} is used
+#'   directly as the warm start.
 #' @param mode_locator_fn Optional constructor function returning a
 #'   closure \code{function(omega_hat) -> mode result}. When \code{NULL},
 #'   the built-in \code{bracket_gss} locator is used.
@@ -51,6 +63,7 @@
 traversal_spec <- function(
   increment,
   traversal_method = "topdown",
+  warmstart_fn = NULL,
   mode_locator_fn = NULL,
   confidence_levels = c(0.90, 0.95, 0.99),
   cutoff_buffer = 1.5,
@@ -68,6 +81,7 @@ traversal_spec <- function(
     name = name %||% "<traversal>",
     increment = increment,
     traversal_method = traversal_method,
+    warmstart_fn = warmstart_fn,
     mode_locator_fn = mode_locator_fn,
     confidence_levels = confidence_levels,
     cutoff_buffer = cutoff_buffer,
@@ -116,6 +130,14 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     x$traversal_method,
     c("topdown", "leftright")
   )
+
+  # warmstart_fn ------------------------------------------------------
+  if (!is.null(x$warmstart_fn) && !is.function(x$warmstart_fn)) {
+    stop(
+      "warmstart_fn must be NULL or a function(psi_curr, psi_next, param_curr).",
+      call. = FALSE
+    )
+  }
 
   # mode_locator_fn ---------------------------------------------------
   if (!is.null(x$mode_locator_fn) && !is.function(x$mode_locator_fn)) {
@@ -235,6 +257,16 @@ print.traversal_spec <- function(x, ...) {
   cat("- Name:                ", x$name, "\n", sep = "")
   cat("- Increment:           ", x$increment, "\n", sep = "")
   cat("- Traversal method:    ", x$traversal_method, "\n", sep = "")
+  cat(
+    "- Warm start:          ",
+    if (!is.null(x$warmstart_fn)) {
+      "custom (warmstart_fn supplied)"
+    } else {
+      "previous param_hat (default)"
+    },
+    "\n",
+    sep = ""
+  )
   cat(
     "- Mode locator:        ",
     if (!is.null(x$mode_locator_fn)) {

@@ -53,6 +53,9 @@ calibrate_traversal <- function(
     param_dim = parameter$param_dim,
     psi_mle = estimand$psi_mle,
     psi_interval = estimand$psi_interval,
+    psi_fn = estimand$psi_fn,
+    psi_jac = estimand$psi_jac,
+    E_loglik_grad = likelihood$E_loglik_grad,
     increment = traversal$increment,
     branch_binder = traversal$branch_binder,
     solver = solver

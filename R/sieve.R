@@ -18,6 +18,15 @@
 #
 # probe() and sieve() arguments default to values stored on
 # model$traversal, with any directly supplied arguments taking precedence.
+#
+# rejection_reasons: optional character vector of probe() reason strings
+#   to enforce. NULL (default) enables all rejection checks. Recognized
+#   values:
+#     "empty_restricted_grid"    "no_feasible_grid_point"
+#     "mode_on_psi_boundary"     "mode_locator_failed"
+#     "mode_eval_failed_after_snap"  "mode_too_low"
+#     "oscillation"              "mode_shift_exhausted"
+#     "jump_left"                "jump_right"
 # ======================================================================
 
 #' @export
@@ -27,6 +36,7 @@ sieve <- function(
   max_mode_shifts = NULL,
   k_recent = NULL,
   drop_multiplier = NULL,
+  rejection_reasons = NULL,
   verbose = FALSE
 ) {
   if (!is_calibrated(model)) {
@@ -37,6 +47,7 @@ sieve <- function(
   max_mode_shifts <- max_mode_shifts %||% model$traversal$max_mode_shifts
   k_recent <- k_recent %||% model$traversal$k_recent
   drop_multiplier <- drop_multiplier %||% model$traversal$drop_multiplier
+  rejection_reasons <- rejection_reasons %||% model$traversal$rejection_reasons
 
   total_seeds <- as.integer(model$sampler$total_seeds)
   draw <- model$sampler$draw
@@ -90,7 +101,8 @@ sieve <- function(
         n_adjacent = n_adjacent,
         max_mode_shifts = max_mode_shifts,
         k_recent = k_recent,
-        drop_multiplier = drop_multiplier
+        drop_multiplier = drop_multiplier,
+        rejection_reasons = rejection_reasons
       ),
       error = function(e) list(accepted = FALSE, reason = "probe_error")
     )

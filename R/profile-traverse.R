@@ -17,7 +17,11 @@
 #' Monotonicity is enforced via jitter retries: if a proposed step
 #' increases the log-likelihood relative to the previous value, the
 #' initial conditions are perturbed and the evaluation retried up to
-#' \code{max_retries} times.
+#' \code{max_retries} times. Additionally, if a proposed drop exceeds
+#' \code{max_drop_frac} times the recent median drop (once at least
+#' three recent drops are available), the step is also retried — this
+#' guards against catastrophic local optima where auglag converges to
+#' a feasible but wildly suboptimal solution.
 #'
 #' An optional \code{warmstart_fn} may be supplied to improve the warm
 #' start at each step. When provided, it is called before each optimizer
@@ -42,7 +46,7 @@
 #' @param profile_evaluator Function \code{(psi, param_init) ->
 #'   list(param_hat, branch_val)}.
 #' @param max_retries      Non-negative integer. Maximum jitter retries
-#'   when monotonicity is violated.
+#'   when monotonicity is violated or a drop is suspiciously large.
 #' @param stop_at_bounds   Logical. Stop when a ψ bound is reached.
 #'   Default: \code{TRUE}.
 #' @param eval_at_bounds   Logical. Evaluate once at the ψ bound before
@@ -53,9 +57,18 @@
 #'   When supplied, called at each step to predict a warm start for
 #'   the next constrained optimization. When \code{NULL} (default),
 #'   the previous \code{param_hat} is used directly.
+#' @param max_drop_frac    Positive numeric scalar. A proposed drop
+#'   exceeding \code{max_drop_frac} times the recent median drop is
+#'   treated as a suspected catastrophic local optimum and retried.
+#'   Requires at least three recent drops before activating. Set to
+#'   \code{Inf} to disable. Default: \code{10.0}.
 #'
-#' @return A tibble with columns \code{k} and \code{loglik}, sorted by
-#'   \code{k}, with duplicate indices removed.
+#' @return A tibble with columns \code{k}, \code{psi}, and
+#'   \code{loglik}, sorted by \code{k}, with duplicate indices removed.
+#'   The \code{psi} column stores the actual ψ value evaluated — which
+#'   may differ from \code{grid$psi_mle + k * grid$increment} for
+#'   boundary points that are snapped to \code{psi_lower} or
+#'   \code{psi_upper}.
 #'
 #' @keywords internal
 traverse_profile_side <- function(
@@ -67,17 +80,19 @@ traverse_profile_side <- function(
   max_retries,
   stop_at_bounds = TRUE,
   eval_at_bounds = TRUE,
-  warmstart_fn = NULL
+  warmstart_fn = NULL,
+  max_drop_frac = 10.0
 ) {
   k_direction <- sign(k_start)
   k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
+  recent_drops <- numeric(0)
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
 
-  df <- tibble::tibble(k = integer(), loglik = numeric())
+  df <- tibble::tibble(k = integer(), psi = numeric(), loglik = numeric())
 
   repeat {
     retry <- 0L
@@ -107,10 +122,26 @@ traverse_profile_side <- function(
       current_par
     }
 
-    # Evaluate with monotonicity enforcement
+    # Evaluate with monotonicity and max-drop enforcement
+    drop <- -Inf
     repeat {
       eval <- profile_evaluator(psi_k, warm_init)
-      if (eval$branch_val < current_val || retry >= max_retries) {
+
+      drop <- current_val - eval$branch_val
+      typical_drop <- if (length(recent_drops) >= 3L) {
+        median(recent_drops)
+      } else {
+        Inf
+      }
+
+      is_too_large <- is.finite(max_drop_frac) &&
+        length(recent_drops) >= 3L &&
+        drop > max_drop_frac * typical_drop
+
+      if (
+        (!is_too_large && eval$branch_val < current_val) ||
+          retry >= max_retries
+      ) {
         break
       }
       retry <- retry + 1L
@@ -119,15 +150,23 @@ traverse_profile_side <- function(
     }
 
     if (eval$branch_val > current_val && max_retries > 0L) {
-      warning(
-        sprintf(
-          "traverse_profile_side(): monotonicity violation at k=%d after %d retries.",
-          k_curr,
-          retry
-        ),
-        call. = FALSE
-      )
-      eval <- profile_evaluator(psi_k, warm_init)
+      violation <- eval$branch_val - current_val
+      if (violation > 1e-3) {
+        warning(
+          sprintf(
+            "traverse_profile_side(): monotonicity violation at k=%d after %d retries (delta = %.6f).",
+            k_curr,
+            retry,
+            violation
+          ),
+          call. = FALSE
+        )
+      }
+    }
+
+    # Update recent drops — only for genuine decreasing steps
+    if (drop > 0 && is.finite(drop)) {
+      recent_drops <- c(tail(recent_drops, 9L), drop)
     }
 
     current_val <- eval$branch_val
@@ -141,7 +180,7 @@ traverse_profile_side <- function(
     }
 
     df <- df |>
-      dplyr::add_row(k = k_curr, loglik = current_val)
+      dplyr::add_row(k = k_curr, psi = psi_k, loglik = current_val)
 
     if (!is.null(cutoff) && current_val < cutoff) {
       break

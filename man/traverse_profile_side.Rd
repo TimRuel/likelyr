@@ -13,7 +13,8 @@ traverse_profile_side(
   max_retries,
   stop_at_bounds = TRUE,
   eval_at_bounds = TRUE,
-  warmstart_fn = NULL
+  warmstart_fn = NULL,
+  max_drop_frac = 10
 )
 }
 \arguments{
@@ -30,7 +31,7 @@ terminates once log-likelihood falls below this value.}
 list(param_hat, branch_val)}.}
 
 \item{max_retries}{Non-negative integer. Maximum jitter retries
-when monotonicity is violated.}
+when monotonicity is violated or a drop is suspiciously large.}
 
 \item{stop_at_bounds}{Logical. Stop when a ψ bound is reached.
 Default: \code{TRUE}.}
@@ -44,10 +45,20 @@ Default: \code{TRUE}.}
 When supplied, called at each step to predict a warm start for
 the next constrained optimization. When \code{NULL} (default),
 the previous \code{param_hat} is used directly.}
+
+\item{max_drop_frac}{Positive numeric scalar. A proposed drop
+exceeding \code{max_drop_frac} times the recent median drop is
+treated as a suspected catastrophic local optimum and retried.
+Requires at least three recent drops before activating. Set to
+\code{Inf} to disable. Default: \code{10.0}.}
 }
 \value{
-A tibble with columns \code{k} and \code{loglik}, sorted by
-\code{k}, with duplicate indices removed.
+A tibble with columns \code{k}, \code{psi}, and
+\code{loglik}, sorted by \code{k}, with duplicate indices removed.
+The \code{psi} column stores the actual ψ value evaluated — which
+may differ from \code{grid$psi_mle + k * grid$increment} for
+boundary points that are snapped to \code{psi_lower} or
+\code{psi_upper}.
 }
 \description{
 Performs a one-sided continuation sweep of the profile log-likelihood
@@ -58,7 +69,11 @@ derived from the previous solution.
 Monotonicity is enforced via jitter retries: if a proposed step
 increases the log-likelihood relative to the previous value, the
 initial conditions are perturbed and the evaluation retried up to
-\code{max_retries} times.
+\code{max_retries} times. Additionally, if a proposed drop exceeds
+\code{max_drop_frac} times the recent median drop (once at least
+three recent drops are available), the step is also retried — this
+guards against catastrophic local optima where auglag converges to
+a feasible but wildly suboptimal solution.
 
 An optional \code{warmstart_fn} may be supplied to improve the warm
 start at each step. When provided, it is called before each optimizer

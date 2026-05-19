@@ -1,9 +1,22 @@
 # ======================================================================
-# Likelihood Specification (v7.0)
+# Likelihood Specification (v7.3)
 #
 # Combines the former likelihood_spec and objective_spec into a single
 # spec. loglik is required for all analyses. E_loglik and E_loglik_grad
 # are optional at construction time but required by integrate().
+#
+# needs_param_mle signals that E_loglik and E_loglik_grad require the
+# MLE parameter vector as an additional argument. When TRUE,
+# calibrate_likelihood() binds param_mle alongside data, reducing the
+# signatures to function(param, omega_hat).
+#
+# omega_hat_from_param_mle is an optional converter used by
+# .generate_profile() to obtain the appropriate omega_hat reference
+# for the profile evaluator from param_mle. When NULL, param_mle is
+# used directly as omega_hat (the default for applications where they
+# share the same space). Data is bound into it during
+# calibrate_likelihood(), reducing its signature from
+# function(param_mle, data) to function(param_mle).
 # ======================================================================
 
 #' Specify a Parametric Likelihood Model
@@ -33,6 +46,23 @@
 #'   gradient of \code{E_loglik} with respect to \code{param}. When
 #'   supplied, the inner solver uses analytic gradients rather than
 #'   finite differences. Must include a \code{data} argument.
+#' @param needs_param_mle Logical. When \code{TRUE},
+#'   \code{calibrate_likelihood()} binds \code{param_mle} into
+#'   \code{E_loglik} and \code{E_loglik_grad} alongside \code{data},
+#'   reducing their signatures from
+#'   \code{function(param, omega_hat, data, param_mle)} to
+#'   \code{function(param, omega_hat)}. Use when the expected
+#'   log-likelihood requires the MLE as a reference — e.g. for a
+#'   rank-1 adjustment of \code{B_mle} to construct an
+#'   observation-specific \code{theta_hat}. Default: \code{FALSE}.
+#' @param omega_hat_from_param_mle Optional. Function
+#'   \code{(param_mle, data) -> numeric vector} converting
+#'   \code{param_mle} to the appropriate \code{omega_hat} reference
+#'   for the profile evaluator. When \code{NULL}, \code{param_mle} is
+#'   used directly as \code{omega_hat} — appropriate when both live in
+#'   the same parameter space. When supplied, \code{data} is bound at
+#'   calibration time, reducing the signature to
+#'   \code{function(param_mle)}. Default: \code{NULL}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -42,6 +72,8 @@ likelihood_spec <- function(
   loglik,
   E_loglik = NULL,
   E_loglik_grad = NULL,
+  needs_param_mle = FALSE,
+  omega_hat_from_param_mle = NULL,
   name = NULL,
   ...
 ) {
@@ -50,6 +82,8 @@ likelihood_spec <- function(
     loglik = loglik,
     E_loglik = E_loglik,
     E_loglik_grad = E_loglik_grad,
+    needs_param_mle = needs_param_mle,
+    omega_hat_from_param_mle = omega_hat_from_param_mle,
     extra = list(...)
   )
 
@@ -65,12 +99,12 @@ likelihood_spec <- function(
 #' @keywords internal
 #' @noRd
 .validate_likelihood_spec <- function(x) {
-  # loglik — required -----------------------------------------------
+  # loglik — required ------------------------------------------------
   if (!is.function(x$loglik)) {
     stop("loglik must be a function(param, data).", call. = FALSE)
   }
 
-  # E_loglik — optional at construction, required for integrate() ---
+  # E_loglik — optional at construction, required for integrate() ----
   if (!is.null(x$E_loglik)) {
     if (!is.function(x$E_loglik)) {
       stop(
@@ -78,7 +112,6 @@ likelihood_spec <- function(
         call. = FALSE
       )
     }
-
     if (!"data" %in% names(formals(x$E_loglik))) {
       stop(
         "E_loglik must include a `data` argument. ",
@@ -96,13 +129,28 @@ likelihood_spec <- function(
         call. = FALSE
       )
     }
-
     if (!"data" %in% names(formals(x$E_loglik_grad))) {
       stop(
         "E_loglik_grad must include a `data` argument.",
         call. = FALSE
       )
     }
+  }
+
+  # needs_param_mle --------------------------------------------------
+  if (!is.logical(x$needs_param_mle) || length(x$needs_param_mle) != 1L) {
+    stop("needs_param_mle must be a single logical value.", call. = FALSE)
+  }
+
+  # omega_hat_from_param_mle — optional ------------------------------
+  if (
+    !is.null(x$omega_hat_from_param_mle) &&
+      !is.function(x$omega_hat_from_param_mle)
+  ) {
+    stop(
+      "omega_hat_from_param_mle must be NULL or a function(param_mle, data).",
+      call. = FALSE
+    )
   }
 
   invisible(x)
@@ -115,20 +163,36 @@ likelihood_spec <- function(
 #' @export
 print.likelihood_spec <- function(x, ...) {
   cat("# Likelihood Specification\n")
-  cat("- Name:             ", x$name, "\n", sep = "")
-  cat("- loglik():         ✔ function\n")
+  cat("- Name:                        ", x$name, "\n", sep = "")
+  cat("- loglik():                     \u2714 function\n")
   cat(
-    "- E_loglik():       ",
-    if (!is.null(x$E_loglik)) "✔ function" else "absent (profile only)",
+    "- E_loglik():                  ",
+    if (!is.null(x$E_loglik)) "\u2714 function" else "absent (profile only)",
     "\n",
     sep = ""
   )
   cat(
-    "- E_loglik_grad():  ",
+    "- E_loglik_grad():             ",
     if (!is.null(x$E_loglik_grad)) {
-      "✔ function"
+      "\u2714 function"
     } else {
       "absent (finite differences)"
+    },
+    "\n",
+    sep = ""
+  )
+  cat(
+    "- needs_param_mle:             ",
+    if (isTRUE(x$needs_param_mle)) "TRUE" else "FALSE",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "- omega_hat_from_param_mle():  ",
+    if (!is.null(x$omega_hat_from_param_mle)) {
+      "\u2714 function"
+    } else {
+      "NULL (param_mle used directly)"
     },
     "\n",
     sep = ""

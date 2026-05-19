@@ -22,8 +22,10 @@
 #'     seeds stored in \code{model$workspace$integrated$cache$branch_seeds}.
 #'     The ψ grid is set from the common interval derived by
 #'     \code{preprocess()}, ensuring full overlap across all branches.
-#'   \item \code{"profile"} — single deterministic branch at
-#'     \code{param_mle}, stored in \code{model$workspace$profile}.
+#'   \item \code{"profile"} — single deterministic branch whose
+#'     reference omega_hat is determined by
+#'     \code{likelihood$omega_hat_from_param_mle} when present, or
+#'     \code{param_mle} directly otherwise.
 #' }
 #'
 #' @param model     A calibrated \code{model} object.
@@ -83,7 +85,6 @@ generate.model <- function(
   }
 
   n_seeds <- length(branch_seeds)
-
   branch_binder <- traversal$branch_binder
   common_interval <- model$workspace$integrated$cache$common_interval
 
@@ -180,8 +181,26 @@ generate.model <- function(
   param_mle <- model$parameter$param_mle
   psi_mle <- estimand$psi_mle
 
-  profile_evaluator <- traversal$branch_binder(param_mle)
+  # -------------------------------------------------------------------
+  # Determine omega_hat for the profile evaluator.
+  # When omega_hat_from_param_mle is supplied (e.g. MLR case), convert
+  # param_mle to the conditional probability vector theta(x_0; B_mle).
+  # D(omega_hat_profile) = psi_mle exactly by construction, ensuring
+  # the E_loglik reference is consistent with psi_fn throughout the
+  # profile sweep. Otherwise use param_mle directly (default for
+  # applications where omega_hat and param live in the same space).
+  # -------------------------------------------------------------------
+  omega_hat_profile <- if (
+    !is.null(model$likelihood$omega_hat_from_param_mle)
+  ) {
+    model$likelihood$omega_hat_from_param_mle(param_mle)
+  } else {
+    param_mle
+  }
+
+  profile_evaluator <- traversal$branch_binder(omega_hat_profile)
   warmstart_fn <- traversal$warmstart_fn
+  max_drop_frac <- traversal$max_drop_frac %||% 10.0
 
   grid <- psi_grid_anchor(
     psi_mle = psi_mle,
@@ -218,7 +237,8 @@ generate.model <- function(
     max_retries = max_retries,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE,
-    warmstart_fn = warmstart_fn
+    warmstart_fn = warmstart_fn,
+    max_drop_frac = max_drop_frac
   )
 
   right <- traverse_profile_side(
@@ -230,12 +250,13 @@ generate.model <- function(
     max_retries = max_retries,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE,
-    warmstart_fn = warmstart_fn
+    warmstart_fn = warmstart_fn,
+    max_drop_frac = max_drop_frac
   )
 
   psi_loglik_df <- left |>
     dplyr::bind_rows(
-      tibble::tibble(k = 0L, loglik = loglik_at_mle),
+      tibble::tibble(k = 0L, psi = psi_mle, loglik = loglik_at_mle),
       right
     ) |>
     assemble_branch_df(grid) |>

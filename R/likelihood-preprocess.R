@@ -23,7 +23,24 @@
 #'
 #' @param model            A calibrated \code{model} object.
 #' @param verbose          Logical. Print diagnostics. Default: \code{FALSE}.
-#' @param ...              Additional arguments passed to \code{sieve()}.
+#' @param ...              Additional arguments passed to \code{sieve()},
+#'   including \code{rejection_reasons} (see below).
+#' @param rejection_reasons Optional character vector of probe rejection
+#'   checks to enforce during \code{sieve()}. \code{NULL} (default) enables
+#'   all checks. Supply a subset to disable unwanted checks. Recognized
+#'   values:
+#'   \itemize{
+#'     \item \code{"empty_restricted_grid"}
+#'     \item \code{"no_feasible_grid_point"}
+#'     \item \code{"mode_on_psi_boundary"}
+#'     \item \code{"mode_locator_failed"}
+#'     \item \code{"mode_eval_failed_after_snap"}
+#'     \item \code{"mode_too_low"}
+#'     \item \code{"oscillation"}
+#'     \item \code{"mode_shift_exhausted"}
+#'     \item \code{"jump_left"}
+#'     \item \code{"jump_right"}
+#'   }
 #'
 #' @return The same calibrated \code{model} object with
 #'   \code{model$workspace$profile} and

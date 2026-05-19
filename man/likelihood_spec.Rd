@@ -8,6 +8,8 @@ likelihood_spec(
   loglik,
   E_loglik = NULL,
   E_loglik_grad = NULL,
+  needs_param_mle = FALSE,
+  omega_hat_from_param_mle = NULL,
   name = NULL,
   ...
 )
@@ -29,6 +31,25 @@ bound at calibration time. Required for \code{integrate()}.}
 gradient of \code{E_loglik} with respect to \code{param}. When
 supplied, the inner solver uses analytic gradients rather than
 finite differences. Must include a \code{data} argument.}
+
+\item{needs_param_mle}{Logical. When \code{TRUE},
+\code{calibrate_likelihood()} binds \code{param_mle} into
+\code{E_loglik} and \code{E_loglik_grad} alongside \code{data},
+reducing their signatures from
+\code{function(param, omega_hat, data, param_mle)} to
+\code{function(param, omega_hat)}. Use when the expected
+log-likelihood requires the MLE as a reference — e.g. for a
+rank-1 adjustment of \code{B_mle} to construct an
+observation-specific \code{theta_hat}. Default: \code{FALSE}.}
+
+\item{omega_hat_from_param_mle}{Optional. Function
+\code{(param_mle, data) -> numeric vector} converting
+\code{param_mle} to the appropriate \code{omega_hat} reference
+for the profile evaluator. When \code{NULL}, \code{param_mle} is
+used directly as \code{omega_hat} — appropriate when both live in
+the same parameter space. When supplied, \code{data} is bound at
+calibration time, reducing the signature to
+\code{function(param_mle)}. Default: \code{NULL}.}
 
 \item{name}{Optional descriptive name.}
 

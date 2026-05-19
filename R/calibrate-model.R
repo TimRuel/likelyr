@@ -53,7 +53,12 @@ calibrate.model_spec <- function(spec, data, verbose = FALSE) {
 
   spec$likelihood <- calibrate_likelihood(
     likelihood = spec$likelihood,
-    data = data
+    data = data,
+    param_mle = if (isTRUE(spec$likelihood$needs_param_mle)) {
+      spec$parameter$param_mle
+    } else {
+      NULL
+    }
   )
 
   spec$estimand <- calibrate_estimand(

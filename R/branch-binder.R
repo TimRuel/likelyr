@@ -47,14 +47,9 @@ branch_binder_constructor <- function(
   # -------------------------------------------------------------------
   # Parameter constraints
   # -------------------------------------------------------------------
-  J <- parameter$param_dim
-
-  lower <- parameter$param_lower %||% rep(-Inf, J)
-  upper <- parameter$param_upper %||% rep(Inf, J)
-
-  # Only pass bounds to the solver when at least one is finite.
-  # Passing explicit -Inf/Inf vectors to auglag/SLSQP can behave
-  # differently from passing NULL and degrade optimizer performance.
+  J_param <- parameter$param_dim
+  lower <- parameter$param_lower %||% rep(-Inf, J_param)
+  upper <- parameter$param_upper %||% rep(Inf, J_param)
   use_bounds <- any(is.finite(lower)) || any(is.finite(upper))
 
   eq_fn <- parameter$eq
@@ -106,6 +101,14 @@ branch_binder_constructor <- function(
     max(as.numeric(v), na.rm = TRUE)
   }
 
+  .eq_resid_inf <- function(theta, heq_fn) {
+    v <- heq_fn(theta)
+    if (!is.numeric(v) || length(v) == 0L) {
+      return(NA_real_)
+    }
+    max(abs(as.numeric(v)), na.rm = TRUE)
+  }
+
   # -------------------------------------------------------------------
   # Stage 1: bind ω̂ — fresh environment per call
   # -------------------------------------------------------------------
@@ -116,7 +119,11 @@ branch_binder_constructor <- function(
     env$omega_hat <- omega_hat
     env$psi_target <- NULL
 
-    E_loglik_max <- E_loglik(omega_hat, omega_hat)
+    E_loglik_max <- if (length(omega_hat) == J_param) {
+      E_loglik(omega_hat, omega_hat)
+    } else {
+      NA_real_
+    }
 
     fn <- function(param) -E_loglik(param, env$omega_hat)
     gr <- if (has_grad) {
@@ -150,14 +157,6 @@ branch_binder_constructor <- function(
       }
     }
 
-    .eq_resid_inf <- function(theta) {
-      v <- heq(theta)
-      if (!is.numeric(v) || length(v) == 0L) {
-        return(NA_real_)
-      }
-      max(abs(as.numeric(v)), na.rm = TRUE)
-    }
-
     # -----------------------------------------------------------------
     # Stage 2: solve θ*(ψ, ω̂)
     # -----------------------------------------------------------------
@@ -167,10 +166,10 @@ branch_binder_constructor <- function(
       x0 <- as.numeric(param_init)
       if (any(!is.finite(x0))) {
         warning(
-          "branch_evaluator: non-finite param_init replaced with omega_hat.",
+          "branch_evaluator: non-finite param_init replaced with zeros.",
           call. = FALSE
         )
-        x0 <- omega_hat
+        x0 <- rep(0, J_param)
       }
 
       if (use_bounds) {
@@ -208,7 +207,7 @@ branch_binder_constructor <- function(
         psi_target = psi_target,
         psi_residual = psi_at_hat - psi_target,
 
-        eq_resid_inf = .eq_resid_inf(theta_hat),
+        eq_resid_inf = .eq_resid_inf(theta_hat, heq),
         ineq_max = .ineq_max(theta_hat),
         bound_min_slack = .bound_min_slack(theta_hat),
 

@@ -16,8 +16,7 @@ traverse_branch_side(
 )
 }
 \arguments{
-\item{grid}{ψ-grid object. \code{psi_lower} and
-\code{psi_upper} define the stopping boundaries.}
+\item{grid}{ψ-grid object.}
 
 \item{k_direction}{Integer +1 or -1.}
 
@@ -27,30 +26,15 @@ traverse_branch_side(
 
 \item{branch_evaluator}{Function (psi, param_init) -> list.}
 
-\item{branch_cutoff}{Numeric scalar. The log-likelihood value
-below which the branch is considered to have reached its CI cutoff.
-Used to decide whether to evaluate at a closed boundary.}
+\item{branch_cutoff}{Numeric scalar.}
 
-\item{psi_interval}{A \code{sets::interval} object or
-\code{NULL}. Used to determine whether each boundary is closed.}
+\item{psi_interval}{A \code{sets::interval} object or NULL.}
 
-\item{max_consecutive_skips}{Integer. Stop side after this many
-consecutive solver failures. Default: \code{2L}.}
+\item{max_consecutive_skips}{Integer. Default: \code{2L}.}
 }
 \description{
 Sweeps outward from \code{k_start} in the given direction, evaluating
 the branch at each grid point. Stops when the common interval boundary
 is reached.
-
-If the next step would cross a finite, closed parameter space
-boundary and the CI cutoff has not yet been reached at the last
-evaluated point, one additional evaluation is performed at the
-exact boundary value before stopping. This ensures the branch
-extends to the boundary when the likelihood is still above the
-cutoff there.
-
-Points where the solver returns a non-finite value are skipped; if
-\code{max_consecutive_skips} such failures occur in a row, the side
-stops early.
 }
 \keyword{internal}

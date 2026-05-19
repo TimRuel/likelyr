@@ -18,6 +18,7 @@ traversal_spec(
   cap_multiplier = 10,
   mode_gap_multiplier = 1,
   interval_buffer = 1,
+  rejection_reasons = NULL,
   name = NULL,
   ...
 )
@@ -86,6 +87,23 @@ A value of \code{1.0} uses the profile extent as-is. Values
 above \code{1.0} expand the interval symmetrically around the
 profile midpoint, providing additional margin for the IL tails
 to reach the cutoff. Default: \code{1.0}.}
+
+\item{rejection_reasons}{Optional character vector of probe rejection
+checks to enforce during \code{sieve()}. \code{NULL} (default)
+enables all checks. Supply a subset to restrict which reasons can
+cause a candidate to be rejected. Recognized values:
+\itemize{
+\item \code{"empty_restricted_grid"}
+\item \code{"no_feasible_grid_point"}
+\item \code{"mode_on_psi_boundary"}
+\item \code{"mode_locator_failed"}
+\item \code{"mode_eval_failed_after_snap"}
+\item \code{"mode_too_low"}
+\item \code{"oscillation"}
+\item \code{"mode_shift_exhausted"}
+\item \code{"jump_left"}
+\item \code{"jump_right"}
+}}
 
 \item{name}{Optional descriptive name.}
 

@@ -1,7 +1,3 @@
-# ======================================================================
-# probe.R — Omega-Hat Pre-Check
-# ======================================================================
-
 #' @importFrom stats qchisq median
 #' @importFrom utils tail
 #' @keywords internal
@@ -11,7 +7,8 @@ probe <- function(
   n_adjacent = NULL,
   max_mode_shifts = NULL,
   k_recent = NULL,
-  drop_multiplier = NULL
+  drop_multiplier = NULL,
+  rejection_reasons = NULL
 ) {
   traversal <- model$traversal
   estimand <- model$estimand
@@ -23,6 +20,12 @@ probe <- function(
   max_mode_shifts <- max_mode_shifts %||% traversal$max_mode_shifts
   k_recent <- k_recent %||% traversal$k_recent
   drop_multiplier <- drop_multiplier %||% traversal$drop_multiplier
+  rejection_reasons <- rejection_reasons %||% model$traversal$rejection_reasons
+
+  # NULL means all reasons active; otherwise only listed reasons cause rejection
+  .should_reject <- function(reason) {
+    is.null(rejection_reasons) || reason %in% rejection_reasons
+  }
 
   max_drop_cap <- traversal$max_drop_cap
   if (is.null(max_drop_cap)) {
@@ -68,7 +71,7 @@ probe <- function(
       floor((hi - psi_mle) / increment)
     }
 
-    if (k_min > k_max) {
+    if (k_min > k_max && .should_reject("empty_restricted_grid")) {
       return(list(
         accepted = FALSE,
         reason = "empty_restricted_grid",
@@ -122,11 +125,13 @@ probe <- function(
   )
 
   if (is.null(mode_result) || mode_result$status != "success") {
-    return(list(
-      accepted = FALSE,
-      reason = "mode_locator_failed",
-      omega_hat = omega_hat
-    ))
+    if (.should_reject("mode_locator_failed")) {
+      return(list(
+        accepted = FALSE,
+        reason = "mode_locator_failed",
+        omega_hat = omega_hat
+      ))
+    }
   }
 
   psi_mode <- mode_result$psi_hat
@@ -140,7 +145,7 @@ probe <- function(
   k_mode <- as.integer(min(max(k_mode_raw, k_min), k_max))
   psi_mode <- psi_mle + k_mode * increment
 
-  if (!.k_in_grid(k_mode)) {
+  if (!.k_in_grid(k_mode) && .should_reject("no_feasible_grid_point")) {
     return(list(
       accepted = FALSE,
       reason = "no_feasible_grid_point",
@@ -151,7 +156,10 @@ probe <- function(
   # -------------------------------------------------------------------
   # 3b. Reject if mode sits on a psi boundary
   # -------------------------------------------------------------------
-  if (k_mode == k_min || k_mode == k_max) {
+  if (
+    (k_mode == k_min || k_mode == k_max) &&
+      .should_reject("mode_on_psi_boundary")
+  ) {
     return(list(
       accepted = FALSE,
       reason = "mode_on_psi_boundary",
@@ -169,7 +177,7 @@ probe <- function(
   branch_evaluator <- traversal$branch_binder(omega_hat)
 
   mode_eval <- .eval_safe(branch_evaluator, psi_mode, param_mode)
-  if (is.null(mode_eval)) {
+  if (is.null(mode_eval) && .should_reject("mode_eval_failed_after_snap")) {
     return(list(
       accepted = FALSE,
       reason = "mode_eval_failed_after_snap",
@@ -184,10 +192,10 @@ probe <- function(
   # -------------------------------------------------------------------
   # 4b. Reject if branch mode log-likelihood is too far below profile MLE
   # -------------------------------------------------------------------
-  if (ll_mode < ll_threshold) {
+  if (ll_mode < ll_threshold && .should_reject("mode_too_low")) {
     return(list(
       accepted = FALSE,
-      reason = paste("mode too low:", ll_mode, "<", ll_threshold),
+      reason = "mode_too_low",
       psi_mode = psi_mode,
       ll_mode = ll_mode,
       ll_threshold = ll_threshold,
@@ -247,7 +255,7 @@ probe <- function(
     left_rose <- !left_done && new_ll_left > ll_left
     right_rose <- !right_done && new_ll_right > ll_right
 
-    if (left_rose && right_rose) {
+    if (left_rose && right_rose && .should_reject("oscillation")) {
       probe_evals_df <- .make_probe_evals_df(
         k_mode,
         c(evals_left, new_ll_left),
@@ -270,7 +278,9 @@ probe <- function(
 
     if (left_rose || right_rose) {
       n_shifts <- n_shifts + 1L
-      if (n_shifts > max_mode_shifts) {
+      if (
+        n_shifts > max_mode_shifts && .should_reject("mode_shift_exhausted")
+      ) {
         probe_evals_df <- .make_probe_evals_df(
           k_mode,
           evals_left,
@@ -301,7 +311,10 @@ probe <- function(
         k_mode <- k_right
       }
 
-      if (k_mode == k_min || k_mode == k_max) {
+      if (
+        (k_mode == k_min || k_mode == k_max) &&
+          .should_reject("mode_on_psi_boundary")
+      ) {
         return(list(
           accepted = FALSE,
           reason = "mode_on_psi_boundary",
@@ -331,7 +344,14 @@ probe <- function(
       drop_left <- ll_left - new_ll_left
       recent <- tail(drops_left, k_recent)
       if (
-        !check_drop(drop_left, recent, drop_multiplier, max_drop_cap, k_recent)
+        !check_drop(
+          drop_left,
+          recent,
+          drop_multiplier,
+          max_drop_cap,
+          k_recent
+        ) &&
+          .should_reject("jump_left")
       ) {
         probe_evals_df <- .make_probe_evals_df(
           k_mode,
@@ -364,7 +384,14 @@ probe <- function(
       drop_right <- ll_right - new_ll_right
       recent <- tail(drops_right, k_recent)
       if (
-        !check_drop(drop_right, recent, drop_multiplier, max_drop_cap, k_recent)
+        !check_drop(
+          drop_right,
+          recent,
+          drop_multiplier,
+          max_drop_cap,
+          k_recent
+        ) &&
+          .should_reject("jump_right")
       ) {
         probe_evals_df <- .make_probe_evals_df(
           k_mode,

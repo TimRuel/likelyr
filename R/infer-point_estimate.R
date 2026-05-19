@@ -33,7 +33,8 @@ fit_psi_loglik <- function(psi_loglik_df) {
 
   psi_loglik_spline <- stats::smooth.spline(
     x = psi_loglik_df$psi,
-    y = psi_loglik_df$loglik
+    y = psi_loglik_df$loglik,
+    spar = 0.7
   )
 
   psi_loglik <- function(psi) {

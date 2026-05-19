@@ -4,26 +4,43 @@
 \alias{calibrate_likelihood}
 \title{Calibrate Likelihood Component}
 \usage{
-calibrate_likelihood(likelihood, data)
+calibrate_likelihood(likelihood, data, param_mle = NULL)
 }
 \arguments{
 \item{likelihood}{A \code{likelihood_spec} object.}
 
 \item{data}{User data.}
+
+\item{param_mle}{Optional numeric vector; MLE of the full model
+parameter. When supplied, bound into \code{E_loglik} and
+\code{E_loglik_grad} alongside \code{data}. Pass when these
+functions require the MLE as a reference — e.g. when constructing
+an observation-specific \code{theta_hat} from \code{omega_hat} via
+a rank-1 adjustment of \code{B_mle}. Default: \code{NULL}.}
 }
 \value{
 The SAME \code{likelihood_spec} object, enriched with:
 \itemize{
-\item \code{$loglik}        — \code{function(param)}
-\item \code{$E_loglik}      — \code{function(param, omega_hat)},
+\item \code{$loglik}                   — \code{function(param)}
+\item \code{$E_loglik}                 — \code{function(param, omega_hat)},
 if supplied
-\item \code{$E_loglik_grad} — \code{function(param, omega_hat)},
+\item \code{$E_loglik_grad}            — \code{function(param, omega_hat)},
+if supplied
+\item \code{$omega_hat_from_param_mle} — \code{function(param_mle)},
 if supplied
 }
 }
 \description{
-Binds data to all likelihood closures. \code{loglik} is always
-bound. \code{E_loglik} and \code{E_loglik_grad} are bound only
-when present.
+Binds \code{data} and optionally \code{param_mle} to all likelihood
+closures. \code{loglik} is always bound to \code{data}. When
+\code{param_mle} is supplied, \code{E_loglik} and
+\code{E_loglik_grad} are bound to both \code{data} and
+\code{param_mle}, reducing their signatures from
+\code{function(param, omega_hat, data, param_mle)} to
+\code{function(param, omega_hat)}. When \code{param_mle} is
+\code{NULL}, only \code{data} is bound via \code{.bind_data_env()}.
+When \code{omega_hat_from_param_mle} is present, \code{data} is
+bound into it, reducing its signature from
+\code{function(param_mle, data)} to \code{function(param_mle)}.
 }
 \keyword{internal}

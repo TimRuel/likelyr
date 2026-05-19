@@ -55,6 +55,22 @@
 #'   above \code{1.0} expand the interval symmetrically around the
 #'   profile midpoint, providing additional margin for the IL tails
 #'   to reach the cutoff. Default: \code{1.0}.
+#' @param rejection_reasons Optional character vector of probe rejection
+#'   checks to enforce during \code{sieve()}. \code{NULL} (default)
+#'   enables all checks. Supply a subset to restrict which reasons can
+#'   cause a candidate to be rejected. Recognized values:
+#'   \itemize{
+#'     \item \code{"empty_restricted_grid"}
+#'     \item \code{"no_feasible_grid_point"}
+#'     \item \code{"mode_on_psi_boundary"}
+#'     \item \code{"mode_locator_failed"}
+#'     \item \code{"mode_eval_failed_after_snap"}
+#'     \item \code{"mode_too_low"}
+#'     \item \code{"oscillation"}
+#'     \item \code{"mode_shift_exhausted"}
+#'     \item \code{"jump_left"}
+#'     \item \code{"jump_right"}
+#'   }
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -74,6 +90,7 @@ traversal_spec <- function(
   cap_multiplier = 10.0,
   mode_gap_multiplier = 1.0,
   interval_buffer = 1.0,
+  rejection_reasons = NULL,
   name = NULL,
   ...
 ) {
@@ -92,6 +109,7 @@ traversal_spec <- function(
     cap_multiplier = cap_multiplier,
     mode_gap_multiplier = mode_gap_multiplier,
     interval_buffer = interval_buffer,
+    rejection_reasons = rejection_reasons,
     max_drop_cap = NULL, # populated by preprocess()
     extra = list(...)
   )
@@ -244,6 +262,39 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     stop("interval_buffer must be a positive numeric scalar.", call. = FALSE)
   }
 
+  # rejection_reasons -------------------------------------------------
+  .valid_reasons <- c(
+    "empty_restricted_grid",
+    "no_feasible_grid_point",
+    "mode_on_psi_boundary",
+    "mode_locator_failed",
+    "mode_eval_failed_after_snap",
+    "mode_too_low",
+    "oscillation",
+    "mode_shift_exhausted",
+    "jump_left",
+    "jump_right"
+  )
+  if (!is.null(x$rejection_reasons)) {
+    if (!is.character(x$rejection_reasons)) {
+      stop(
+        "rejection_reasons must be NULL or a character vector.",
+        call. = FALSE
+      )
+    }
+    unknown <- setdiff(x$rejection_reasons, .valid_reasons)
+    if (length(unknown) > 0L) {
+      stop(
+        "Unknown rejection_reasons: ",
+        paste(unknown, collapse = ", "),
+        ".\nValid values: ",
+        paste(.valid_reasons, collapse = ", "),
+        ".",
+        call. = FALSE
+      )
+    }
+  }
+
   invisible(x)
 }
 
@@ -291,6 +342,16 @@ print.traversal_spec <- function(x, ...) {
   cat("- cap_multiplier:      ", x$cap_multiplier, "\n", sep = "")
   cat("- mode_gap_multiplier: ", x$mode_gap_multiplier, "\n", sep = "")
   cat("- interval_buffer:     ", x$interval_buffer, "\n", sep = "")
+  if (!is.null(x$rejection_reasons)) {
+    cat(
+      "- rejection_reasons:   ",
+      paste(x$rejection_reasons, collapse = ", "),
+      "\n",
+      sep = ""
+    )
+  } else {
+    cat("- rejection_reasons:    NULL  (all checks active)\n")
+  }
   if (!is.null(x$max_drop_cap)) {
     cat(
       "- max_drop_cap:        ",

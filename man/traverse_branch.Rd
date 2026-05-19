@@ -27,8 +27,7 @@ list(param_hat, branch_val)}.}
 \value{
 A list with:
 \itemize{
-\item \code{$branch_df}        — tibble(psi, loglik,
-loglik_centered, k)
+\item \code{$branch_df}        — tibble(k, psi, loglik, rel_loglik)
 \item \code{$psi_hat}          — numeric scalar
 \item \code{$traversal_method} — character scalar
 }

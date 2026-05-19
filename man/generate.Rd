@@ -29,7 +29,9 @@ Dispatches to the appropriate branch generation strategy based on
 seeds stored in \code{model$workspace$integrated$cache$branch_seeds}.
 The ψ grid is set from the common interval derived by
 \code{preprocess()}, ensuring full overlap across all branches.
-\item \code{"profile"} — single deterministic branch at
-\code{param_mle}, stored in \code{model$workspace$profile}.
+\item \code{"profile"} — single deterministic branch whose
+reference omega_hat is determined by
+\code{likelihood$omega_hat_from_param_mle} when present, or
+\code{param_mle} directly otherwise.
 }
 }

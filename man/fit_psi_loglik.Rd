@@ -4,7 +4,7 @@
 \alias{fit_psi_loglik}
 \title{Fit a smooth log-likelihood function in ψ}
 \usage{
-fit_psi_loglik(psi_loglik_df)
+fit_psi_loglik(psi_loglik_df, spar = NULL)
 }
 \arguments{
 \item{psi_loglik_df}{A data frame containing columns:
@@ -12,15 +12,29 @@ fit_psi_loglik(psi_loglik_df)
 \item{psi}{Numeric ψ grid values.}
 \item{loglik}{Corresponding log-likelihood values.}
 }}
+
+\item{spar}{Optional numeric smoothing parameter passed to
+\code{smooth.spline}. When \code{NULL} (default), selected
+automatically as described above.}
 }
 \value{
-A function \code{f(psi)} returning the smoothed log-likelihood at \code{psi}.
+A function \code{f(psi)} returning the smoothed log-likelihood at
+\code{psi}, with attributes \code{"pseudolikelihood"},
+\code{"psi range"}, and \code{"spar"}.
 }
 \description{
 Fits a smoothing spline to a discrete ψ–log-likelihood grid and returns
 a function for evaluating the smoothed log-likelihood at arbitrary ψ.
 
-This helper assumes that \code{psi_loglik_df} represents a \emph{unimodal} log-likelihood
-curve on a sufficiently dense grid of psi values.
+This helper assumes that \code{psi_loglik_df} represents a \emph{unimodal}
+log-likelihood curve on a sufficiently dense grid of ψ values.
+
+When \code{spar} is \code{NULL} (default), the smoothing parameter is
+selected automatically. When the discrete maximum lies in the interior
+of the grid, \code{spar} is chosen to minimise the distance between the
+spline argmax and the discrete argmax, encouraging the smooth curve to
+peak in the same location as the data. When the discrete maximum is at
+or near a boundary (within one grid increment of either edge), this
+criterion is degenerate, so GCV is used instead.
 }
 \keyword{internal}

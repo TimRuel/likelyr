@@ -244,8 +244,8 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
 
     ggplot2::theme(
       legend.position = "inside",
-      legend.position.inside = c(1, 1),
-      legend.justification = c(1, 1)
+      legend.position.inside = c(1, 0),
+      legend.justification = c(1, 0)
     )
 }
 

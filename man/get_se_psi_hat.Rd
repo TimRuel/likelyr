@@ -9,7 +9,8 @@ get_se_psi_hat(psi_hat, psi_loglik_df)
 \arguments{
 \item{psi_hat}{Numeric ψ value (typically the MLE).}
 
-\item{psi_loglik_df}{A data frame containing ordered \code{psi} and \code{loglik} values.}
+\item{psi_loglik_df}{A data frame containing ordered \code{psi} and
+\code{loglik} values.}
 }
 \value{
 A numeric scalar giving the approximate standard error.

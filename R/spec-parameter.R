@@ -47,6 +47,7 @@ parameter_spec <- function(
   param_dim = NULL,
   param_lower = NULL,
   param_upper = NULL,
+  omega_dim = NULL,
   eq = NULL,
   eq_jac = NULL,
   ineq = NULL,
@@ -61,6 +62,7 @@ parameter_spec <- function(
     param_dim = param_dim,
     param_lower = param_lower,
     param_upper = param_upper,
+    omega_dim = omega_dim,
     eq = eq,
     eq_jac = eq_jac,
     ineq = ineq,
@@ -187,6 +189,18 @@ parameter_spec <- function(
 
     param_dim <- as.integer(param_dim)
     param_0 <- NULL
+  }
+
+  # After param_dim is resolved:
+  if (is.null(x$omega_dim)) {
+    x$omega_dim <- x$param_dim
+  } else {
+    if (
+      !is.numeric(x$omega_dim) || length(x$omega_dim) != 1L || x$omega_dim < 1L
+    ) {
+      stop("omega_dim must be a positive integer scalar.", call. = FALSE)
+    }
+    x$omega_dim <- as.integer(x$omega_dim)
   }
 
   # --------------------------------------------------------------
@@ -393,9 +407,10 @@ parameter_spec <- function(
 #' @export
 print.parameter_spec <- function(x, ...) {
   cat("# Parameter Specification\n")
-  cat("- Name:            ", x$name, "\n", sep = "")
-  cat("- Dimension:       ", x$param_dim, "\n", sep = "")
-  cat("- param_mle_fn():  ✔ function\n")
+  cat("- Name:                ", x$name, "\n", sep = "")
+  cat("- Parameter Dimension: ", x$param_dim, "\n", sep = "")
+  cat("- Omega Dimension:     ", x$omega_dim, "\n", sep = "")
+  cat("- param_mle_fn():      ✔ function\n")
 
   if (!is.null(x$param_0)) {
     cat("- True value(s):\n")

@@ -36,21 +36,32 @@ shift_psi_loglik <- function(psi_loglik, shift_val) {
 #'
 #' If \code{uniroot} fails on a side because the grid reaches a declared
 #' parameter space boundary before descending to the critical threshold,
-#' the boundary value is substituted for that endpoint. If the grid
-#' simply did not descend far enough without hitting a boundary,
-#' \code{NA_real_} is returned for that endpoint.
+#' the boundary value is substituted for that endpoint. A side is
+#' considered to have reached its boundary when the grid edge lies within
+#' one \code{grid_increment} of the declared domain bound and the
+#' log-likelihood is still above the critical threshold at the grid edge.
+#' If the grid simply did not descend far enough without hitting a
+#' boundary, \code{NA_real_} is returned for that endpoint.
 #'
-#' @param psi_loglik   Function returning \eqn{\ell(\psi)}.
-#' @param alpha        Numeric scalar in (0, 1).
-#' @param psi_interval Optional named list with \code{$lower} and
-#'   \code{$upper} slots. When provided, boundary substitution is
+#' @param psi_loglik     Function returning \eqn{\ell(\psi)}.
+#' @param alpha          Numeric scalar in (0, 1).
+#' @param psi_interval   Optional \code{sets::interval} object defining
+#'   the parameter space domain. When provided, boundary substitution is
 #'   applied on each side independently.
+#' @param grid_increment Positive numeric scalar. The ψ grid spacing,
+#'   used to determine whether the grid edge is close enough to the
+#'   domain boundary to trigger boundary substitution.
 #'
 #' @return A one-row tibble with columns \code{alpha}, \code{lower},
 #'   \code{upper}, and attribute \code{psi_hat}.
 #'
 #' @keywords internal
-find_interval_endpoints <- function(psi_loglik, alpha, psi_interval = NULL) {
+find_interval_endpoints <- function(
+  psi_loglik,
+  alpha,
+  psi_interval = NULL,
+  grid_increment = NULL
+) {
   crit <- 0.5 * stats::qchisq(1 - alpha, df = 1)
   psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
   psi_hat <- psi_loglik_max_point[["argmax"]]
@@ -59,7 +70,9 @@ find_interval_endpoints <- function(psi_loglik, alpha, psi_interval = NULL) {
   psi_loglik_shifted <- shift_psi_loglik(psi_loglik, shift_val)
 
   psi_range <- attr(psi_loglik, "psi range")
-  tol <- sqrt(.Machine$double.eps)
+
+  # Fallback tolerance when grid_increment is not supplied
+  tol <- grid_increment %||% sqrt(.Machine$double.eps)
 
   # ------------------------------------------------------------------
   # Lower endpoint
@@ -70,17 +83,12 @@ find_interval_endpoints <- function(psi_loglik, alpha, psi_interval = NULL) {
       interval = c(psi_range[1], psi_hat)
     )$root,
     error = function(e) {
-      # Boundary substitution: grid left edge is at declared lower bound
-      # and the likelihood is still above the critical threshold there
-      if (
-        !is.null(min(psi_interval)) &&
-          abs(psi_range[1] - min(psi_interval)) < tol &&
-          psi_loglik_shifted(psi_range[1]) > 0
-      ) {
-        min(psi_interval)
-      } else {
-        NA_real_
-      }
+      psi_lower <- min(psi_interval)
+      grid_at_bound <- !is.null(psi_lower) &&
+        is.finite(psi_lower) &&
+        (psi_range[1] - psi_lower) < tol &&
+        psi_loglik_shifted(psi_range[1]) > 0
+      if (grid_at_bound) psi_lower else NA_real_
     }
   )
 
@@ -93,17 +101,12 @@ find_interval_endpoints <- function(psi_loglik, alpha, psi_interval = NULL) {
       interval = c(psi_hat, psi_range[2])
     )$root,
     error = function(e) {
-      # Boundary substitution: grid right edge is at declared upper bound
-      # and the likelihood is still above the critical threshold there
-      if (
-        !is.null(max(psi_interval)) &&
-          abs(psi_range[2] - max(psi_interval)) < tol &&
-          psi_loglik_shifted(psi_range[2]) > 0
-      ) {
-        max(psi_interval)
-      } else {
-        NA_real_
-      }
+      psi_upper <- max(psi_interval)
+      grid_at_bound <- !is.null(psi_upper) &&
+        is.finite(psi_upper) &&
+        (psi_upper - psi_range[2]) < tol &&
+        psi_loglik_shifted(psi_range[2]) > 0
+      if (grid_at_bound) psi_upper else NA_real_
     }
   )
 
@@ -155,7 +158,6 @@ add_interval_diagnostics <- function(interval_estimate_df, psi_0 = NA_real_) {
 #' Format Psi Confidence Interval Table for Display
 #'
 #' @param interval_estimate_df Data frame of CI bounds and diagnostics.
-#' @param digits Integer. Decimal places for rounding. Default: \code{2}.
 #'
 #' @return Formatted data frame suitable for display.
 #'
@@ -200,9 +202,12 @@ format_interval_estimate_df <- function(interval_estimate_df) {
 #' @param alpha_levels  Numeric vector of significance levels.
 #' @param psi_0         Optional numeric scalar. True value of \eqn{\psi}.
 #'   Default: \code{NA_real_}.
-#' @param psi_interval  Optional named list with \code{$lower} and
-#'   \code{$upper} slots. Passed to \code{find_interval_endpoints()} for
-#'   boundary substitution.
+#' @param psi_interval  Optional \code{sets::interval} object defining
+#'   the parameter space domain. Passed to \code{find_interval_endpoints()}
+#'   for boundary substitution.
+#' @param grid_increment Positive numeric scalar. The ψ grid spacing.
+#'   Passed to \code{find_interval_endpoints()} to determine whether the
+#'   grid edge is within one step of the domain boundary.
 #'
 #' @return Formatted data frame of confidence interval summaries.
 #'
@@ -215,13 +220,18 @@ get_interval_estimate_df <- function(
 ) {
   psi_loglik <- fit_psi_loglik(psi_loglik_df)
 
+  grid_increment <- psi_loglik_df$psi |>
+    diff() |>
+    max()
+
   interval_estimate_df <- alpha_levels |>
     purrr::map_dfr(
       \(alpha) {
         find_interval_endpoints(
           psi_loglik = psi_loglik,
           alpha = alpha,
-          psi_interval = psi_interval
+          psi_interval = psi_interval,
+          grid_increment = grid_increment
         )
       }
     ) |>
@@ -232,7 +242,6 @@ get_interval_estimate_df <- function(
     psi_loglik_df,
     "pseudolikelihood"
   )
-
   attr(interval_estimate_df, "psi_interval") <- psi_interval
 
   interval_estimate_df

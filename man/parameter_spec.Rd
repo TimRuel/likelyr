@@ -10,6 +10,7 @@ parameter_spec(
   param_dim = NULL,
   param_lower = NULL,
   param_upper = NULL,
+  omega_dim = NULL,
   eq = NULL,
   eq_jac = NULL,
   ineq = NULL,

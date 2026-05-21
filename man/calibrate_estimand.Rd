@@ -18,12 +18,11 @@ calibrate_estimand(estimand, data, param_mle, param_0 = NULL)
 \value{
 The same \code{estimand_spec} object, enriched with:
 \itemize{
-\item \code{$psi_fn}     — data-bound closure
+\item \code{$psi_fn}     — data-bound closure \code{function(param)}
 \item \code{$psi_jac}    — data-bound closure (if present)
 \item \code{$psi_mle}
 \item \code{$psi_0}      — if available
 \item \code{$psi_domain} — \code{sets::interval} object, or NULL
-if no bounds specified
 }
 }
 \description{
@@ -31,6 +30,13 @@ Binds data into \code{psi_fn()} and \code{psi_jac()}, computes
 \code{psi_mle}, optionally sets \code{psi_0} from \code{param_0},
 and converts bound information into a \code{sets::interval} object
 stored as \code{psi_domain}.
+
+When \code{make_psi_fns} is present on the \code{estimand_spec}, it
+is called with \code{data} to produce optimized \code{psi_fn} and
+\code{psi_jac} closures that have data-derived constants already
+closed over. This replaces the standard data-binding path and avoids
+recomputing expensive quantities (e.g. the design matrix, reference
+covariate) on every auglag iteration.
 
 If \code{psi_0} is already present on the \code{estimand_spec}
 (supplied directly by the user), it is respected and not recomputed.

@@ -32,6 +32,9 @@ The ψ grid is set from the common interval derived by
 \item \code{"profile"} — single deterministic branch whose
 reference omega_hat is determined by
 \code{likelihood$omega_hat_from_param_mle} when present, or
-\code{param_mle} directly otherwise.
+\code{param_mle} directly otherwise. When a \code{locate_mode}
+is supplied on the traversal spec, it is used to locate the true
+profile mode before sweeping outward; otherwise \code{psi_mle} is
+used as the anchor.
 }
 }

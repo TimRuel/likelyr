@@ -1,5 +1,5 @@
 # ======================================================================
-# calibrate-traversal.R — Traversal Calibration (v2.0)
+# calibrate-traversal.R — Traversal Calibration (v2.1)
 #
 # After calibration, model$traversal holds:
 #   $branch_binder  — closure(omega_hat) -> branch_evaluator
@@ -51,6 +51,7 @@ calibrate_traversal <- function(
   base_args <- list(
     param_mle = parameter$param_mle,
     param_dim = parameter$param_dim,
+    omega_dim = parameter$omega_dim %||% parameter$param_dim,
     psi_mle = estimand$psi_mle,
     psi_interval = estimand$psi_interval,
     psi_fn = estimand$psi_fn,
@@ -97,16 +98,23 @@ calibrate_traversal <- function(
   )
 
   branch_binder <- base_args$branch_binder
+  param_mle <- base_args$param_mle
   psi_mle <- base_args$psi_mle
   increment <- base_args$increment
+  same_space <- isTRUE(base_args$omega_dim == base_args$param_dim)
 
   function(omega_hat, psi_hint = NULL) {
     branch_evaluator <- branch_binder(omega_hat)
 
+    # When omega_hat and param share the same space, omega_hat is itself
+    # a valid warm start. Otherwise use param_mle, which is always a
+    # valid element of the model parameter space.
+    param_init <- if (same_space) omega_hat else param_mle
+
     arg_pool <- list(
       branch_evaluator = branch_evaluator,
       psi_init = psi_hint %||% psi_mle,
-      param_init = omega_hat,
+      param_init = param_init,
       psi_mle = psi_mle,
       increment = increment
     )

@@ -14,9 +14,12 @@
 #   Returns a branch binder.
 #
 # Level 2 — Binder:
-#   Called once per omega-hat. Closes over ω̂, pre-computes
-#   E_loglik_max, and builds the constrained objective and
-#   Jacobians. Returns a branch evaluator.
+#   Called once per omega-hat. Closes over ω̂ and builds the
+#   constrained objective and Jacobians. When make_branch_fns is
+#   present on the likelihood, it is called here to get pre-optimized
+#   fn/gr closures with theta_hat already computed for this omega_hat.
+#   Otherwise, fn/gr are constructed from E_loglik/E_loglik_grad.
+#   Returns a branch evaluator.
 #
 # Level 3 — Evaluator:
 #   Called once per ψ grid point. Solves the constrained
@@ -27,6 +30,13 @@
 #       • ineq(θ) ≤ 0      [optional]
 #   Returns the optimised parameter, branch log-likelihood,
 #   and solver diagnostics.
+#
+# The omega_hat space and the model parameter space may differ in
+# dimension. omega_dim (from parameter$omega_dim) gives the dimension
+# of the omega_hat space; param_dim gives the model parameter dimension.
+# When they differ (e.g. MLR where omega_hat ∈ Delta^{J-1} but
+# param ∈ R^{p(J-1)}), E_loglik_max is set to NA and any param_init
+# with the wrong dimension is caught and replaced with zeros.
 # ======================================================================
 
 #' @keywords internal
@@ -45,11 +55,14 @@ branch_binder_constructor <- function(
   )
 
   # -------------------------------------------------------------------
-  # Parameter constraints
+  # Parameter space dimensions
   # -------------------------------------------------------------------
-  J_param <- parameter$param_dim
-  lower <- parameter$param_lower %||% rep(-Inf, J_param)
-  upper <- parameter$param_upper %||% rep(Inf, J_param)
+  param_dim <- parameter$param_dim
+  omega_dim <- parameter$omega_dim %||% parameter$param_dim
+  same_space <- isTRUE(omega_dim == param_dim)
+
+  lower <- parameter$param_lower %||% rep(-Inf, param_dim)
+  upper <- parameter$param_upper %||% rep(Inf, param_dim)
   use_bounds <- any(is.finite(lower)) || any(is.finite(upper))
 
   eq_fn <- parameter$eq
@@ -65,11 +78,13 @@ branch_binder_constructor <- function(
   psi_jac <- estimand$psi_jac
   E_loglik <- likelihood$E_loglik
   E_loglik_grad <- likelihood$E_loglik_grad
-  has_grad <- !is.null(E_loglik_grad)
+  make_branch_fns <- likelihood$make_branch_fns # NULL for most applications
+  has_grad <- !is.null(E_loglik_grad) || !is.null(make_branch_fns)
 
-  if (is.null(E_loglik)) {
+  if (is.null(E_loglik) && is.null(make_branch_fns)) {
     stop(
-      "branch_binder_constructor() requires E_loglik — supply it via likelihood_spec().",
+      "branch_binder_constructor() requires E_loglik or make_branch_fns ",
+      "— supply at least one via likelihood_spec().",
       call. = FALSE
     )
   }
@@ -119,17 +134,37 @@ branch_binder_constructor <- function(
     env$omega_hat <- omega_hat
     env$psi_target <- NULL
 
-    E_loglik_max <- if (length(omega_hat) == J_param) {
+    # -----------------------------------------------------------------
+    # Build fn and gr for auglag.
+    #
+    # When make_branch_fns is present, call it with omega_hat to get
+    # pre-optimized fn/gr with theta_hat already computed for this
+    # omega_hat. This is the fast path for applications where E_loglik
+    # recomputes expensive quantities (e.g. X_design %*% B_hat) on
+    # every call.
+    #
+    # When make_branch_fns is absent, construct fn/gr from E_loglik/
+    # E_loglik_grad as before. This is the standard path and works for
+    # all applications.
+    # -----------------------------------------------------------------
+    if (!is.null(make_branch_fns)) {
+      branch_fns <- make_branch_fns(omega_hat)
+      fn <- branch_fns$fn
+      gr <- branch_fns$gr
+    } else {
+      fn <- function(param) -E_loglik(param, env$omega_hat)
+      gr <- if (!is.null(E_loglik_grad)) {
+        function(param) -E_loglik_grad(param, env$omega_hat)
+      } else {
+        NULL
+      }
+    }
+
+    # E_loglik_max for diagnostics — only meaningful when same_space
+    E_loglik_max <- if (same_space && !is.null(E_loglik)) {
       E_loglik(omega_hat, omega_hat)
     } else {
       NA_real_
-    }
-
-    fn <- function(param) -E_loglik(param, env$omega_hat)
-    gr <- if (has_grad) {
-      function(param) -E_loglik_grad(param, env$omega_hat)
-    } else {
-      NULL
     }
 
     heq <- if (is.null(eq_fn)) {
@@ -164,12 +199,23 @@ branch_binder_constructor <- function(
       env$psi_target <- psi_target
 
       x0 <- as.numeric(param_init)
-      if (any(!is.finite(x0))) {
+
+      if (length(x0) != param_dim) {
+        warning(
+          "branch_evaluator: param_init has wrong dimension (got ",
+          length(x0),
+          ", expected ",
+          param_dim,
+          ") — replaced with zeros.",
+          call. = FALSE
+        )
+        x0 <- rep(0, param_dim)
+      } else if (any(!is.finite(x0))) {
         warning(
           "branch_evaluator: non-finite param_init replaced with zeros.",
           call. = FALSE
         )
-        x0 <- rep(0, J_param)
+        x0 <- rep(0, param_dim)
       }
 
       if (use_bounds) {
@@ -196,12 +242,20 @@ branch_binder_constructor <- function(
       theta_hat <- as.numeric(res$par)
       psi_at_hat <- psi_fn(theta_hat)
 
+      # E_loglik_at_hat via the standard E_loglik (called once post-solve,
+      # not in the auglag inner loop, so overhead is acceptable)
+      E_loglik_at_hat <- if (!is.null(E_loglik)) {
+        E_loglik(theta_hat, omega_hat)
+      } else {
+        NA_real_
+      }
+
       list(
         param_hat = theta_hat,
         branch_val = loglik(theta_hat),
 
-        E_loglik_at_hat = E_loglik(theta_hat, omega_hat),
-        E_loglik_gap = E_loglik_max - E_loglik(theta_hat, omega_hat),
+        E_loglik_at_hat = E_loglik_at_hat,
+        E_loglik_gap = E_loglik_max - E_loglik_at_hat,
 
         psi_at_hat = psi_at_hat,
         psi_target = psi_target,
@@ -213,7 +267,7 @@ branch_binder_constructor <- function(
 
         solver_status = res$status %||% NA_integer_,
         solver_message = res$message %||% NA_character_,
-        solver_iterations = res$iterations %||% NA_integer_,
+        solver_iterations = res$iter %||% NA_integer_,
         solver_eval_counts = res$evaluations %||%
           list(fn = NA_integer_, gr = NA_integer_)
       )

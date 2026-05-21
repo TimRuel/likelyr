@@ -18,6 +18,10 @@ traversal_spec(
   cap_multiplier = 10,
   mode_gap_multiplier = 1,
   interval_buffer = 1,
+  max_drop_frac = 10,
+  resid_tol = 0.001,
+  profile_retry_on = c("monotonicity", "constraint", "drop"),
+  use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
   ...
@@ -43,8 +47,11 @@ When \code{NULL} (default), the previous \code{param_hat} is used
 directly as the warm start.}
 
 \item{mode_locator_fn}{Optional constructor function returning a
-closure \code{function(omega_hat) -> mode result}. When \code{NULL},
-the built-in \code{bracket_gss} locator is used.}
+closure \code{function(omega_hat) -> mode result}. Always used for
+integrated likelihood branch mode location. Optionally used for
+the profile when \code{use_mode_locator_for_profile = TRUE}.
+When \code{NULL}, the built-in \code{bracket_gss} locator is used
+for the integrated likelihood.}
 
 \item{confidence_levels}{Numeric vector in (0, 1).
 Default: \code{c(0.90, 0.95, 0.99)}.}
@@ -83,15 +90,35 @@ rejected as uninformative. Default: \code{1.0}.}
 \item{interval_buffer}{Positive numeric scalar. Multiplicative
 expansion factor applied to the profile likelihood half-width
 when computing the common ψ interval during \code{preprocess()}.
-A value of \code{1.0} uses the profile extent as-is. Values
-above \code{1.0} expand the interval symmetrically around the
-profile midpoint, providing additional margin for the IL tails
-to reach the cutoff. Default: \code{1.0}.}
+Default: \code{1.0}.}
+
+\item{max_drop_frac}{Positive numeric scalar. During profile
+traversal, a proposed drop exceeding \code{max_drop_frac} times
+the recent median drop is treated as a suspected catastrophic local
+optimum and retried with jitter. Set to \code{Inf} to disable.
+Default: \code{10.0}.}
+
+\item{resid_tol}{Non-negative numeric scalar. Constraint residual
+tolerance used during profile traversal. Steps exceeding the
+tolerance trigger jitter retries and do not advance the warm start
+chain. Default: \code{1e-3}.}
+
+\item{profile_retry_on}{Character vector. Which violations trigger
+jitter retries during profile traversal. Any subset of
+\code{c("monotonicity", "constraint", "drop")}. Default: all three.}
+
+\item{use_mode_locator_for_profile}{Logical. When \code{TRUE} and
+\code{mode_locator_fn} is supplied, the mode locator is called with
+the profile reference \code{omega_hat} to find the true profile
+mode before sweeping outward. Useful when the profile maximum does
+not coincide with \code{psi_mle} — e.g. when the parameter of
+interest is defined conditionally at a reference covariate and the
+surrogate objective is not perfectly aligned with the observed
+log-likelihood. Default: \code{FALSE}.}
 
 \item{rejection_reasons}{Optional character vector of probe rejection
 checks to enforce during \code{sieve()}. \code{NULL} (default)
-enables all checks. Supply a subset to restrict which reasons can
-cause a candidate to be rejected. Recognized values:
+enables all checks. Recognized values:
 \itemize{
 \item \code{"empty_restricted_grid"}
 \item \code{"no_feasible_grid_point"}

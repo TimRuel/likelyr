@@ -2,80 +2,61 @@
 % Please edit documentation in R/spec-estimand.R
 \name{estimand_spec}
 \alias{estimand_spec}
-\title{Specify an Estimand ψ(θ)}
+\title{Specify the Parameter of Interest for a Likelihood Model}
 \usage{
 estimand_spec(
   psi_fn,
   psi_jac = NULL,
   psi_lower = NULL,
   psi_upper = NULL,
-  psi_closed = NULL,
+  psi_closed = c(lower = FALSE, upper = FALSE),
   psi_0 = NULL,
+  make_psi_fns = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{psi_fn}{Required. Function(param) → scalar ψ(θ).}
+\item{psi_fn}{Required. Function \code{(param, data) -> scalar}.
+The parameter of interest as a function of the model parameter.}
 
-\item{psi_jac}{Optional. Function(param) → gradient vector ∇ψ(θ).}
+\item{psi_jac}{Optional. Function \code{(param, data) -> matrix}.
+Jacobian of \code{psi_fn} with respect to \code{param}, returned
+as a 1 x param_dim row vector. When supplied, passed as
+\code{heqjac} to the augmented Lagrangian solver.}
 
-\item{psi_lower}{Optional numeric scalar. Lower bound of ψ domain.}
+\item{psi_lower}{Optional numeric scalar. Lower bound of the
+parameter of interest domain.}
 
-\item{psi_upper}{Optional numeric scalar. Upper bound of ψ domain.}
+\item{psi_upper}{Optional numeric scalar. Upper bound of the
+parameter of interest domain.}
 
-\item{psi_closed}{Optional named logical vector. Indicates whether
-each present bound is closed (\code{TRUE}) or open (\code{FALSE}).
-Names must be a subset of \code{c("lower", "upper")} matching the
-non-NULL bounds. Omit entirely when no bounds are specified.}
+\item{psi_closed}{Named logical vector with elements \code{"lower"}
+and \code{"upper"} indicating whether the corresponding bound is
+closed (inclusive). Default: both \code{FALSE}.}
 
-\item{psi_0}{Optional numeric scalar. True value of ψ, used in
-simulation studies. Overrides internal ψ₀ computation if supplied.}
+\item{psi_0}{Optional numeric scalar. True value of the parameter of
+interest. When supplied, stored directly and not recomputed from
+\code{param_0} during calibration.}
+
+\item{make_psi_fns}{Optional function \code{(data) -> list(psi_fn,
+  psi_jac)}. When supplied, replaces the standard data-binding of
+\code{psi_fn} and \code{psi_jac} during calibration with optimized
+closures that precompute all quantities constant in \code{data}
+(e.g. the reference covariate \code{x_0} and the number of
+categories \code{J}). The returned \code{psi_fn} and \code{psi_jac}
+take only \code{param} — they have \code{data}-derived constants
+already closed over. This avoids recomputing \code{x_reference(data)}
+and \code{get_X_design(data)} on every auglag iteration. When
+\code{NULL} (default), the standard binding path is used.}
 
 \item{name}{Optional descriptive name.}
 
-\item{...}{Additional user metadata (stored but unused).}
+\item{...}{Additional metadata stored but unused internally.}
 }
 \value{
 An \code{estimand_spec} object.
 }
 \description{
-Defines the estimand function ψ(θ) and its domain. This is
-intentionally minimal — grid spacing, search intervals, confidence
-levels, and inference tuning parameters belong to other specs.
-
-Optional bounds \code{psi_lower} and \code{psi_upper} describe the
-geometric domain of ψ (e.g. [1/J, 1) for Simpson's index). These
-are hard constraints on branch traversal, not likelihood cutoffs.
-
-\code{psi_closed} is a named logical vector indicating whether each
-present bound is closed (reachable) or open (not reachable). Names
-must be a subset of \code{c("lower", "upper")} and must correspond
-to non-NULL bounds. A closed lower bound means the branch mode may
-occur at \code{psi_lower}; an open lower bound means it cannot.
-
-The true value \code{psi_0} may be supplied directly when known
-(e.g. in simulation studies). If provided, it overrides internal
-computation of ψ₀ during calibration.
-}
-\examples{
-# No bounds
-estimand_spec(psi_fn = function(param) sum(param))
-
-# Closed lower, open upper — Simpson's index case
-J <- 10L
-estimand_spec(
-  psi_fn    = function(param) sum(softmax(param)^2),
-  psi_lower = 1/J,
-  psi_upper = 1,
-  psi_closed = c(lower = TRUE, upper = FALSE)
-)
-
-# Closed lower only
-estimand_spec(
-  psi_fn    = function(param) exp(param),
-  psi_lower = 0,
-  psi_closed = c(lower = TRUE)
-)
-
+Specify the Parameter of Interest for a Likelihood Model
 }

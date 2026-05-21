@@ -1,5 +1,5 @@
 # ======================================================================
-# Likelihood Calibration (v4.5)
+# Likelihood Calibration (v4.6)
 # ======================================================================
 
 #' Calibrate Likelihood Component
@@ -16,15 +16,15 @@
 #' When \code{omega_hat_from_param_mle} is present, \code{data} is
 #' bound into it, reducing its signature from
 #' \code{function(param_mle, data)} to \code{function(param_mle)}.
+#' When \code{make_branch_fns} is present and \code{param_mle} is
+#' supplied, it is called once with \code{(data, param_mle)}, reducing
+#' its signature from \code{function(data, param_mle) -> function(omega_hat)}
+#' to \code{function(omega_hat) -> list(fn, gr)}.
 #'
 #' @param likelihood A \code{likelihood_spec} object.
 #' @param data       User data.
 #' @param param_mle  Optional numeric vector; MLE of the full model
-#'   parameter. When supplied, bound into \code{E_loglik} and
-#'   \code{E_loglik_grad} alongside \code{data}. Pass when these
-#'   functions require the MLE as a reference — e.g. when constructing
-#'   an observation-specific \code{theta_hat} from \code{omega_hat} via
-#'   a rank-1 adjustment of \code{B_mle}. Default: \code{NULL}.
+#'   parameter.
 #'
 #' @return The SAME \code{likelihood_spec} object, enriched with:
 #'   \itemize{
@@ -35,6 +35,8 @@
 #'       if supplied
 #'     \item \code{$omega_hat_from_param_mle} — \code{function(param_mle)},
 #'       if supplied
+#'     \item \code{$make_branch_fns}          — \code{function(omega_hat)},
+#'       if supplied and param_mle available
 #'   }
 #'
 #' @keywords internal
@@ -43,9 +45,6 @@ calibrate_likelihood <- function(likelihood, data, param_mle = NULL) {
 
   # -------------------------------------------------------------------
   # 1. Bind data to loglik
-  #    loglik has signature (param, data) — different from the
-  #    (param, omega_hat, data, param_mle) signature used by E_loglik,
-  #    so we bind it directly.
   # -------------------------------------------------------------------
   orig_loglik <- .bundle_fun_env(likelihood$loglik)
   d <- data
@@ -104,8 +103,6 @@ calibrate_likelihood <- function(likelihood, data, param_mle = NULL) {
 
   # -------------------------------------------------------------------
   # 4. Bind data to omega_hat_from_param_mle (if present)
-  #    Reduces signature from function(param_mle, data)
-  #    to function(param_mle) for use by .generate_profile().
   # -------------------------------------------------------------------
   if (!is.null(likelihood$omega_hat_from_param_mle)) {
     orig_fn <- .bundle_fun_env(likelihood$omega_hat_from_param_mle)
@@ -116,6 +113,25 @@ calibrate_likelihood <- function(likelihood, data, param_mle = NULL) {
     fn_env$d_ <- d_
     environment(fn) <- fn_env
     likelihood$omega_hat_from_param_mle <- fn
+  }
+
+  # -------------------------------------------------------------------
+  # 5. Bind make_branch_fns (if present and param_mle available)
+  #
+  #    make_branch_fns has signature:
+  #      function(data, param_mle) -> function(omega_hat) -> list(fn, gr)
+  #
+  #    Calling it once here with (data, param_mle) precomputes all
+  #    data- and MLE-derived constants (X_design, x_0, B_mle_mat,
+  #    missing_mask, J), reducing the stored function to:
+  #      function(omega_hat) -> list(fn, gr)
+  #
+  #    branch_binder_constructor then calls this once per omega_hat
+  #    to get the optimized fn/gr pair with theta_hat precomputed.
+  # -------------------------------------------------------------------
+  if (!is.null(likelihood$make_branch_fns) && !is.null(param_mle)) {
+    orig_fn <- .bundle_fun_env(likelihood$make_branch_fns)
+    likelihood$make_branch_fns <- orig_fn(data, param_mle)
   }
 
   likelihood

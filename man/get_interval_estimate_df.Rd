@@ -20,9 +20,13 @@ get_interval_estimate_df(
 \item{psi_0}{Optional numeric scalar. True value of \eqn{\psi}.
 Default: \code{NA_real_}.}
 
-\item{psi_interval}{Optional named list with \code{$lower} and
-\code{$upper} slots. Passed to \code{find_interval_endpoints()} for
-boundary substitution.}
+\item{psi_interval}{Optional \code{sets::interval} object defining
+the parameter space domain. Passed to \code{find_interval_endpoints()}
+for boundary substitution.}
+
+\item{grid_increment}{Positive numeric scalar. The ψ grid spacing.
+Passed to \code{find_interval_endpoints()} to determine whether the
+grid edge is within one step of the domain boundary.}
 }
 \value{
 Formatted data frame of confidence interval summaries.

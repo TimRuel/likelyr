@@ -1,10 +1,12 @@
 # ======================================================================
-# Estimand Calibration (v2.1)
+# Estimand Calibration (v2.2)
 #
-# Changes from v2.0:
-#   • psi_lower, psi_upper, psi_closed converted to a sets::interval
-#     object (psi_domain) during calibration. Downstream code reads
-#     psi_domain rather than the individual bound slots.
+# Changes from v2.1:
+#   • make_psi_fns hook: when present on the estimand_spec, it is called
+#     once with data during calibration and its returned psi_fn/psi_jac
+#     replace the standard data-bound closures. This allows application
+#     specs to precompute data-derived constants (e.g. x_0, J) once
+#     rather than on every auglag iteration.
 # ======================================================================
 
 #' Calibrate Estimand Component
@@ -14,6 +16,13 @@
 #' \code{psi_mle}, optionally sets \code{psi_0} from \code{param_0},
 #' and converts bound information into a \code{sets::interval} object
 #' stored as \code{psi_domain}.
+#'
+#' When \code{make_psi_fns} is present on the \code{estimand_spec}, it
+#' is called with \code{data} to produce optimized \code{psi_fn} and
+#' \code{psi_jac} closures that have data-derived constants already
+#' closed over. This replaces the standard data-binding path and avoids
+#' recomputing expensive quantities (e.g. the design matrix, reference
+#' covariate) on every auglag iteration.
 #'
 #' If \code{psi_0} is already present on the \code{estimand_spec}
 #' (supplied directly by the user), it is respected and not recomputed.
@@ -25,12 +34,11 @@
 #'
 #' @return The same \code{estimand_spec} object, enriched with:
 #'   \itemize{
-#'     \item \code{$psi_fn}     — data-bound closure
+#'     \item \code{$psi_fn}     — data-bound closure \code{function(param)}
 #'     \item \code{$psi_jac}    — data-bound closure (if present)
 #'     \item \code{$psi_mle}
 #'     \item \code{$psi_0}      — if available
 #'     \item \code{$psi_domain} — \code{sets::interval} object, or NULL
-#'       if no bounds specified
 #'   }
 #'
 #' @importFrom sets interval
@@ -43,17 +51,28 @@ calibrate_estimand <- function(estimand, data, param_mle, param_0 = NULL) {
   psi_closed <- estimand$psi_closed
 
   # -------------------------------------------------------------------
-  # 1. Bind data to psi_fn
+  # 1 & 2. Bind data to psi_fn and psi_jac.
+  #
+  #   When make_psi_fns is present, call it once with data to get
+  #   optimized closures with x_0, J, and other constants precomputed.
+  #   This replaces the standard binding path for both functions.
+  #
+  #   When make_psi_fns is absent, use the standard closure approach:
+  #   wrap psi_fn(param, data) -> psi_fn(param) by closing over data.
   # -------------------------------------------------------------------
-  orig_psi_fn <- estimand$psi_fn
-  estimand$psi_fn <- function(param) orig_psi_fn(param, data)
+  if (!is.null(estimand$make_psi_fns)) {
+    fns <- estimand$make_psi_fns(data)
+    estimand$psi_fn <- fns$psi_fn
+    estimand$psi_jac <- fns$psi_jac
+    estimand$make_psi_fns <- NULL
+  } else {
+    orig_psi_fn <- estimand$psi_fn
+    estimand$psi_fn <- function(param) orig_psi_fn(param, data)
 
-  # -------------------------------------------------------------------
-  # 2. Bind data to psi_jac (if present)
-  # -------------------------------------------------------------------
-  if (!is.null(estimand$psi_jac)) {
-    orig_psi_jac <- estimand$psi_jac
-    estimand$psi_jac <- function(param) orig_psi_jac(param, data)
+    if (!is.null(estimand$psi_jac)) {
+      orig_psi_jac <- estimand$psi_jac
+      estimand$psi_jac <- function(param) orig_psi_jac(param, data)
+    }
   }
 
   # -------------------------------------------------------------------

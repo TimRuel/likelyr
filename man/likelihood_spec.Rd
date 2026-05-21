@@ -2,7 +2,7 @@
 % Please edit documentation in R/spec-likelihood.R
 \name{likelihood_spec}
 \alias{likelihood_spec}
-\title{Specify a Parametric Likelihood Model}
+\title{Specify the Likelihood for a Model}
 \usage{
 likelihood_spec(
   loglik,
@@ -10,46 +10,49 @@ likelihood_spec(
   E_loglik_grad = NULL,
   needs_param_mle = FALSE,
   omega_hat_from_param_mle = NULL,
+  make_branch_fns = NULL,
   name = NULL,
   ...
 )
 }
 \arguments{
-\item{loglik}{Required. Function \code{(param, data) -> numeric}
-giving the observed data log-likelihood.}
+\item{loglik}{Function \code{(param, data) -> scalar}. Observed
+log-likelihood.}
 
-\item{E_loglik}{Optional. Function
-\code{(param, omega_hat, data) -> numeric} giving the expected
-log-likelihood objective maximized by the inner solver during
-branch evaluation:
-\deqn{E_{\hat\omega}[ \log p(Y \mid \theta) ]}
-The \code{data} argument must be present in the signature; it is
-bound at calibration time. Required for \code{integrate()}.}
+\item{E_loglik}{Function \code{(param, omega_hat, data, param_mle) ->
+  scalar}. Expected log-likelihood under the nuisance configuration
+\code{omega_hat}. When \code{needs_param_mle = TRUE}, the
+\code{param_mle} argument is bound during calibration.}
 
-\item{E_loglik_grad}{Optional. Function
-\code{(param, omega_hat, data) -> numeric vector} giving the
-gradient of \code{E_loglik} with respect to \code{param}. When
-supplied, the inner solver uses analytic gradients rather than
-finite differences. Must include a \code{data} argument.}
+\item{E_loglik_grad}{Optional function with same signature as
+\code{E_loglik}, returning the gradient of \code{E_loglik} with
+respect to \code{param}. When supplied, passed as \code{gr} to
+the augmented Lagrangian solver.}
 
-\item{needs_param_mle}{Logical. When \code{TRUE},
-\code{calibrate_likelihood()} binds \code{param_mle} into
-\code{E_loglik} and \code{E_loglik_grad} alongside \code{data},
-reducing their signatures from
-\code{function(param, omega_hat, data, param_mle)} to
-\code{function(param, omega_hat)}. Use when the expected
-log-likelihood requires the MLE as a reference — e.g. for a
-rank-1 adjustment of \code{B_mle} to construct an
-observation-specific \code{theta_hat}. Default: \code{FALSE}.}
+\item{needs_param_mle}{Logical. When \code{TRUE}, \code{param_mle}
+is bound into \code{E_loglik} and \code{E_loglik_grad} during
+calibration alongside \code{data}. Default: \code{FALSE}.}
 
-\item{omega_hat_from_param_mle}{Optional. Function
-\code{(param_mle, data) -> numeric vector} converting
-\code{param_mle} to the appropriate \code{omega_hat} reference
-for the profile evaluator. When \code{NULL}, \code{param_mle} is
-used directly as \code{omega_hat} — appropriate when both live in
-the same parameter space. When supplied, \code{data} is bound at
-calibration time, reducing the signature to
-\code{function(param_mle)}. Default: \code{NULL}.}
+\item{omega_hat_from_param_mle}{Optional function
+\code{(param_mle, data) -> numeric vector}. Converts \code{param_mle}
+to a reference \code{omega_hat} for profile likelihood computation.
+Required when \code{omega_hat} and the model parameter live in
+different spaces (e.g. MLR, where \code{omega_hat} is a probability
+vector in \eqn{\Delta^{J-1}} but \code{param} is \code{vec(B)} in
+\eqn{\mathbb{R}^{p(J-1)}}). Bound to \code{data} during calibration.}
+
+\item{make_branch_fns}{Optional function
+\code{(data, param_mle) -> function(omega_hat) -> list(fn, gr)}.
+When supplied, replaces the default \code{E_loglik}/\code{E_loglik_grad}
+closures in the branch binder with pre-optimized versions that
+precompute all quantities that are constant given \code{omega_hat}
+(e.g. \code{theta_hat}, \code{X_design}, \code{B_hat}). The outer
+function is called once during calibration with \code{data} and
+\code{param_mle}; the returned \code{function(omega_hat)} is called
+once per branch to produce \code{fn} and \code{gr} for auglag.
+When \code{NULL} (default), the standard \code{E_loglik} path is
+used. Simple models where \code{E_loglik} is already cheap need not
+define this slot.}
 
 \item{name}{Optional descriptive name.}
 
@@ -59,13 +62,5 @@ calibration time, reducing the signature to
 A \code{likelihood_spec} object.
 }
 \description{
-Defines the likelihood component of the model, including the
-observed data log-likelihood and optionally the expected
-log-likelihood objective used by the integrated likelihood method.
-
-\code{loglik} is required for all analyses (profile and integrated).
-
-\code{E_loglik} and \code{E_loglik_grad} are optional at
-construction time but required when calling \code{integrate()}.
-A clear error is raised at that point if they are absent.
+Specify the Likelihood for a Model
 }

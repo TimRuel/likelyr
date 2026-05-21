@@ -25,7 +25,10 @@
 #'   \item \code{"profile"} — single deterministic branch whose
 #'     reference omega_hat is determined by
 #'     \code{likelihood$omega_hat_from_param_mle} when present, or
-#'     \code{param_mle} directly otherwise.
+#'     \code{param_mle} directly otherwise. When a \code{locate_mode}
+#'     is supplied on the traversal spec, it is used to locate the true
+#'     profile mode before sweeping outward; otherwise \code{psi_mle} is
+#'     used as the anchor.
 #' }
 #'
 #' @param model     A calibrated \code{model} object.
@@ -183,12 +186,6 @@ generate.model <- function(
 
   # -------------------------------------------------------------------
   # Determine omega_hat for the profile evaluator.
-  # When omega_hat_from_param_mle is supplied (e.g. MLR case), convert
-  # param_mle to the conditional probability vector theta(x_0; B_mle).
-  # D(omega_hat_profile) = psi_mle exactly by construction, ensuring
-  # the E_loglik reference is consistent with psi_fn throughout the
-  # profile sweep. Otherwise use param_mle directly (default for
-  # applications where omega_hat and param live in the same space).
   # -------------------------------------------------------------------
   omega_hat_profile <- if (
     !is.null(model$likelihood$omega_hat_from_param_mle)
@@ -201,9 +198,54 @@ generate.model <- function(
   profile_evaluator <- traversal$branch_binder(omega_hat_profile)
   warmstart_fn <- traversal$warmstart_fn
   max_drop_frac <- traversal$max_drop_frac %||% 10.0
+  resid_tol <- traversal$resid_tol %||% 1e-3
+  profile_retry_on <- traversal$profile_retry_on %||%
+    c("monotonicity", "constraint", "drop")
+  max_retries <- solver$max_retries %||% 4L
 
+  # -------------------------------------------------------------------
+  # Locate the profile mode.
+  #
+  # When locate_mode exists on the calibrated traversal spec, use it to
+  # find the true profile mode — the actual maximizer of loglik along
+  # the profile curve. This is important when psi(B) is defined
+  # conditionally (e.g. Simpson's index at x_0), because the surrogate
+  # objective E_loglik and the true log-likelihood are not perfectly
+  # aligned, causing the profile maximum to drift from psi_mle.
+  #
+  # When locate_mode is NULL, fall back to psi_mle as the anchor
+  # and param_mle as the warm start (standard behavior).
+  # -------------------------------------------------------------------
+  if (
+    !is.null(traversal$locate_mode) &&
+      isTRUE(traversal$use_mode_locator_for_profile)
+  ) {
+    mode_result <- traversal$locate_mode(omega_hat_profile)
+    profile_psi_hat <- mode_result$psi_hat
+    profile_init <- mode_result$param_hat
+    loglik_at_mode <- mode_result$loglik_at_mode
+
+    if (verbose) {
+      cat(
+        "[generate] Profile mode located at psi = ",
+        round(profile_psi_hat, 4),
+        " (psi_mle = ",
+        round(psi_mle, 4),
+        ")\n",
+        sep = ""
+      )
+    }
+  } else {
+    profile_psi_hat <- psi_mle
+    profile_init <- param_mle
+    loglik_at_mode <- profile_evaluator(psi_mle, param_mle)$branch_val
+  }
+
+  # -------------------------------------------------------------------
+  # Build grid anchored at the profile mode.
+  # -------------------------------------------------------------------
   grid <- psi_grid_anchor(
-    psi_mle = psi_mle,
+    psi_mle = profile_psi_hat,
     increment = traversal$increment,
     psi_lower = min(estimand$psi_interval),
     psi_upper = max(estimand$psi_interval)
@@ -212,9 +254,7 @@ generate.model <- function(
   alpha_target <- min(1 - traversal$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
   effective_crit <- crit * traversal$cutoff_buffer
-  loglik_at_mle <- profile_evaluator(psi_mle, param_mle)$branch_val
-  cutoff <- loglik_at_mle - effective_crit
-  max_retries <- solver$max_retries %||% 4L
+  cutoff <- loglik_at_mode - effective_crit
 
   if (verbose) {
     cat(
@@ -226,37 +266,52 @@ generate.model <- function(
       "\n",
       sep = ""
     )
+    cat(sprintf(
+      "%-8s %-12s %-12s %-10s %-8s\n",
+      "psi",
+      "loglik",
+      "E_loglik",
+      "psi_resid",
+      "iters"
+    ))
+    cat(strrep("-", 55), "\n")
   }
 
   left <- traverse_profile_side(
     grid = grid,
     k_start = -1L,
     cutoff = cutoff,
-    init_guess = param_mle,
+    init_guess = profile_init,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
-    eval_at_bounds = TRUE,
+    eval_at_bounds = FALSE,
     warmstart_fn = warmstart_fn,
-    max_drop_frac = max_drop_frac
+    max_drop_frac = max_drop_frac,
+    resid_tol = resid_tol,
+    profile_retry_on = profile_retry_on,
+    verbose = verbose
   )
 
   right <- traverse_profile_side(
     grid = grid,
     k_start = +1L,
     cutoff = cutoff,
-    init_guess = param_mle,
+    init_guess = profile_init,
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
     eval_at_bounds = TRUE,
     warmstart_fn = warmstart_fn,
-    max_drop_frac = max_drop_frac
+    max_drop_frac = max_drop_frac,
+    resid_tol = resid_tol,
+    profile_retry_on = profile_retry_on,
+    verbose = verbose
   )
 
   psi_loglik_df <- left |>
     dplyr::bind_rows(
-      tibble::tibble(k = 0L, psi = psi_mle, loglik = loglik_at_mle),
+      tibble::tibble(k = 0L, psi = profile_psi_hat, loglik = loglik_at_mode),
       right
     ) |>
     assemble_branch_df(grid) |>

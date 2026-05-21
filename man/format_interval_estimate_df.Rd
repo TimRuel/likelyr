@@ -8,8 +8,6 @@ format_interval_estimate_df(interval_estimate_df)
 }
 \arguments{
 \item{interval_estimate_df}{Data frame of CI bounds and diagnostics.}
-
-\item{digits}{Integer. Decimal places for rounding. Default: \code{2}.}
 }
 \value{
 Formatted data frame suitable for display.

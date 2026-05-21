@@ -10,11 +10,7 @@ get_psi_loglik_max_point(psi_loglik)
 \item{psi_loglik}{A function of the form returned by \code{fit_psi_loglik()}.}
 }
 \value{
-A tibble with columns:
-\describe{
-\item{argmax}{The ψ value maximizing the log-likelihood.}
-\item{maximum}{The corresponding maximum log-likelihood value.}
-}
+A named numeric vector with elements \code{argmax} and \code{maximum}.
 }
 \description{
 Finds the maximizer and maximum value of a smoothed log-likelihood

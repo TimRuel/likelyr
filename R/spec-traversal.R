@@ -1,5 +1,5 @@
 # ======================================================================
-# spec-traversal.R — Traversal Specification (v2.1)
+# spec-traversal.R — Traversal Specification (v2.3)
 # ======================================================================
 
 #' Specify the Branch Traversal Strategy
@@ -20,8 +20,11 @@
 #'   When \code{NULL} (default), the previous \code{param_hat} is used
 #'   directly as the warm start.
 #' @param mode_locator_fn Optional constructor function returning a
-#'   closure \code{function(omega_hat) -> mode result}. When \code{NULL},
-#'   the built-in \code{bracket_gss} locator is used.
+#'   closure \code{function(omega_hat) -> mode result}. Always used for
+#'   integrated likelihood branch mode location. Optionally used for
+#'   the profile when \code{use_mode_locator_for_profile = TRUE}.
+#'   When \code{NULL}, the built-in \code{bracket_gss} locator is used
+#'   for the integrated likelihood.
 #' @param confidence_levels Numeric vector in (0, 1).
 #'   Default: \code{c(0.90, 0.95, 0.99)}.
 #' @param cutoff_buffer Positive numeric scalar. Each branch is required
@@ -51,14 +54,30 @@
 #' @param interval_buffer Positive numeric scalar. Multiplicative
 #'   expansion factor applied to the profile likelihood half-width
 #'   when computing the common ψ interval during \code{preprocess()}.
-#'   A value of \code{1.0} uses the profile extent as-is. Values
-#'   above \code{1.0} expand the interval symmetrically around the
-#'   profile midpoint, providing additional margin for the IL tails
-#'   to reach the cutoff. Default: \code{1.0}.
+#'   Default: \code{1.0}.
+#' @param max_drop_frac Positive numeric scalar. During profile
+#'   traversal, a proposed drop exceeding \code{max_drop_frac} times
+#'   the recent median drop is treated as a suspected catastrophic local
+#'   optimum and retried with jitter. Set to \code{Inf} to disable.
+#'   Default: \code{10.0}.
+#' @param resid_tol Non-negative numeric scalar. Constraint residual
+#'   tolerance used during profile traversal. Steps exceeding the
+#'   tolerance trigger jitter retries and do not advance the warm start
+#'   chain. Default: \code{1e-3}.
+#' @param profile_retry_on Character vector. Which violations trigger
+#'   jitter retries during profile traversal. Any subset of
+#'   \code{c("monotonicity", "constraint", "drop")}. Default: all three.
+#' @param use_mode_locator_for_profile Logical. When \code{TRUE} and
+#'   \code{mode_locator_fn} is supplied, the mode locator is called with
+#'   the profile reference \code{omega_hat} to find the true profile
+#'   mode before sweeping outward. Useful when the profile maximum does
+#'   not coincide with \code{psi_mle} — e.g. when the parameter of
+#'   interest is defined conditionally at a reference covariate and the
+#'   surrogate objective is not perfectly aligned with the observed
+#'   log-likelihood. Default: \code{FALSE}.
 #' @param rejection_reasons Optional character vector of probe rejection
 #'   checks to enforce during \code{sieve()}. \code{NULL} (default)
-#'   enables all checks. Supply a subset to restrict which reasons can
-#'   cause a candidate to be rejected. Recognized values:
+#'   enables all checks. Recognized values:
 #'   \itemize{
 #'     \item \code{"empty_restricted_grid"}
 #'     \item \code{"no_feasible_grid_point"}
@@ -90,6 +109,10 @@ traversal_spec <- function(
   cap_multiplier = 10.0,
   mode_gap_multiplier = 1.0,
   interval_buffer = 1.0,
+  max_drop_frac = 10.0,
+  resid_tol = 1e-3,
+  profile_retry_on = c("monotonicity", "constraint", "drop"),
+  use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
   ...
@@ -109,6 +132,10 @@ traversal_spec <- function(
     cap_multiplier = cap_multiplier,
     mode_gap_multiplier = mode_gap_multiplier,
     interval_buffer = interval_buffer,
+    max_drop_frac = max_drop_frac,
+    resid_tol = resid_tol,
+    profile_retry_on = profile_retry_on,
+    use_mode_locator_for_profile = use_mode_locator_for_profile,
     rejection_reasons = rejection_reasons,
     max_drop_cap = NULL, # populated by preprocess()
     extra = list(...)
@@ -136,18 +163,13 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
 .validate_traversal_spec <- function(x) {
   # increment ---------------------------------------------------------
   if (
-    !is.numeric(x$increment) ||
-      length(x$increment) != 1L ||
-      x$increment <= 0
+    !is.numeric(x$increment) || length(x$increment) != 1L || x$increment <= 0
   ) {
     stop("increment must be a positive numeric scalar.", call. = FALSE)
   }
 
   # traversal method --------------------------------------------------
-  x$traversal_method <- match.arg(
-    x$traversal_method,
-    c("topdown", "leftright")
-  )
+  x$traversal_method <- match.arg(x$traversal_method, c("topdown", "leftright"))
 
   # warmstart_fn ------------------------------------------------------
   if (!is.null(x$warmstart_fn) && !is.function(x$warmstart_fn)) {
@@ -161,7 +183,6 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
   if (!is.null(x$mode_locator_fn) && !is.function(x$mode_locator_fn)) {
     stop("mode_locator_fn must be NULL or a function.", call. = FALSE)
   }
-
   if (x$traversal_method == "leftright" && !is.null(x$mode_locator_fn)) {
     cat(
       "traversal_spec: mode_locator_fn is ignored when ",
@@ -192,9 +213,7 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
 
   # n_adjacent --------------------------------------------------------
   if (
-    !is.numeric(x$n_adjacent) ||
-      length(x$n_adjacent) != 1L ||
-      x$n_adjacent < 0
+    !is.numeric(x$n_adjacent) || length(x$n_adjacent) != 1L || x$n_adjacent < 0
   ) {
     stop("n_adjacent must be a non-negative integer scalar.", call. = FALSE)
   }
@@ -214,11 +233,7 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
   x$max_mode_shifts <- as.integer(x$max_mode_shifts)
 
   # k_recent ----------------------------------------------------------
-  if (
-    !is.numeric(x$k_recent) ||
-      length(x$k_recent) != 1L ||
-      x$k_recent < 0
-  ) {
+  if (!is.numeric(x$k_recent) || length(x$k_recent) != 1L || x$k_recent < 0) {
     stop("k_recent must be a non-negative integer scalar.", call. = FALSE)
   }
   x$k_recent <- as.integer(x$k_recent)
@@ -260,6 +275,56 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
       x$interval_buffer <= 0
   ) {
     stop("interval_buffer must be a positive numeric scalar.", call. = FALSE)
+  }
+
+  # max_drop_frac -----------------------------------------------------
+  if (
+    !is.numeric(x$max_drop_frac) ||
+      length(x$max_drop_frac) != 1L ||
+      x$max_drop_frac <= 0
+  ) {
+    stop(
+      "max_drop_frac must be a positive numeric scalar (use Inf to disable).",
+      call. = FALSE
+    )
+  }
+
+  # resid_tol ---------------------------------------------------------
+  if (
+    !is.numeric(x$resid_tol) || length(x$resid_tol) != 1L || x$resid_tol < 0
+  ) {
+    stop("resid_tol must be a non-negative numeric scalar.", call. = FALSE)
+  }
+
+  # profile_retry_on --------------------------------------------------
+  .valid_retry <- c("monotonicity", "constraint", "drop")
+  if (!is.character(x$profile_retry_on) || length(x$profile_retry_on) == 0L) {
+    stop(
+      "profile_retry_on must be a non-empty character vector.",
+      call. = FALSE
+    )
+  }
+  unknown_retry <- setdiff(x$profile_retry_on, .valid_retry)
+  if (length(unknown_retry) > 0L) {
+    stop(
+      "Unknown profile_retry_on values: ",
+      paste(unknown_retry, collapse = ", "),
+      ".\nValid values: ",
+      paste(.valid_retry, collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+
+  # use_mode_locator_for_profile --------------------------------------
+  if (
+    !is.logical(x$use_mode_locator_for_profile) ||
+      length(x$use_mode_locator_for_profile) != 1L
+  ) {
+    stop(
+      "use_mode_locator_for_profile must be a single logical value.",
+      call. = FALSE
+    )
   }
 
   # rejection_reasons -------------------------------------------------
@@ -305,11 +370,11 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
 #' @export
 print.traversal_spec <- function(x, ...) {
   cat("# Traversal Specification\n")
-  cat("- Name:                ", x$name, "\n", sep = "")
-  cat("- Increment:           ", x$increment, "\n", sep = "")
-  cat("- Traversal method:    ", x$traversal_method, "\n", sep = "")
+  cat("- Name:                          ", x$name, "\n", sep = "")
+  cat("- Increment:                     ", x$increment, "\n", sep = "")
+  cat("- Traversal method:              ", x$traversal_method, "\n", sep = "")
   cat(
-    "- Warm start:          ",
+    "- Warm start:                    ",
     if (!is.null(x$warmstart_fn)) {
       "custom (warmstart_fn supplied)"
     } else {
@@ -319,7 +384,7 @@ print.traversal_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "- Mode locator:        ",
+    "- Mode locator:                  ",
     if (!is.null(x$mode_locator_fn)) {
       "custom (mode_locator_fn supplied)"
     } else {
@@ -329,38 +394,57 @@ print.traversal_spec <- function(x, ...) {
     sep = ""
   )
   cat(
-    "- CI levels:           ",
+    "- Use mode locator for profile:  ",
+    if (isTRUE(x$use_mode_locator_for_profile)) "TRUE" else "FALSE",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "- CI levels:                     ",
     paste(format(x$confidence_levels), collapse = ", "),
     "\n",
     sep = ""
   )
-  cat("- Cutoff buffer:       ", x$cutoff_buffer, "\n", sep = "")
-  cat("- n_adjacent:          ", x$n_adjacent, "\n", sep = "")
-  cat("- max_mode_shifts:     ", x$max_mode_shifts, "\n", sep = "")
-  cat("- k_recent:            ", x$k_recent, "\n", sep = "")
-  cat("- drop_multiplier:     ", x$drop_multiplier, "\n", sep = "")
-  cat("- cap_multiplier:      ", x$cap_multiplier, "\n", sep = "")
-  cat("- mode_gap_multiplier: ", x$mode_gap_multiplier, "\n", sep = "")
-  cat("- interval_buffer:     ", x$interval_buffer, "\n", sep = "")
+  cat("- Cutoff buffer:                 ", x$cutoff_buffer, "\n", sep = "")
+  cat("- n_adjacent:                    ", x$n_adjacent, "\n", sep = "")
+  cat("- max_mode_shifts:               ", x$max_mode_shifts, "\n", sep = "")
+  cat("- k_recent:                      ", x$k_recent, "\n", sep = "")
+  cat("- drop_multiplier:               ", x$drop_multiplier, "\n", sep = "")
+  cat("- cap_multiplier:                ", x$cap_multiplier, "\n", sep = "")
+  cat(
+    "- mode_gap_multiplier:           ",
+    x$mode_gap_multiplier,
+    "\n",
+    sep = ""
+  )
+  cat("- interval_buffer:               ", x$interval_buffer, "\n", sep = "")
+  cat("- max_drop_frac:                 ", x$max_drop_frac, "\n", sep = "")
+  cat("- resid_tol:                     ", x$resid_tol, "\n", sep = "")
+  cat(
+    "- profile_retry_on:              ",
+    paste(x$profile_retry_on, collapse = ", "),
+    "\n",
+    sep = ""
+  )
   if (!is.null(x$rejection_reasons)) {
     cat(
-      "- rejection_reasons:   ",
+      "- rejection_reasons:             ",
       paste(x$rejection_reasons, collapse = ", "),
       "\n",
       sep = ""
     )
   } else {
-    cat("- rejection_reasons:    NULL  (all checks active)\n")
+    cat("- rejection_reasons:              NULL  (all checks active)\n")
   }
   if (!is.null(x$max_drop_cap)) {
     cat(
-      "- max_drop_cap:        ",
+      "- max_drop_cap:                  ",
       round(x$max_drop_cap, 6),
       "  (set by preprocess())\n",
       sep = ""
     )
   } else {
-    cat("- max_drop_cap:         NULL  (set by preprocess())\n")
+    cat("- max_drop_cap:                   NULL  (set by preprocess())\n")
   }
   invisible(x)
 }

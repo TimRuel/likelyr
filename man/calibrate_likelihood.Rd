@@ -12,11 +12,7 @@ calibrate_likelihood(likelihood, data, param_mle = NULL)
 \item{data}{User data.}
 
 \item{param_mle}{Optional numeric vector; MLE of the full model
-parameter. When supplied, bound into \code{E_loglik} and
-\code{E_loglik_grad} alongside \code{data}. Pass when these
-functions require the MLE as a reference — e.g. when constructing
-an observation-specific \code{theta_hat} from \code{omega_hat} via
-a rank-1 adjustment of \code{B_mle}. Default: \code{NULL}.}
+parameter.}
 }
 \value{
 The SAME \code{likelihood_spec} object, enriched with:
@@ -28,6 +24,8 @@ if supplied
 if supplied
 \item \code{$omega_hat_from_param_mle} — \code{function(param_mle)},
 if supplied
+\item \code{$make_branch_fns}          — \code{function(omega_hat)},
+if supplied and param_mle available
 }
 }
 \description{
@@ -42,5 +40,9 @@ closures. \code{loglik} is always bound to \code{data}. When
 When \code{omega_hat_from_param_mle} is present, \code{data} is
 bound into it, reducing its signature from
 \code{function(param_mle, data)} to \code{function(param_mle)}.
+When \code{make_branch_fns} is present and \code{param_mle} is
+supplied, it is called once with \code{(data, param_mle)}, reducing
+its signature from \code{function(data, param_mle) -> function(omega_hat)}
+to \code{function(omega_hat) -> list(fn, gr)}.
 }
 \keyword{internal}

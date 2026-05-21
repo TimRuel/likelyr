@@ -4,16 +4,25 @@
 \alias{find_interval_endpoints}
 \title{Find Confidence Interval Endpoints by Log-Likelihood Inversion}
 \usage{
-find_interval_endpoints(psi_loglik, alpha, psi_interval = NULL)
+find_interval_endpoints(
+  psi_loglik,
+  alpha,
+  psi_interval = NULL,
+  grid_increment = NULL
+)
 }
 \arguments{
 \item{psi_loglik}{Function returning \eqn{\ell(\psi)}.}
 
 \item{alpha}{Numeric scalar in (0, 1).}
 
-\item{psi_interval}{Optional named list with \code{$lower} and
-\code{$upper} slots. When provided, boundary substitution is
+\item{psi_interval}{Optional \code{sets::interval} object defining
+the parameter space domain. When provided, boundary substitution is
 applied on each side independently.}
+
+\item{grid_increment}{Positive numeric scalar. The ψ grid spacing,
+used to determine whether the grid edge is close enough to the
+domain boundary to trigger boundary substitution.}
 }
 \value{
 A one-row tibble with columns \code{alpha}, \code{lower},
@@ -26,8 +35,11 @@ confidence interval for \eqn{\psi} by solving for the roots of
 
 If \code{uniroot} fails on a side because the grid reaches a declared
 parameter space boundary before descending to the critical threshold,
-the boundary value is substituted for that endpoint. If the grid
-simply did not descend far enough without hitting a boundary,
-\code{NA_real_} is returned for that endpoint.
+the boundary value is substituted for that endpoint. A side is
+considered to have reached its boundary when the grid edge lies within
+one \code{grid_increment} of the declared domain bound and the
+log-likelihood is still above the critical threshold at the grid edge.
+If the grid simply did not descend far enough without hitting a
+boundary, \code{NA_real_} is returned for that endpoint.
 }
 \keyword{internal}

@@ -165,18 +165,14 @@ print.profile <- function(x, ...) {
 
 #' @method plot profile
 #' @export
-plot.profile <- function(x, points = FALSE, ...) {
+plot.profile <- function(x, ...) {
   .assert_local_plotting()
 
   if (is.null(x$psi_loglik_df)) {
     stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  if (is_inferred(x) && !points) {
-    plot_pseudolikelihood_curve(x$inference, psi_loglik_df = x$psi_loglik_df)
-  } else {
-    plot_pseudolikelihood_points(x)
-  }
+  plot_pseudolikelihood_points(x)
 }
 
 # ======================================================================

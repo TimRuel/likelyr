@@ -112,6 +112,7 @@ traversal_spec <- function(
   max_drop_frac = 10.0,
   resid_tol = 1e-3,
   profile_retry_on = c("monotonicity", "constraint", "drop"),
+  branch_retry_on = character(0),
   use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
@@ -135,6 +136,7 @@ traversal_spec <- function(
     max_drop_frac = max_drop_frac,
     resid_tol = resid_tol,
     profile_retry_on = profile_retry_on,
+    branch_retry_on = branch_retry_on,
     use_mode_locator_for_profile = use_mode_locator_for_profile,
     rejection_reasons = rejection_reasons,
     max_drop_cap = NULL, # populated by preprocess()

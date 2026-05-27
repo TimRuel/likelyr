@@ -21,6 +21,7 @@ traversal_spec(
   max_drop_frac = 10,
   resid_tol = 0.001,
   profile_retry_on = c("monotonicity", "constraint", "drop"),
+  branch_retry_on = character(0),
   use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,

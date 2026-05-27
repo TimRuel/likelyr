@@ -274,7 +274,7 @@ print.integrated <- function(x, ...) {
 
 #' @method plot integrated
 #' @export
-plot.integrated <- function(x, points = FALSE, ...) {
+plot.integrated <- function(x, ...) {
   .assert_local_plotting()
 
   if (!is_result(x)) {
@@ -288,11 +288,7 @@ plot.integrated <- function(x, points = FALSE, ...) {
     stop("No pseudolikelihood data available to plot.", call. = FALSE)
   }
 
-  if (is_inferred(x) && !points) {
-    plot_pseudolikelihood_curve(x$inference, psi_loglik_df = x$psi_loglik_df)
-  } else {
-    plot_pseudolikelihood_points(x)
-  }
+  plot_pseudolikelihood_points(x)
 }
 
 # ======================================================================

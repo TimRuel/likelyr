@@ -25,7 +25,7 @@
 #'   \item \code{"profile"} — single deterministic branch whose
 #'     reference omega_hat is determined by
 #'     \code{likelihood$omega_hat_from_param_mle} when present, or
-#'     \code{param_mle} directly otherwise. When a \code{locate_mode}
+#'     \code{param_mle} directly otherwise. When a \code{mode_locator_fn}
 #'     is supplied on the traversal spec, it is used to locate the true
 #'     profile mode before sweeping outward; otherwise \code{psi_mle} is
 #'     used as the anchor.
@@ -206,21 +206,27 @@ generate.model <- function(
   # -------------------------------------------------------------------
   # Locate the profile mode.
   #
-  # When locate_mode exists on the calibrated traversal spec, use it to
+  # When mode_locator_fn is supplied on the traversal spec, use it to
   # find the true profile mode — the actual maximizer of loglik along
   # the profile curve. This is important when psi(B) is defined
   # conditionally (e.g. Simpson's index at x_0), because the surrogate
   # objective E_loglik and the true log-likelihood are not perfectly
   # aligned, causing the profile maximum to drift from psi_mle.
   #
-  # When locate_mode is NULL, fall back to psi_mle as the anchor
+  # When mode_locator_fn is NULL, fall back to psi_mle as the anchor
   # and param_mle as the warm start (standard behavior).
   # -------------------------------------------------------------------
   if (
-    !is.null(traversal$locate_mode) &&
+    !is.null(traversal$mode_locator_fn) &&
       isTRUE(traversal$use_mode_locator_for_profile)
   ) {
-    mode_result <- traversal$locate_mode(omega_hat_profile)
+    mode_locator <- traversal$mode_locator_fn(
+      psi_interval = estimand$psi_interval,
+      branch_binder = traversal$branch_binder,
+      increment = traversal$increment,
+      param_dim = model$parameter$param_dim
+    )
+    mode_result <- mode_locator(omega_hat_profile)
     profile_psi_hat <- mode_result$psi_hat
     profile_init <- mode_result$param_hat
     loglik_at_mode <- mode_result$loglik_at_mode
@@ -277,6 +283,13 @@ generate.model <- function(
     cat(strrep("-", 55), "\n")
   }
 
+  # Evaluate at a boundary only when it is closed (a regular point of the
+  # parameter space). Open boundaries are limit points — evaluating there
+  # produces theoretically problematic and numerically unreliable values
+  # that distort spline fitting downstream.
+  eval_at_lower <- isTRUE(sets::interval_is_left_closed(estimand$psi_interval))
+  eval_at_upper <- isTRUE(sets::interval_is_right_closed(estimand$psi_interval))
+
   left <- traverse_profile_side(
     grid = grid,
     k_start = -1L,
@@ -285,7 +298,7 @@ generate.model <- function(
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
-    eval_at_bounds = FALSE,
+    eval_at_bounds = eval_at_lower,
     warmstart_fn = warmstart_fn,
     max_drop_frac = max_drop_frac,
     resid_tol = resid_tol,
@@ -301,7 +314,7 @@ generate.model <- function(
     profile_evaluator = profile_evaluator,
     max_retries = max_retries,
     stop_at_bounds = TRUE,
-    eval_at_bounds = TRUE,
+    eval_at_bounds = eval_at_upper,
     warmstart_fn = warmstart_fn,
     max_drop_frac = max_drop_frac,
     resid_tol = resid_tol,

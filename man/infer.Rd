@@ -26,4 +26,9 @@ Inference results are folded directly onto each result object —
 \code{point_estimate_df}, \code{interval_estimate_df}, and
 \code{zero_max_psi_ll_fn} become top-level slots alongside
 \code{pl_df}/\code{il_df}.
+
+The filtered \code{psi_loglik_df} (after applying the \code{above_crit}
+mask) is stored on the inference result so that plotting uses the same
+data as inference. The unfiltered \code{psi_loglik_df} remains on the
+workspace result for use by \code{diagnose()}.
 }

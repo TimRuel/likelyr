@@ -36,7 +36,6 @@ make_boundary_layers <- function(psi_interval, psi_limits) {
 
   layers <- list()
 
-  # Only shade when boundary falls strictly inside the plot range
   if (is.finite(domain_lower) && domain_lower > psi_limits[1]) {
     layers <- c(
       layers,
@@ -87,6 +86,52 @@ make_boundary_layers <- function(psi_interval, psi_limits) {
 }
 
 # ---------------------------------------------------------------------
+# Internal: resolve psi_loglik_df for plotting
+# ---------------------------------------------------------------------
+
+#' Resolve the psi_loglik_df to use for spline fitting
+#'
+#' Prefers the filtered df stored on the inference result (used to
+#' produce estimates) over the unfiltered df on the workspace result
+#' (preserved for diagnose()). When inference has not been run, falls
+#' back to the workspace df.
+#'
+#' @param inference_result An inference result object, or NULL.
+#' @param workspace_psi_loglik_df The unfiltered df from the workspace.
+#'
+#' @return A psi_loglik_df suitable for spline fitting.
+#'
+#' @keywords internal
+#' @noRd
+.resolve_psi_loglik_df <- function(inference_result, workspace_psi_loglik_df) {
+  inference_result$psi_loglik_df %||% workspace_psi_loglik_df
+}
+
+# ---------------------------------------------------------------------
+# Internal: legend position
+# ---------------------------------------------------------------------
+
+#' Choose legend corner opposite to the point estimates
+#'
+#' Places the legend in the top-left when estimates cluster on the right
+#' half of the plot, and top-right when they cluster on the left half.
+#'
+#' @param estimate_psis Numeric vector of estimate ψ values (psi_hat, psi_0).
+#' @param psi_limits    Numeric length-2 vector of plot x limits.
+#'
+#' @return A list suitable for passing to \code{legend.position.inside}
+#'   and \code{legend.justification}.
+#'
+#' @keywords internal
+#' @noRd
+.legend_corner <- function(estimate_psis, psi_limits) {
+  anchor_mean <- mean(estimate_psis[is.finite(estimate_psis)], na.rm = TRUE)
+  midpoint <- mean(psi_limits)
+  x <- if (anchor_mean > midpoint) 0 else 1
+  list(position = c(x, 1), justification = c(x, 1))
+}
+
+# ---------------------------------------------------------------------
 # Point cloud visualization
 # ---------------------------------------------------------------------
 
@@ -119,28 +164,30 @@ plot_pseudolikelihood_points <- function(result) {
 #' @importFrom stats qchisq
 #' @keywords internal
 #' @noRd
-plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
+plot_pseudolikelihood_curve <- function(
+  inference_result,
+  psi_loglik_df,
+  points = FALSE
+) {
   point_estimate_df <- inference_result$point_estimate_df
   interval_estimate_df <- inference_result$interval_estimate_df
   pseudolikelihood <- attr(psi_loglik_df, "pseudolikelihood")
-  psi_loglik <- fit_psi_loglik(psi_loglik_df)
-  psi_hat <- point_estimate_df$psi_hat
 
+  # Use the filtered df from inference when available — it matches the
+  # data used to compute psi_hat, keeping the curve peak aligned with
+  # the estimate. Fall back to the workspace df before infer() is run.
+  psi_loglik_df_fit <- .resolve_psi_loglik_df(inference_result, psi_loglik_df)
+  psi_loglik <- fit_psi_loglik(psi_loglik_df_fit)
+  psi_loglik_max <- get_psi_loglik_max_point(psi_loglik)[["maximum"]]
+
+  psi_hat <- point_estimate_df$psi_hat
   ci_long <- extract_ci_long(interval_estimate_df)
   ci_raw <- ci_long |> dplyr::filter(!is.na(endpoint))
 
-  # --------------------------------------------------
-  # PSI interval — parameter space boundaries
-  # --------------------------------------------------
   psi_interval <- attr(interval_estimate_df, "psi_interval")
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
 
-  # --------------------------------------------------
-  # PSI limits — driven by inferential quantities only.
-  # Full plot range extends beyond domain for padding;
-  # curve is clipped separately to the domain boundary.
-  # --------------------------------------------------
   psi_anchors <- c(
     ci_raw$endpoint,
     psi_hat,
@@ -149,7 +196,7 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 
   if (length(psi_anchors) == 0L) {
-    psi_anchors <- range(psi_loglik_df$psi)
+    psi_anchors <- range(psi_loglik_df_fit$psi)
   }
 
   padding <- diff(range(psi_anchors)) * 0.05
@@ -167,30 +214,30 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
     min(psi_limits[2], domain_upper)
   )
 
-  # --------------------------------------------------
-  # Y limits
-  # --------------------------------------------------
   alpha_min <- if (nrow(ci_raw) > 0) min(ci_raw$alpha) else 0.05
   y_lower <- -0.5 * qchisq(1 - alpha_min, df = 1)
   y_limits <- c(y_lower * 1.05, 0)
 
-  # --------------------------------------------------
-  # Boundary shading
-  # --------------------------------------------------
   boundary_layers <- make_boundary_layers(psi_interval, psi_limits)
 
-  # --------------------------------------------------
-  # Curve layer
-  # --------------------------------------------------
   curve_layer <- make_curve_layer(
     psi_loglik = psi_loglik,
     psi_limits = curve_limits,
     comparison = FALSE
   )
 
-  # --------------------------------------------------
-  # Labels
-  # --------------------------------------------------
+  points_layer <- if (points) {
+    ggplot2::geom_point(
+      data = psi_loglik_df_fit,
+      ggplot2::aes(x = psi, y = loglik - psi_loglik_max),
+      color = "black",
+      size = plot_point_cloud_size(),
+      alpha = plot_point_cloud_alpha()
+    )
+  } else {
+    NULL
+  }
+
   label_data <- data.frame(
     source = c(pseudolikelihood, "Truth"),
     value = c(point_estimate_df$psi_hat, point_estimate_df$psi_0),
@@ -204,12 +251,10 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
     )
   )
 
-  # --------------------------------------------------
-  # Assemble plot
-  # --------------------------------------------------
   plot_base(plot = "single_curve") +
     boundary_layers +
     curve_layer +
+    points_layer +
     loglik_reference_line() +
 
     make_ci_vline_layer(ci_long) +
@@ -244,8 +289,14 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
 
     ggplot2::theme(
       legend.position = "inside",
-      legend.position.inside = c(1, 0),
-      legend.justification = c(1, 0)
+      legend.position.inside = .legend_corner(
+        c(psi_hat, point_estimate_df$psi_0),
+        psi_limits
+      )$position,
+      legend.justification = .legend_corner(
+        c(psi_hat, point_estimate_df$psi_0),
+        psi_limits
+      )$justification
     )
 }
 
@@ -265,8 +316,13 @@ plot_pseudolikelihood_curve <- function(inference_result, psi_loglik_df) {
 plot_pseudolikelihood_curves <- function(res_list) {
   .assert_local_plotting()
 
-  psi_loglik_dfs <- purrr::map(res_list, \(x) x$psi_loglik_df)
   infer_list <- purrr::map(res_list, \(x) x$inference)
+
+  # For each result, prefer the inference df (filtered, used for
+  # estimation) over the workspace df (unfiltered, for diagnose()).
+  psi_loglik_dfs <- purrr::map(res_list, \(x) {
+    .resolve_psi_loglik_df(x$inference, x$psi_loglik_df)
+  })
 
   psi_hats <- purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_hat)
 
@@ -276,21 +332,16 @@ plot_pseudolikelihood_curves <- function(res_list) {
   ) |>
     dplyr::filter(!is.na(endpoint))
 
-  # --------------------------------------------------
-  # PSI interval — take from first inference result that has one
-  # --------------------------------------------------
   psi_interval <- purrr::detect(
-    purrr::map(infer_list, \(x) attr(x$interval_estimate_df, "psi_interval")),
+    purrr::map(
+      infer_list,
+      \(x) attr(x$interval_estimate_df, "psi_interval")
+    ),
     \(x) !is.null(x)
   )
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
 
-  # --------------------------------------------------
-  # PSI limits — driven by inferential quantities only.
-  # Full plot range extends beyond domain for padding;
-  # curves are clipped separately to the domain boundary.
-  # --------------------------------------------------
   psi_anchors <- c(
     ci_all$endpoint,
     psi_hats,
@@ -317,21 +368,12 @@ plot_pseudolikelihood_curves <- function(res_list) {
     min(psi_limits[2], domain_upper)
   )
 
-  # --------------------------------------------------
-  # Y limits
-  # --------------------------------------------------
   alpha_min <- if (nrow(ci_all) > 0) min(ci_all$alpha) else 0.05
   y_lower <- -0.5 * qchisq(1 - alpha_min, df = 1)
   y_limits <- c(y_lower * 1.05, 0)
 
-  # --------------------------------------------------
-  # Boundary shading
-  # --------------------------------------------------
   boundary_layers <- make_boundary_layers(psi_interval, psi_limits)
 
-  # --------------------------------------------------
-  # Curve layers
-  # --------------------------------------------------
   curve_layers <- psi_loglik_dfs |>
     purrr::map(
       \(df) {
@@ -343,9 +385,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
       }
     )
 
-  # --------------------------------------------------
-  # Labels
-  # --------------------------------------------------
   label_data <- purrr::imap_dfr(
     infer_list,
     \(x, key) {
@@ -364,9 +403,6 @@ plot_pseudolikelihood_curves <- function(res_list) {
     dplyr::distinct() |>
     dplyr::arrange(label)
 
-  # --------------------------------------------------
-  # Confidence cutoffs
-  # --------------------------------------------------
   crit_df <- purrr::map_dfr(
     infer_list,
     \(x) {
@@ -382,13 +418,10 @@ plot_pseudolikelihood_curves <- function(res_list) {
       label = paste0(100 * (1 - alpha), "%")
     )
 
-  crit_df$color <- plot_ci_palette(dplyr::distinct(data.frame(
-    Level = crit_df$label
-  )))
+  crit_df$color <- plot_ci_palette(
+    dplyr::distinct(data.frame(Level = crit_df$label))
+  )
 
-  # --------------------------------------------------
-  # Assemble plot
-  # --------------------------------------------------
   plot_base(plot = "comparison") +
     boundary_layers +
     curve_layers +
@@ -414,7 +447,19 @@ plot_pseudolikelihood_curves <- function(res_list) {
 
     ggplot2::theme(
       legend.position = "inside",
-      legend.position.inside = c(1, 1),
-      legend.justification = c(1, 1)
+      legend.position.inside = .legend_corner(
+        c(
+          psi_hats,
+          purrr::map_dbl(infer_list, function(x) x$point_estimate_df$psi_0)
+        ),
+        psi_limits
+      )$position,
+      legend.justification = .legend_corner(
+        c(
+          psi_hats,
+          purrr::map_dbl(infer_list, function(x) x$point_estimate_df$psi_0)
+        ),
+        psi_limits
+      )$justification
     )
 }

@@ -22,7 +22,7 @@ The \code{psi_lower} and \code{psi_upper} slots define the common
 interval boundaries that stop traversal.}
 
 \item{branch_evaluator}{Function \code{(psi, param_init) ->
-list(param_hat, branch_val)}.}
+list(param_hat, branch_val, psi_residual)}.}
 }
 \description{
 Picks up where \code{probe()} left off: reads pre-evaluated points

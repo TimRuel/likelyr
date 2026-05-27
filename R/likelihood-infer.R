@@ -12,6 +12,11 @@
 #' \code{zero_max_psi_ll_fn} become top-level slots alongside
 #' \code{pl_df}/\code{il_df}.
 #'
+#' The filtered \code{psi_loglik_df} (after applying the \code{above_crit}
+#' mask) is stored on the inference result so that plotting uses the same
+#' data as inference. The unfiltered \code{psi_loglik_df} remains on the
+#' workspace result for use by \code{diagnose()}.
+#'
 #' @param model A calibrated \code{model} object.
 #' @param which Character vector. Subset of
 #'   \code{c("profile", "integrated")}. Default: all available.
@@ -59,7 +64,11 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
 #' @keywords internal
 #' @noRd
 .set_infer_result <- function(model, name, res) {
-  model$workspace[[name]]$inference <- new_inference_result(res)
+  # res is list(result = <synthesize_inference output>,
+  #             psi_loglik_df = <filtered df>)
+  inference <- new_inference_result(res$result)
+  inference$psi_loglik_df <- res$psi_loglik_df
+  model$workspace[[name]]$inference <- inference
   model$workspace[[name]] <- mark_inferred(model$workspace[[name]])
   model
 }
@@ -95,16 +104,26 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
     stop("infer(): workspace_result is missing psi_loglik_df", call. = FALSE)
   }
 
-  if ("above_crit" %in% names(psi_loglik_df)) {
-    psi_loglik_df <- psi_loglik_df |>
-      dplyr::filter(above_crit)
+  # Apply above_crit filter when present. The filtered df is used for
+  # all inference computations and stored on the inference result so that
+  # plotting uses the same data. The unfiltered df remains on the
+  # workspace result for diagnose().
+  psi_loglik_df_filtered <- if ("above_crit" %in% names(psi_loglik_df)) {
+    psi_loglik_df |> dplyr::filter(above_crit)
+  } else {
+    psi_loglik_df
   }
 
-  synthesize_inference(
-    psi_loglik_df = psi_loglik_df,
+  result <- synthesize_inference(
+    psi_loglik_df = psi_loglik_df_filtered,
     alpha_levels = alpha_levels,
     psi_0 = psi_0,
     psi_interval = psi_interval
+  )
+
+  list(
+    result = result,
+    psi_loglik_df = psi_loglik_df_filtered
   )
 }
 
@@ -248,6 +267,30 @@ view.inference <- function(
       x$point_estimate_df,
       x$interval_estimate_df
     )
+  )
+}
+
+# ---------------------------------------------------------------------
+# Plot (local-only)
+# ---------------------------------------------------------------------
+
+#' @method plot inference
+#' @export
+plot.inference <- function(x, points = FALSE, ...) {
+  .assert_local_plotting()
+
+  if (is.null(x$psi_loglik_df)) {
+    stop(
+      "plot.inference() requires a psi_loglik_df on the inference result.\n",
+      "Run infer() first.",
+      call. = FALSE
+    )
+  }
+
+  plot_pseudolikelihood_curve(
+    inference_result = x,
+    psi_loglik_df = x$psi_loglik_df,
+    points = points
   )
 }
 

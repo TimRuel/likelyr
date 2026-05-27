@@ -45,7 +45,7 @@
 #'   The \code{psi_lower} and \code{psi_upper} slots define the common
 #'   interval boundaries that stop traversal.
 #' @param branch_evaluator Function \code{(psi, param_init) ->
-#'   list(param_hat, branch_val)}.
+#'   list(param_hat, branch_val, psi_residual)}.
 #'
 #' @return A list with:
 #'   \itemize{
@@ -120,6 +120,12 @@ traverse_branch_topdown <- function(
 
   psi_interval <- traversal$psi_interval %||% NULL
 
+  # Read retry settings from traversal spec — same knobs as profile
+  max_retries <- traversal$max_retries %||% 0L
+  resid_tol <- traversal$resid_tol %||% 1e-3
+  max_drop_frac <- traversal$max_drop_frac %||% Inf
+  branch_retry_on <- traversal$branch_retry_on %||% character(0)
+
   probe_evals_df_left <- probe_evals_df |> dplyr::filter(side == "left")
   probe_evals_df_right <- probe_evals_df |> dplyr::filter(side == "right")
 
@@ -147,7 +153,11 @@ traverse_branch_topdown <- function(
       init_guess = branch_seed$param_left_edge,
       branch_evaluator = branch_evaluator,
       branch_cutoff = branch_cutoff,
-      psi_interval = psi_interval
+      psi_interval = psi_interval,
+      max_retries = max_retries,
+      resid_tol = resid_tol,
+      max_drop_frac = max_drop_frac,
+      branch_retry_on = branch_retry_on
     )
   }
 
@@ -164,7 +174,11 @@ traverse_branch_topdown <- function(
       init_guess = branch_seed$param_right_edge,
       branch_evaluator = branch_evaluator,
       branch_cutoff = branch_cutoff,
-      psi_interval = psi_interval
+      psi_interval = psi_interval,
+      max_retries = max_retries,
+      resid_tol = resid_tol,
+      max_drop_frac = max_drop_frac,
+      branch_retry_on = branch_retry_on
     )
   }
 
@@ -261,15 +275,38 @@ traverse_branch_leftright <- function(
 #' @description
 #' Sweeps outward from \code{k_start} in the given direction, evaluating
 #' the branch at each grid point. Stops when the common interval boundary
-#' is reached.
+#' is reached or the log-likelihood falls below \code{branch_cutoff}.
+#'
+#' Jitter retries are triggered by any combination of the following,
+#' controlled by \code{branch_retry_on}:
+#' \enumerate{
+#'   \item \code{"monotonicity"}: the proposed step increases the
+#'     log-likelihood relative to the previous value.
+#'   \item \code{"constraint"}: the psi residual at the returned
+#'     solution exceeds \code{resid_tol}.
+#'   \item \code{"drop"}: the proposed drop exceeds \code{max_drop_frac}
+#'     times the recent median drop (once at least three recent drops
+#'     are available).
+#' }
+#' The warm start chain only advances when \code{psi_resid <= resid_tol},
+#' preventing constraint failures from corrupting subsequent steps.
 #'
 #' @param grid                  ψ-grid object.
 #' @param k_direction           Integer +1 or -1.
 #' @param k_start               Integer starting grid index.
 #' @param init_guess            Numeric vector warm-start parameter.
 #' @param branch_evaluator      Function (psi, param_init) -> list.
-#' @param branch_cutoff         Numeric scalar.
+#' @param branch_cutoff         Numeric scalar. Default: \code{-Inf}.
 #' @param psi_interval          A \code{sets::interval} object or NULL.
+#' @param max_retries           Non-negative integer. Maximum jitter
+#'   retries per step. Default: \code{0L} (no retries).
+#' @param resid_tol             Non-negative numeric scalar. Constraint
+#'   residual tolerance. Default: \code{1e-3}.
+#' @param max_drop_frac         Positive numeric scalar. Drop threshold
+#'   multiplier. Set to \code{Inf} to disable. Default: \code{Inf}.
+#' @param branch_retry_on       Character vector. Which violations
+#'   trigger jitter retries. Any subset of \code{c("monotonicity",
+#'   "constraint", "drop")}. Default: \code{character(0)} (no retries).
 #' @param max_consecutive_skips Integer. Default: \code{2L}.
 #'
 #' @keywords internal
@@ -281,12 +318,21 @@ traverse_branch_side <- function(
   branch_evaluator,
   branch_cutoff = -Inf,
   psi_interval = NULL,
+  max_retries = 0L,
+  resid_tol = 1e-3,
+  max_drop_frac = Inf,
+  branch_retry_on = character(0),
   max_consecutive_skips = 2L
 ) {
   k_curr <- k_start
   current_par <- init_guess
   current_ll <- Inf
   consecutive_skips <- 0L
+  recent_drops <- numeric(0)
+
+  check_monotonicity <- "monotonicity" %in% branch_retry_on
+  check_constraint <- "constraint" %in% branch_retry_on
+  check_drop <- "drop" %in% branch_retry_on
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
@@ -304,8 +350,9 @@ traverse_branch_side <- function(
   repeat {
     psi_k <- grid$psi_mle + k_curr * grid$increment
 
-    hit_lower <- !is.null(psi_lower) && psi_k < psi_lower
-    hit_upper <- !is.null(psi_upper) && psi_k > psi_upper
+    # Use >= / <= so exact boundary grid points are caught correctly
+    hit_lower <- !is.null(psi_lower) && psi_k <= psi_lower
+    hit_upper <- !is.null(psi_upper) && psi_k >= psi_upper
 
     if (hit_lower || hit_upper) {
       cutoff_not_reached <- current_ll > branch_cutoff
@@ -327,11 +374,53 @@ traverse_branch_side <- function(
       break
     }
 
-    eval <- tryCatch(
-      branch_evaluator(psi_k, current_par),
-      error = function(e) NULL
-    )
+    # -------------------------------------------------------------------
+    # Evaluate with retry logic
+    # -------------------------------------------------------------------
+    retry <- 0L
+    warm_init <- current_par
+    drop <- -Inf
 
+    repeat {
+      eval <- tryCatch(
+        branch_evaluator(psi_k, warm_init),
+        error = function(e) NULL
+      )
+
+      if (is.null(eval) || !is.finite(eval$branch_val)) {
+        # Non-finite result — count as skip, break retry loop
+        eval <- NULL
+        break
+      }
+
+      drop <- current_ll - eval$branch_val
+      psi_resid <- abs(eval$psi_residual %||% (eval$psi_at_hat - psi_k))
+
+      typical_drop <- if (length(recent_drops) >= 3L) {
+        median(recent_drops)
+      } else {
+        Inf
+      }
+
+      monotone_ok <- !check_monotonicity || eval$branch_val <= current_ll
+      constraint_ok <- !check_constraint || psi_resid <= resid_tol
+      drop_ok <- !check_drop ||
+        !(is.finite(max_drop_frac) &&
+          length(recent_drops) >= 3L &&
+          drop > max_drop_frac * typical_drop)
+
+      if ((monotone_ok && constraint_ok && drop_ok) || retry >= max_retries) {
+        break
+      }
+
+      retry <- retry + 1L
+      warm_init <- warm_init +
+        stats::rnorm(length(warm_init), sd = 0.1 * retry)
+    }
+
+    # -------------------------------------------------------------------
+    # Record result or skip
+    # -------------------------------------------------------------------
     if (is.null(eval) || !is.finite(eval$branch_val)) {
       consecutive_skips <- consecutive_skips + 1L
       if (consecutive_skips >= max_consecutive_skips) break
@@ -339,7 +428,18 @@ traverse_branch_side <- function(
       df <- dplyr::add_row(df, k = k_curr, loglik = eval$branch_val)
       current_ll <- eval$branch_val
       consecutive_skips <- 0L
-      current_par <- eval$param_hat
+
+      if (drop > 0 && is.finite(drop)) {
+        recent_drops <- c(tail(recent_drops, 9L), drop)
+      }
+
+      # Advance warm start only when constraint was satisfied
+      psi_resid_final <- abs(
+        eval$psi_residual %||% (eval$psi_at_hat - psi_k)
+      )
+      if (psi_resid_final <= resid_tol) {
+        current_par <- eval$param_hat
+      }
     }
 
     k_curr <- k_curr + k_direction
@@ -361,7 +461,11 @@ assemble_branch_df <- function(df, grid) {
     dplyr::arrange(k) |>
     dplyr::distinct() |>
     dplyr::mutate(
-      psi = if ("psi" %in% names(df)) psi else grid$psi_mle + k * grid$increment
+      psi = if ("psi" %in% names(df)) {
+        psi
+      } else {
+        grid$psi_mle + k * grid$increment
+      }
     ) |>
     dplyr::mutate(
       rel_loglik = loglik - max(loglik, na.rm = TRUE)

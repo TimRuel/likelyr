@@ -1,40 +1,93 @@
 # =====================================================================
-# infer-psi_hat.R — Point estimation from ψ log-likelihood
+# infer-point_estimate.R — Point estimation from ψ log-likelihood
 # =====================================================================
+
+#' Compute the upper convex hull indices of a planar point sequence
+#'
+#' @description
+#' Given a sequence of points (x, y) sorted by x, returns the indices
+#' of the points forming the upper convex hull — the piecewise linear
+#' concave envelope lying at or above all other points. This is the
+#' discrete Least Concave Majorant (LCM).
+#'
+#' Uses the standard cross-product stack algorithm: a point is removed
+#' from the hull when adding the next point would create a left turn
+#' (convex kink), which would violate the concavity of the upper envelope.
+#'
+#' @param x Numeric vector of x-coordinates (must be sorted ascending).
+#' @param y Numeric vector of y-coordinates, same length as x.
+#'
+#' @return Integer vector of indices into x/y forming the upper hull,
+#'   always including the first and last points.
+#'
+#' @keywords internal
+.upper_convex_hull <- function(x, y) {
+  n <- length(x)
+  if (n < 2L) {
+    return(seq_len(n))
+  }
+
+  hull <- integer(n)
+  size <- 0L
+
+  for (i in seq_len(n)) {
+    while (size >= 2L) {
+      o <- hull[size - 1L]
+      a <- hull[size]
+      # Cross product of vectors (a-o) and (i-o).
+      # >= 0 means a left turn or collinear — a is below or on the line
+      # from o to i, so a is not on the upper hull and should be removed.
+      cp <- (x[a] - x[o]) * (y[i] - y[o]) - (y[a] - y[o]) * (x[i] - x[o])
+      if (cp >= 0) {
+        size <- size - 1L
+      } else {
+        break
+      }
+    }
+    size <- size + 1L
+    hull[size] <- i
+  }
+
+  hull[seq_len(size)]
+}
 
 #' Fit a smooth log-likelihood function in ψ
 #'
 #' @description
-#' Fits a smoothing spline to a discrete ψ–log-likelihood grid and returns
-#' a function for evaluating the smoothed log-likelihood at arbitrary ψ.
+#' Fits a smoothing spline to a discrete ψ–log-likelihood grid, then
+#' projects the result onto its Least Concave Majorant (LCM) to enforce
+#' global concavity.
 #'
-#' This helper assumes that `psi_loglik_df` represents a *unimodal*
-#' log-likelihood curve on a sufficiently dense grid of ψ values.
+#' The procedure is:
+#' \enumerate{
+#'   \item Fit \code{smooth.spline} to the raw grid.
+#'   \item Evaluate the spline on a fine internal grid (500 points).
+#'   \item Compute the upper convex hull of the fine-grid evaluations —
+#'     the tightest concave piecewise-linear function lying at or above
+#'     the spline. This is the LCM.
+#'   \item Return a linear interpolant through the LCM knots.
+#' }
 #'
-#' When \code{spar} is \code{NULL} (default), the smoothing parameter is
-#' selected automatically. When the discrete maximum lies in the interior
-#' of the grid, \code{spar} is chosen to minimise the distance between the
-#' spline argmax and the discrete argmax, encouraging the smooth curve to
-#' peak in the same location as the data. When the discrete maximum is at
-#' or near a boundary (within one grid increment of either edge), this
-#' criterion is degenerate, so GCV is used instead.
+#' In regions where the spline is already concave, the LCM knots are
+#' dense (one per fine-grid point) and the piecewise-linear interpolant
+#' closely tracks the spline. In regions where the spline is convex —
+#' typically the far left tail at small ψ — the LCM bridges over the
+#' violation with a linear segment between the surrounding concave
+#' sections, preserving the mode and the shape of the main body of the
+#' curve.
 #'
 #' @param psi_loglik_df A data frame containing columns:
 #'   \describe{
 #'     \item{psi}{Numeric ψ grid values.}
 #'     \item{loglik}{Corresponding log-likelihood values.}
 #'   }
-#' @param spar Optional numeric smoothing parameter passed to
-#'   \code{smooth.spline}. When \code{NULL} (default), selected
-#'   automatically as described above.
 #'
 #' @return
-#' A function \code{f(psi)} returning the smoothed log-likelihood at
-#' \code{psi}, with attributes \code{"pseudolikelihood"},
-#' \code{"psi range"}, and \code{"spar"}.
+#' A function \code{f(psi)} returning the smoothed, concavity-corrected
+#' log-likelihood at \code{psi}.
 #'
 #' @keywords internal
-fit_psi_loglik <- function(psi_loglik_df, spar = NULL) {
+fit_psi_loglik <- function(psi_loglik_df) {
   required <- c("psi", "loglik")
   if (!all(required %in% names(psi_loglik_df))) {
     stop(
@@ -44,66 +97,46 @@ fit_psi_loglik <- function(psi_loglik_df, spar = NULL) {
     )
   }
 
-  i_max <- which.max(psi_loglik_df$loglik)
-  psi_max_obs <- psi_loglik_df$psi[i_max]
+  # ------------------------------------------------------------------
+  # Step 1: fit smooth spline to raw grid
+  # ------------------------------------------------------------------
+  psi_loglik_spline <- stats::smooth.spline(
+    x = psi_loglik_df$psi,
+    y = psi_loglik_df$loglik
+  )
 
-  .fit_spline <- function(s) {
-    stats::smooth.spline(
-      x = psi_loglik_df$psi,
-      y = psi_loglik_df$loglik,
-      spar = s
-    )
-  }
+  psi_range <- range(psi_loglik_spline$x)
 
-  .spline_argmax <- function(sp) {
-    psi_range <- range(sp$x)
-    psi_loglik_fn <- function(psi) stats::predict(sp, psi)$y
-    stats::optimize(
-      f = psi_loglik_fn,
-      lower = psi_range[1],
-      upper = psi_range[2],
-      maximum = TRUE
-    )$maximum
-  }
+  # ------------------------------------------------------------------
+  # Step 2: evaluate on fine grid
+  # ------------------------------------------------------------------
+  psi_fine <- seq(psi_range[1], psi_range[2], length.out = 500L)
+  y_fine <- stats::predict(psi_loglik_spline, psi_fine)$y
 
-  if (is.null(spar)) {
-    psi_range <- range(psi_loglik_df$psi)
-    grid_increment <- psi_loglik_df$psi[2] - psi_loglik_df$psi[1]
-    at_boundary <- (psi_max_obs - psi_range[1]) < grid_increment ||
-      (psi_range[2] - psi_max_obs) < grid_increment
+  # ------------------------------------------------------------------
+  # Step 3: project onto LCM via upper convex hull
+  # ------------------------------------------------------------------
+  hull_idx <- .upper_convex_hull(psi_fine, y_fine)
+  psi_lcm <- psi_fine[hull_idx]
+  y_lcm <- y_fine[hull_idx]
 
-    if (at_boundary) {
-      # Argmax-alignment criterion is degenerate when the mode is at or
-      # near a boundary — use GCV instead.
-      psi_loglik_spline <- stats::smooth.spline(
-        x = psi_loglik_df$psi,
-        y = psi_loglik_df$loglik
-      )
-      spar <- psi_loglik_spline$spar
-    } else {
-      opt <- stats::optimize(
-        f = function(s) abs(.spline_argmax(.fit_spline(s)) - psi_max_obs),
-        lower = 0.4,
-        upper = 0.7,
-        maximum = FALSE
-      )
-      spar <- opt$minimum
-      psi_loglik_spline <- .fit_spline(spar)
-    }
-  } else {
-    psi_loglik_spline <- .fit_spline(spar)
-  }
+  # ------------------------------------------------------------------
+  # Step 4: linear interpolant through LCM knots
+  # ------------------------------------------------------------------
+  lcm_interp <- stats::approxfun(
+    psi_lcm,
+    y_lcm,
+    method = "linear",
+    rule = 2L
+  )
 
-  psi_loglik <- function(psi) {
-    stats::predict(psi_loglik_spline, psi)$y
-  }
+  psi_loglik <- function(psi) lcm_interp(psi)
 
   attr(psi_loglik, "pseudolikelihood") <- attr(
     psi_loglik_df,
     "pseudolikelihood"
   )
-  attr(psi_loglik, "psi range") <- range(psi_loglik_spline$x)
-  attr(psi_loglik, "spar") <- spar
+  attr(psi_loglik, "psi range") <- psi_range
 
   psi_loglik
 }

@@ -12,6 +12,10 @@ traverse_branch_side(
   branch_evaluator,
   branch_cutoff = -Inf,
   psi_interval = NULL,
+  max_retries = 0L,
+  resid_tol = 0.001,
+  max_drop_frac = Inf,
+  branch_retry_on = character(0),
   max_consecutive_skips = 2L
 )
 }
@@ -26,15 +30,42 @@ traverse_branch_side(
 
 \item{branch_evaluator}{Function (psi, param_init) -> list.}
 
-\item{branch_cutoff}{Numeric scalar.}
+\item{branch_cutoff}{Numeric scalar. Default: \code{-Inf}.}
 
 \item{psi_interval}{A \code{sets::interval} object or NULL.}
+
+\item{max_retries}{Non-negative integer. Maximum jitter
+retries per step. Default: \code{0L} (no retries).}
+
+\item{resid_tol}{Non-negative numeric scalar. Constraint
+residual tolerance. Default: \code{1e-3}.}
+
+\item{max_drop_frac}{Positive numeric scalar. Drop threshold
+multiplier. Set to \code{Inf} to disable. Default: \code{Inf}.}
+
+\item{branch_retry_on}{Character vector. Which violations
+trigger jitter retries. Any subset of \code{c("monotonicity",
+  "constraint", "drop")}. Default: \code{character(0)} (no retries).}
 
 \item{max_consecutive_skips}{Integer. Default: \code{2L}.}
 }
 \description{
 Sweeps outward from \code{k_start} in the given direction, evaluating
 the branch at each grid point. Stops when the common interval boundary
-is reached.
+is reached or the log-likelihood falls below \code{branch_cutoff}.
+
+Jitter retries are triggered by any combination of the following,
+controlled by \code{branch_retry_on}:
+\enumerate{
+\item \code{"monotonicity"}: the proposed step increases the
+log-likelihood relative to the previous value.
+\item \code{"constraint"}: the psi residual at the returned
+solution exceeds \code{resid_tol}.
+\item \code{"drop"}: the proposed drop exceeds \code{max_drop_frac}
+times the recent median drop (once at least three recent drops
+are available).
+}
+The warm start chain only advances when \code{psi_resid <= resid_tol},
+preventing constraint failures from corrupting subsequent steps.
 }
 \keyword{internal}

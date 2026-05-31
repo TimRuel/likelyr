@@ -154,21 +154,36 @@ probe <- function(
   }
 
   # -------------------------------------------------------------------
-  # 3b. Reject if mode sits on a psi boundary
+  # 3b. Reject if mode sits on a psi boundary, unless psi_mle is itself
+  #     near that boundary. When psi_mle is at or near a boundary (k_max
+  #     or k_min close to zero), monotone branch profiles peaking at that
+  #     boundary are correct behavior, not a pathology.
   # -------------------------------------------------------------------
-  if (
-    (k_mode == k_min || k_mode == k_max) &&
-      .should_reject("mode_on_psi_boundary")
-  ) {
-    return(list(
-      accepted = FALSE,
-      reason = "mode_on_psi_boundary",
-      psi_mode = psi_mode,
-      k_mode = k_mode,
-      k_min = k_min,
-      k_max = k_max,
-      omega_hat = omega_hat
-    ))
+  boundary_k_tol <- as.integer(0.1 / increment)
+
+  if (.should_reject("mode_on_psi_boundary")) {
+    if (k_mode == k_max && k_max > boundary_k_tol) {
+      return(list(
+        accepted = FALSE,
+        reason = "mode_on_psi_boundary",
+        psi_mode = psi_mode,
+        k_mode = k_mode,
+        k_min = k_min,
+        k_max = k_max,
+        omega_hat = omega_hat
+      ))
+    }
+    if (k_mode == k_min && k_min < -boundary_k_tol) {
+      return(list(
+        accepted = FALSE,
+        reason = "mode_on_psi_boundary",
+        psi_mode = psi_mode,
+        k_mode = k_mode,
+        k_min = k_min,
+        k_max = k_max,
+        omega_hat = omega_hat
+      ))
+    }
   }
 
   # -------------------------------------------------------------------
@@ -311,19 +326,29 @@ probe <- function(
         k_mode <- k_right
       }
 
-      if (
-        (k_mode == k_min || k_mode == k_max) &&
-          .should_reject("mode_on_psi_boundary")
-      ) {
-        return(list(
-          accepted = FALSE,
-          reason = "mode_on_psi_boundary",
-          psi_mode = psi_mode,
-          k_mode = k_mode,
-          k_min = k_min,
-          k_max = k_max,
-          omega_hat = omega_hat
-        ))
+      if (.should_reject("mode_on_psi_boundary")) {
+        if (k_mode == k_max && k_max > boundary_k_tol) {
+          return(list(
+            accepted = FALSE,
+            reason = "mode_on_psi_boundary",
+            psi_mode = psi_mode,
+            k_mode = k_mode,
+            k_min = k_min,
+            k_max = k_max,
+            omega_hat = omega_hat
+          ))
+        }
+        if (k_mode == k_min && k_min < -boundary_k_tol) {
+          return(list(
+            accepted = FALSE,
+            reason = "mode_on_psi_boundary",
+            psi_mode = psi_mode,
+            k_mode = k_mode,
+            k_min = k_min,
+            k_max = k_max,
+            omega_hat = omega_hat
+          ))
+        }
       }
 
       ll_left <- ll_mode

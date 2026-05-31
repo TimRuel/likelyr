@@ -59,7 +59,8 @@ calibrate_traversal <- function(
     E_loglik_grad = likelihood$E_loglik_grad,
     increment = traversal$increment,
     branch_binder = traversal$branch_binder,
-    solver = solver
+    solver = solver,
+    data = data
   )
 
   .call_constructor <- function(fn) {

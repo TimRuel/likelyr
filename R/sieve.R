@@ -145,6 +145,16 @@ sieve <- function(
           "\n",
           sep = ""
         )
+        if (reason == "mode_too_low") {
+          cat(sprintf(
+            "         ll_mode=%.2f | ll_threshold=%.2f | gap=%.2f | ll_at_psi_mle=%.2f\n",
+            result$ll_mode %||% NA_real_,
+            result$ll_threshold %||% NA_real_,
+            (result$ll_mode %||% NA_real_) -
+              (result$ll_threshold %||% NA_real_),
+            result$ll_at_psi_mle %||% NA_real_
+          ))
+        }
       }
     }
   }

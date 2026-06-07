@@ -24,6 +24,13 @@
 #   which guarantees param_mle is at most 1/4 of the way to the bound
 #   in the largest component, while preventing auglag from diverging
 #   to ±Inf in unbounded spaces like the multinomial logit.
+#
+# ATTRIBUTE PRESERVATION:
+#   param_mle_fn may attach named attributes to param_mle (e.g.
+#   Sigma_hat, fix_Sigma) for use by likelihood calibration. These
+#   are preserved across the as.numeric() coercion by saving and
+#   restoring the attribute list, so downstream functions that look
+#   for them via attr() will find them on the stored param_mle.
 # ======================================================================
 
 #' Calibrate Parameter Component
@@ -68,7 +75,12 @@ calibrate_parameter <- function(parameter, data) {
     )
   }
 
+  # Coerce to plain numeric while preserving any attributes attached by
+  # param_mle_fn (e.g. Sigma_hat, fix_Sigma for random effects models).
+  # as.numeric() strips attributes, so we save and restore them.
+  saved_attrs <- attributes(param_mle)
   param_mle <- as.numeric(param_mle)
+  attributes(param_mle) <- saved_attrs
 
   # -------------------------------------------------------------------
   # 2. Resolve "auto" bounds now that param_mle is known.

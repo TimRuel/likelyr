@@ -75,7 +75,7 @@ safe_eval_branch <- function(psi, param_init, branch_evaluator) {
 
 #' Generate Coarse ψ Grid
 #'
-#' @param interval Numeric length-2 vector \code{z(lower, upper)}.
+#' @param interval Numeric length-2 vector \code{c(lower, upper)}.
 #' @param n        Integer number of grid points.
 #'
 #' @return Numeric vector of ψ values.
@@ -214,12 +214,10 @@ check_drop <- function(
   max_drop_cap,
   k_recent
 ) {
-  # Absolute cap — calibrated from profile curvature
   if (drop > max_drop_cap) {
     return(FALSE)
   }
 
-  # Relative check — only once enough history exists
   if (length(recent_drops) < k_recent) {
     return(TRUE)
   }
@@ -287,34 +285,18 @@ compute_common_interval <- function(
     )
   }
 
-  # -------------------------------------------------------------------
-  # Profile extent
-  # -------------------------------------------------------------------
   profile_lower <- min(psi_loglik_df$psi)
   profile_upper <- max(psi_loglik_df$psi)
 
-  # -------------------------------------------------------------------
-  # Apply multiplicative buffer around profile half-width
-  # -------------------------------------------------------------------
   center <- (profile_lower + profile_upper) / 2
   half_width <- (profile_upper - profile_lower) / 2
 
   psi_lower <- center - half_width * interval_buffer
   psi_upper <- center + half_width * interval_buffer
 
-  # -------------------------------------------------------------------
-  # Domain bounds
-  # -------------------------------------------------------------------
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else NULL
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else NULL
 
-  # -------------------------------------------------------------------
-  # Boundary proximity detection:
-  # If the profile reached a finite boundary without dropping to its
-  # cutoff (detected as profile endpoint within one grid step of the
-  # domain boundary), snap the common interval to that boundary so
-  # branches are evaluated all the way to it.
-  # -------------------------------------------------------------------
   snapped_to_lower <- FALSE
   snapped_to_upper <- FALSE
 
@@ -350,4 +332,83 @@ compute_common_interval <- function(
     snapped_to_lower = snapped_to_lower,
     snapped_to_upper = snapped_to_upper
   )
+}
+
+# ----------------------------------------------------------------------
+# Endpoint outlier trimming
+# ----------------------------------------------------------------------
+
+#' Trim Outlier Endpoints from a Branch Log-Likelihood Curve
+#'
+#' @description
+#' Removes isolated outlier points at the left and/or right endpoints
+#' of a branch log-likelihood curve. An endpoint is flagged when the
+#' absolute log-likelihood drop between it and its neighbour exceeds
+#' \code{cap_multiplier} times the median drop in the interior of the
+#' curve.
+#'
+#' This is a post-hoc sanity check only. It does not modify points in
+#' the interior of the curve.
+#'
+#' @param branch_df      A tibble with columns \code{k}, \code{psi},
+#'   \code{loglik}, \code{rel_loglik}, as produced by
+#'   \code{assemble_branch_df()}.
+#' @param cap_multiplier Positive numeric scalar. Endpoint drops
+#'   exceeding \code{cap_multiplier * median(interior_drops)} are
+#'   trimmed. Default: \code{10.0}.
+#'
+#' @return The same tibble with outlier endpoints removed. Attributes
+#'   set by \code{assemble_branch_df()} are preserved.
+#'
+#' @keywords internal
+trim_branch_endpoints <- function(branch_df, cap_multiplier = 10.0) {
+  if (nrow(branch_df) < 4L) {
+    return(branch_df)
+  }
+
+  ll <- branch_df$loglik
+  n <- length(ll)
+
+  drops <- abs(diff(ll))
+
+  interior_drops <- drops[seq(2L, length(drops) - 1L)]
+  if (length(interior_drops) == 0L || all(is.na(interior_drops))) {
+    return(branch_df)
+  }
+
+  ref_drop <- median(interior_drops, na.rm = TRUE)
+  if (!is.finite(ref_drop) || ref_drop <= 0) {
+    return(branch_df)
+  }
+
+  cap <- cap_multiplier * ref_drop
+
+  trim_left <- 0L
+  while (
+    (trim_left + 1L) < (n - trim_left) &&
+      abs(ll[trim_left + 2L] - ll[trim_left + 1L]) > cap
+  ) {
+    trim_left <- trim_left + 1L
+  }
+
+  trim_right <- 0L
+  while (
+    (trim_right + 1L) < (n - trim_left - trim_right) &&
+      abs(ll[n - trim_right] - ll[n - trim_right - 1L]) > cap
+  ) {
+    trim_right <- trim_right + 1L
+  }
+
+  if (trim_left == 0L && trim_right == 0L) {
+    return(branch_df)
+  }
+
+  kept_attrs <- attributes(branch_df)
+  result <- branch_df[seq(trim_left + 1L, n - trim_right), ]
+
+  for (nm in setdiff(names(kept_attrs), c("names", "row.names", "class"))) {
+    attr(result, nm) <- kept_attrs[[nm]]
+  }
+
+  result
 }

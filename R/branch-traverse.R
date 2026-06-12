@@ -456,7 +456,7 @@ traverse_branch_side <- function(
 
 #' @keywords internal
 #' @noRd
-assemble_branch_df <- function(df, grid) {
+assemble_branch_df <- function(df, grid, cap_multiplier = 10.0) {
   branch_df <- df |>
     dplyr::arrange(k) |>
     dplyr::distinct() |>
@@ -470,7 +470,8 @@ assemble_branch_df <- function(df, grid) {
     dplyr::mutate(
       rel_loglik = loglik - max(loglik, na.rm = TRUE)
     ) |>
-    dplyr::select(k, psi, loglik, rel_loglik)
+    dplyr::select(k, psi, loglik, rel_loglik) |>
+    trim_branch_endpoints(cap_multiplier = cap_multiplier)
 
   attr(branch_df, "mode_index") <- which.max(branch_df$loglik)
   attr(branch_df, "n_points") <- nrow(branch_df)

@@ -21,6 +21,13 @@
 #' its signature from \code{function(data, param_mle) -> function(omega_hat)}
 #' to \code{function(omega_hat) -> list(fn, gr)}.
 #'
+#' Sigma handling for random effects models:
+#' When \code{param_mle} carries a \code{Sigma_hat} attribute and
+#' \code{fix_Sigma = TRUE}, \code{loglik} is bound with
+#' \code{Sigma = Sigma_hat} so that it correctly evaluates the marginal
+#' log-likelihood from a \code{vec(B)}-only parameter vector rather than
+#' attempting to unpack a Cholesky factor that is not present.
+#'
 #' @param likelihood A \code{likelihood_spec} object.
 #' @param data       User data.
 #' @param param_mle  Optional numeric vector; MLE of the full model
@@ -44,17 +51,41 @@ calibrate_likelihood <- function(likelihood, data, param_mle = NULL) {
   stopifnot(inherits(likelihood, "likelihood_spec"))
 
   # -------------------------------------------------------------------
-  # 1. Bind data to loglik
+  # 1. Bind data to loglik.
+  #
+  # When param_mle carries Sigma_hat and fix_Sigma = TRUE, bind Sigma
+  # explicitly so loglik(param) correctly evaluates from a vec(B)-only
+  # param vector rather than trying to unpack a Cholesky factor that is
+  # not present.
   # -------------------------------------------------------------------
   orig_loglik <- .bundle_fun_env(likelihood$loglik)
   d <- data
 
-  ll_wrapper <- function(param) orig_loglik(param, d)
+  Sigma_for_loglik <- if (
+    !is.null(param_mle) &&
+      isTRUE(attr(param_mle, "fix_Sigma")) &&
+      !is.null(attr(param_mle, "Sigma_hat"))
+  ) {
+    attr(param_mle, "Sigma_hat")
+  } else {
+    NULL
+  }
 
-  ll_env <- new.env(parent = baseenv())
-  ll_env$orig_loglik <- orig_loglik
-  ll_env$d <- d
-  environment(ll_wrapper) <- ll_env
+  if (!is.null(Sigma_for_loglik)) {
+    Sigma_ <- Sigma_for_loglik
+    ll_wrapper <- function(param) orig_loglik(param, d, Sigma = Sigma_)
+    ll_env <- new.env(parent = baseenv())
+    ll_env$orig_loglik <- orig_loglik
+    ll_env$d <- d
+    ll_env$Sigma_ <- Sigma_
+    environment(ll_wrapper) <- ll_env
+  } else {
+    ll_wrapper <- function(param) orig_loglik(param, d)
+    ll_env <- new.env(parent = baseenv())
+    ll_env$orig_loglik <- orig_loglik
+    ll_env$d <- d
+    environment(ll_wrapper) <- ll_env
+  }
 
   likelihood$loglik <- ll_wrapper
 

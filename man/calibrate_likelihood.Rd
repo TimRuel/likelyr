@@ -44,5 +44,12 @@ When \code{make_branch_fns} is present and \code{param_mle} is
 supplied, it is called once with \code{(data, param_mle)}, reducing
 its signature from \code{function(data, param_mle) -> function(omega_hat)}
 to \code{function(omega_hat) -> list(fn, gr)}.
+
+Sigma handling for random effects models:
+When \code{param_mle} carries a \code{Sigma_hat} attribute and
+\code{fix_Sigma = TRUE}, \code{loglik} is bound with
+\code{Sigma = Sigma_hat} so that it correctly evaluates the marginal
+log-likelihood from a \code{vec(B)}-only parameter vector rather than
+attempting to unpack a Cholesky factor that is not present.
 }
 \keyword{internal}

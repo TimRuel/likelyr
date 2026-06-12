@@ -7,7 +7,7 @@
 make_coarse_psi_grid(interval, n = 25L)
 }
 \arguments{
-\item{interval}{Numeric length-2 vector \code{z(lower, upper)}.}
+\item{interval}{Numeric length-2 vector \code{c(lower, upper)}.}
 
 \item{n}{Integer number of grid points.}
 }

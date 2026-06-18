@@ -3,7 +3,8 @@
 #
 # Provides:
 #   traverse_profile_side() — one-sided profile sweep with
-#                             monotonicity enforcement via jitter retries
+#                             multi-start evaluation and hard
+#                             monotonicity enforcement
 # ======================================================================
 
 #' One-Sided Profile Log-Likelihood Sweep Along the ψ-Grid
@@ -11,51 +12,56 @@
 #' @description
 #' Performs a one-sided continuation sweep of the profile log-likelihood
 #' by moving outward from the mode along a fixed ψ-grid. At each grid
-#' point ψ_k, the constrained optimization is solved using a warm start
-#' derived from the previous solution.
+#' point ψ_k, the constrained optimization is solved using a set of
+#' diverse starting points. The best feasible result is selected.
 #'
-#' Jitter retries are triggered by any combination of the following,
-#' controlled by \code{profile_retry_on}:
+#' Starting points at each grid point:
 #' \enumerate{
-#'   \item \code{"monotonicity"}: the proposed step increases the
-#'     log-likelihood relative to the previous value.
-#'   \item \code{"constraint"}: the psi residual at the returned
-#'     solution exceeds \code{resid_tol}, indicating auglag found a
-#'     feasible-but-wrong local optimum.
-#'   \item \code{"drop"}: the proposed drop exceeds \code{max_drop_frac}
-#'     times the recent median drop (once at least three recent drops
-#'     are available).
+#'   \item The current warm-start (chained from the previous step).
+#'   \item \code{init_guess} — the mode parameter, providing a global
+#'     anchor that breaks chain dependency when the warm start has drifted.
+#'   \item \code{max_retries} jittered copies of \code{init_guess},
+#'     with jitter scale increasing with retry index.
 #' }
-#' The warm start chain only advances when the constraint was satisfied
-#' (\code{psi_resid <= resid_tol}), preventing constraint failures from
-#' corrupting subsequent steps.
 #'
-#' @param grid             ψ-grid object from \code{psi_grid_anchor()}.
-#' @param k_start          Integer. Starting grid index (+1 or -1).
-#' @param cutoff           Numeric scalar. Stopping threshold.
-#' @param init_guess       Numeric vector. Warm-start parameter at mode.
+#' Selection criterion: the feasible result with the highest
+#' log-likelihood. Feasibility is determined by
+#' \code{psi_resid <= resid_tol}. If no feasible result is found across
+#' all starts, the warm-start result is recorded as a fallback.
+#'
+#' Monotonicity is enforced as a hard theoretical property: the profile
+#' log-likelihood must be non-increasing away from the mode. A result
+#' that increases relative to the previous value is never used to
+#' advance the warm-start chain, regardless of feasibility. A warning
+#' is issued if a monotonicity violation survives all starts.
+#'
+#' The warm-start chain advances only from steps that are both feasible
+#' and non-increasing, preventing constraint failures and upward jumps
+#' from corrupting subsequent steps.
+#'
+#' @param grid              ψ-grid object from \code{psi_grid_anchor()}.
+#' @param k_start           Integer. Starting grid index (+1 or -1).
+#' @param cutoff            Numeric scalar. Stopping threshold.
+#' @param init_guess        Numeric vector. Warm-start parameter at mode.
+#'   Used as a global anchor start at every grid point.
 #' @param profile_evaluator Function \code{(psi, param_init) ->
 #'   list(param_hat, branch_val, psi_residual, E_loglik_at_hat,
 #'   solver_iterations)}.
-#' @param max_retries      Non-negative integer. Maximum jitter retries
-#'   per step.
-#' @param stop_at_bounds   Logical. Default: \code{TRUE}.
-#' @param eval_at_bounds   Logical. Evaluate once at the ψ bound before
-#'   stopping. Requires \code{stop_at_bounds = TRUE}. The boundary
-#'   evaluation bypasses all retry and monotonicity checks and breaks
-#'   immediately after recording the result, preventing the boundary
-#'   point from being evaluated twice on consecutive grid steps.
-#'   Default: \code{TRUE}.
-#' @param warmstart_fn     Optional function
+#' @param max_retries       Non-negative integer. Number of jittered
+#'   copies of \code{init_guess} to try beyond the warm-start and
+#'   \code{init_guess} itself.
+#' @param stop_at_bounds    Logical. Default: \code{TRUE}.
+#' @param eval_at_bounds    Logical. Evaluate once at the ψ bound before
+#'   stopping. Requires \code{stop_at_bounds = TRUE}. Default: \code{TRUE}.
+#' @param warmstart_fn      Optional function
 #'   \code{(psi_curr, psi_next, param_curr) -> numeric vector}.
-#' @param max_drop_frac    Positive numeric scalar. Drop threshold
-#'   multiplier. Set to \code{Inf} to disable. Default: \code{10.0}.
-#' @param resid_tol        Non-negative numeric scalar. Constraint
-#'   residual tolerance. Default: \code{1e-3}.
-#' @param profile_retry_on Character vector. Which violations trigger
-#'   jitter retries. Any subset of \code{c("monotonicity",
-#'   "constraint", "drop")}. Default: all three.
-#' @param verbose          Logical. Print a row per grid point.
+#' @param max_drop_frac     Retained for API compatibility. Not used in
+#'   the multi-start implementation.
+#' @param resid_tol         Non-negative numeric scalar. Constraint
+#'   residual tolerance for feasibility determination. Default: \code{1e-3}.
+#' @param profile_retry_on  Retained for API compatibility. Monotonicity
+#'   is always enforced; this argument is ignored.
+#' @param verbose           Logical. Print a row per grid point.
 #'   Default: \code{FALSE}.
 #'
 #' @return A tibble with columns \code{k}, \code{psi}, \code{loglik}.
@@ -82,10 +88,6 @@ traverse_profile_side <- function(
   current_val <- Inf
   recent_drops <- numeric(0)
 
-  check_monotonicity <- "monotonicity" %in% profile_retry_on
-  check_constraint <- "constraint" %in% profile_retry_on
-  check_drop <- "drop" %in% profile_retry_on
-
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
 
@@ -105,27 +107,90 @@ traverse_profile_side <- function(
     ))
   }
 
+  # -------------------------------------------------------------------
+  # Evaluate a single start safely; returns NULL on error or non-finite
+  # -------------------------------------------------------------------
+  .try_start <- function(psi_k, start) {
+    ev <- tryCatch(
+      profile_evaluator(psi_k, start),
+      error = function(e) NULL
+    )
+    if (is.null(ev) || !is.finite(ev$branch_val)) {
+      return(NULL)
+    }
+    ev
+  }
+
+  # -------------------------------------------------------------------
+  # Multi-start evaluation at a single grid point.
+  #
+  # Starts: warm_init, init_guess, max_retries jittered init_guess copies.
+  # Selection: highest branch_val among feasible (psi_resid <= resid_tol)
+  #            results. Falls back to the warm-start result if no feasible
+  #            result is found.
+  # -------------------------------------------------------------------
+  .best_eval <- function(psi_k, warm_init) {
+    starts <- c(
+      list(warm_init),
+      list(init_guess),
+      lapply(seq_len(max_retries), function(i) {
+        init_guess + stats::rnorm(length(init_guess), sd = 0.3 * i)
+      })
+    )
+
+    best_feasible <- NULL
+    fallback <- NULL
+
+    for (start in starts) {
+      ev <- .try_start(psi_k, start)
+      if (is.null(ev)) {
+        next
+      }
+
+      psi_resid <- abs(ev$psi_residual %||% (ev$psi_at_hat - psi_k))
+      feasible <- psi_resid <= resid_tol
+
+      if (feasible) {
+        if (
+          is.null(best_feasible) ||
+            ev$branch_val > best_feasible$branch_val
+        ) {
+          best_feasible <- ev
+        }
+      } else if (is.null(fallback)) {
+        fallback <- ev
+      }
+    }
+
+    best_feasible %||% fallback %||% .try_start(psi_k, warm_init)
+  }
+
   repeat {
-    retry <- 0L
     psi_k <- grid$psi_mle + k_curr * grid$increment
 
     hit_lower <- !is.null(psi_lower) && psi_k <= psi_lower
     hit_upper <- !is.null(psi_upper) && psi_k >= psi_upper
 
     # -------------------------------------------------------------------
-    # Boundary handling: evaluate once at the bound then stop immediately.
-    # Breaking here (before the normal evaluation loop) ensures the
-    # boundary point is never evaluated twice on consecutive grid steps.
+    # Boundary handling
     # -------------------------------------------------------------------
     if ((hit_lower || hit_upper) && stop_at_bounds) {
       if (eval_at_bounds) {
         psi_k <- if (hit_lower) psi_lower else psi_upper
-        eval <- profile_evaluator(psi_k, current_par)
+        eval <- .try_start(psi_k, current_par) %||%
+          list(
+            branch_val = NA_real_,
+            E_loglik_at_hat = NA_real_,
+            psi_residual = NA_real_,
+            solver_iterations = NA_integer_
+          )
         if (verbose) {
           .print_verbose_row(psi_k, eval)
         }
-        df <- df |>
-          dplyr::add_row(k = k_curr, psi = psi_k, loglik = eval$branch_val)
+        if (is.finite(eval$branch_val)) {
+          df <- df |>
+            dplyr::add_row(k = k_curr, psi = psi_k, loglik = eval$branch_val)
+        }
       }
       break
     }
@@ -144,68 +209,51 @@ traverse_profile_side <- function(
     }
 
     # -------------------------------------------------------------------
-    # Evaluate with selected violation checks
+    # Multi-start evaluation
     # -------------------------------------------------------------------
-    drop <- -Inf
-    repeat {
-      eval <- profile_evaluator(psi_k, warm_init)
+    eval <- .best_eval(psi_k, warm_init)
 
-      drop <- current_val - eval$branch_val
-      psi_resid <- abs(eval$psi_residual %||% (eval$psi_at_hat - psi_k))
-      typical_drop <- if (length(recent_drops) >= 3L) {
-        median(recent_drops)
-      } else {
-        Inf
-      }
-
-      monotone_ok <- !check_monotonicity || eval$branch_val <= current_val
-      constraint_ok <- !check_constraint || psi_resid <= resid_tol
-      drop_ok <- !check_drop ||
-        !(is.finite(max_drop_frac) &&
-          length(recent_drops) >= 3L &&
-          drop > max_drop_frac * typical_drop)
-
-      if ((monotone_ok && constraint_ok && drop_ok) || retry >= max_retries) {
-        break
-      }
-
-      retry <- retry + 1L
-      warm_init <- warm_init +
-        stats::rnorm(length(warm_init), sd = 0.1 * retry)
+    if (is.null(eval)) {
+      stop(
+        "traverse_profile_side(): all starts failed at k = ",
+        k_curr,
+        call. = FALSE
+      )
     }
 
-    # Warn on significant monotonicity violations that survived all retries
-    if (
-      check_monotonicity && eval$branch_val > current_val && max_retries > 0L
-    ) {
-      violation <- eval$branch_val - current_val
-      if (violation > 1e-3) {
-        warning(
-          sprintf(
-            "traverse_profile_side(): monotonicity violation at k=%d after %d retries (delta = %.6f).",
-            k_curr,
-            retry,
-            violation
-          ),
-          call. = FALSE
-        )
-      }
-    }
-
-    # Update recent drops — only for genuine decreasing steps
-    if (drop > 0 && is.finite(drop)) {
-      recent_drops <- c(tail(recent_drops, 9L), drop)
-    }
-
-    current_val <- eval$branch_val
-
-    if (!is.finite(current_val)) {
+    if (!is.finite(eval$branch_val)) {
       stop(
         "traverse_profile_side(): non-finite log-likelihood at k = ",
         k_curr,
         call. = FALSE
       )
     }
+
+    # -------------------------------------------------------------------
+    # Hard monotonicity check
+    # -------------------------------------------------------------------
+    monotonicity_ok <- eval$branch_val <= current_val + 1e-6
+
+    if (!monotonicity_ok) {
+      warning(
+        sprintf(
+          "traverse_profile_side(): monotonicity violation at k=%d after all starts (delta = %.6f).",
+          k_curr,
+          eval$branch_val - current_val
+        ),
+        call. = FALSE
+      )
+    }
+
+    # -------------------------------------------------------------------
+    # Update drop history — only genuine decreasing steps
+    # -------------------------------------------------------------------
+    drop <- current_val - eval$branch_val
+    if (drop > 0 && is.finite(drop)) {
+      recent_drops <- c(tail(recent_drops, 9L), drop)
+    }
+
+    current_val <- eval$branch_val
 
     if (verbose) {
       .print_verbose_row(psi_k, eval)
@@ -218,9 +266,15 @@ traverse_profile_side <- function(
       break
     }
 
-    # Advance warm start only when constraint was satisfied
-    psi_resid_final <- abs(eval$psi_residual %||% (eval$psi_at_hat - psi_k))
-    if (psi_resid_final <= resid_tol) {
+    # -------------------------------------------------------------------
+    # Advance warm start only from clean steps:
+    #   feasible (psi_resid <= resid_tol) AND non-increasing
+    # -------------------------------------------------------------------
+    psi_resid_final <- abs(
+      eval$psi_residual %||% (eval$psi_at_hat - psi_k)
+    )
+
+    if (psi_resid_final <= resid_tol && monotonicity_ok) {
       current_par <- eval$param_hat
     }
 

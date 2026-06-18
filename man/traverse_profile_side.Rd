@@ -27,36 +27,33 @@ traverse_profile_side(
 
 \item{cutoff}{Numeric scalar. Stopping threshold.}
 
-\item{init_guess}{Numeric vector. Warm-start parameter at mode.}
+\item{init_guess}{Numeric vector. Warm-start parameter at mode.
+Used as a global anchor start at every grid point.}
 
 \item{profile_evaluator}{Function \code{(psi, param_init) ->
 list(param_hat, branch_val, psi_residual, E_loglik_at_hat,
 solver_iterations)}.}
 
-\item{max_retries}{Non-negative integer. Maximum jitter retries
-per step.}
+\item{max_retries}{Non-negative integer. Number of jittered
+copies of \code{init_guess} to try beyond the warm-start and
+\code{init_guess} itself.}
 
 \item{stop_at_bounds}{Logical. Default: \code{TRUE}.}
 
 \item{eval_at_bounds}{Logical. Evaluate once at the ψ bound before
-stopping. Requires \code{stop_at_bounds = TRUE}. The boundary
-evaluation bypasses all retry and monotonicity checks and breaks
-immediately after recording the result, preventing the boundary
-point from being evaluated twice on consecutive grid steps.
-Default: \code{TRUE}.}
+stopping. Requires \code{stop_at_bounds = TRUE}. Default: \code{TRUE}.}
 
 \item{warmstart_fn}{Optional function
 \code{(psi_curr, psi_next, param_curr) -> numeric vector}.}
 
-\item{max_drop_frac}{Positive numeric scalar. Drop threshold
-multiplier. Set to \code{Inf} to disable. Default: \code{10.0}.}
+\item{max_drop_frac}{Retained for API compatibility. Not used in
+the multi-start implementation.}
 
 \item{resid_tol}{Non-negative numeric scalar. Constraint
-residual tolerance. Default: \code{1e-3}.}
+residual tolerance for feasibility determination. Default: \code{1e-3}.}
 
-\item{profile_retry_on}{Character vector. Which violations trigger
-jitter retries. Any subset of \code{c("monotonicity",
-  "constraint", "drop")}. Default: all three.}
+\item{profile_retry_on}{Retained for API compatibility. Monotonicity
+is always enforced; this argument is ignored.}
 
 \item{verbose}{Logical. Print a row per grid point.
 Default: \code{FALSE}.}
@@ -67,23 +64,31 @@ A tibble with columns \code{k}, \code{psi}, \code{loglik}.
 \description{
 Performs a one-sided continuation sweep of the profile log-likelihood
 by moving outward from the mode along a fixed ψ-grid. At each grid
-point ψ_k, the constrained optimization is solved using a warm start
-derived from the previous solution.
+point ψ_k, the constrained optimization is solved using a set of
+diverse starting points. The best feasible result is selected.
 
-Jitter retries are triggered by any combination of the following,
-controlled by \code{profile_retry_on}:
+Starting points at each grid point:
 \enumerate{
-\item \code{"monotonicity"}: the proposed step increases the
-log-likelihood relative to the previous value.
-\item \code{"constraint"}: the psi residual at the returned
-solution exceeds \code{resid_tol}, indicating auglag found a
-feasible-but-wrong local optimum.
-\item \code{"drop"}: the proposed drop exceeds \code{max_drop_frac}
-times the recent median drop (once at least three recent drops
-are available).
+\item The current warm-start (chained from the previous step).
+\item \code{init_guess} — the mode parameter, providing a global
+anchor that breaks chain dependency when the warm start has drifted.
+\item \code{max_retries} jittered copies of \code{init_guess},
+with jitter scale increasing with retry index.
 }
-The warm start chain only advances when the constraint was satisfied
-(\code{psi_resid <= resid_tol}), preventing constraint failures from
-corrupting subsequent steps.
+
+Selection criterion: the feasible result with the highest
+log-likelihood. Feasibility is determined by
+\code{psi_resid <= resid_tol}. If no feasible result is found across
+all starts, the warm-start result is recorded as a fallback.
+
+Monotonicity is enforced as a hard theoretical property: the profile
+log-likelihood must be non-increasing away from the mode. A result
+that increases relative to the previous value is never used to
+advance the warm-start chain, regardless of feasibility. A warning
+is issued if a monotonicity violation survives all starts.
+
+The warm-start chain advances only from steps that are both feasible
+and non-increasing, preventing constraint failures and upward jumps
+from corrupting subsequent steps.
 }
 \keyword{internal}

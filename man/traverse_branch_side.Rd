@@ -9,6 +9,7 @@ traverse_branch_side(
   k_direction,
   k_start,
   init_guess,
+  warm_init,
   branch_evaluator,
   branch_cutoff = -Inf,
   psi_interval = NULL,
@@ -26,7 +27,12 @@ traverse_branch_side(
 
 \item{k_start}{Integer starting grid index.}
 
-\item{init_guess}{Numeric vector warm-start parameter.}
+\item{init_guess}{Numeric vector. Global anchor warm start
+(branch mode parameter). Used at every step as a fallback.}
+
+\item{warm_init}{Numeric vector. Local warm start from
+the probe edge. Used as the first start at the first step only;
+thereafter chained from the previous accepted step.}
 
 \item{branch_evaluator}{Function (psi, param_init) -> list.}
 
@@ -34,8 +40,9 @@ traverse_branch_side(
 
 \item{psi_interval}{A \code{sets::interval} object or NULL.}
 
-\item{max_retries}{Non-negative integer. Maximum jitter
-retries per step. Default: \code{0L} (no retries).}
+\item{max_retries}{Non-negative integer. Number of jittered
+copies of \code{init_guess} to try beyond the warm-start and
+\code{init_guess} itself. Default: \code{0L}.}
 
 \item{resid_tol}{Non-negative numeric scalar. Constraint
 residual tolerance. Default: \code{1e-3}.}
@@ -43,29 +50,29 @@ residual tolerance. Default: \code{1e-3}.}
 \item{max_drop_frac}{Positive numeric scalar. Drop threshold
 multiplier. Set to \code{Inf} to disable. Default: \code{Inf}.}
 
-\item{branch_retry_on}{Character vector. Which violations
-trigger jitter retries. Any subset of \code{c("monotonicity",
-  "constraint", "drop")}. Default: \code{character(0)} (no retries).}
+\item{branch_retry_on}{Retained for API compatibility. Not used
+in the multi-start implementation.}
 
 \item{max_consecutive_skips}{Integer. Default: \code{2L}.}
 }
 \description{
 Sweeps outward from \code{k_start} in the given direction, evaluating
-the branch at each grid point. Stops when the common interval boundary
-is reached or the log-likelihood falls below \code{branch_cutoff}.
-
-Jitter retries are triggered by any combination of the following,
-controlled by \code{branch_retry_on}:
+the branch at each grid point using a multi-start strategy. At each
+step, the following starts are tried in order:
 \enumerate{
-\item \code{"monotonicity"}: the proposed step increases the
-log-likelihood relative to the previous value.
-\item \code{"constraint"}: the psi residual at the returned
-solution exceeds \code{resid_tol}.
-\item \code{"drop"}: the proposed drop exceeds \code{max_drop_frac}
-times the recent median drop (once at least three recent drops
-are available).
+\item The current warm start (chained from the previous step).
+\item \code{init_guess} — the branch mode parameter, providing a
+global anchor that breaks chain dependency when the warm start
+has drifted.
+\item \code{max_retries} jittered copies of \code{init_guess},
+with jitter scale increasing with retry index.
 }
-The warm start chain only advances when \code{psi_resid <= resid_tol},
+The best feasible result (lowest \code{psi_residual}) is selected.
+If no feasible result is found, the warm-start result is used as a
+fallback. The warm-start chain advances only from feasible steps,
 preventing constraint failures from corrupting subsequent steps.
+
+Traversal stops when the common interval boundary is reached or the
+log-likelihood falls below \code{branch_cutoff}.
 }
 \keyword{internal}

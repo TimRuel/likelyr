@@ -162,7 +162,7 @@ sieve <- function(
   branch_seeds <- branch_seeds[seq_len(n_accepted)]
 
   diag_df <- if (length(diag_log) > 0) {
-    do.call(rbind, lapply(diag_log, as.data.frame, stringsAsFactors = FALSE))
+    dplyr::bind_rows(lapply(diag_log, as.data.frame, stringsAsFactors = FALSE))
   } else {
     data.frame()
   }

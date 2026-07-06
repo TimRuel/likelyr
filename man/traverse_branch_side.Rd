@@ -47,11 +47,10 @@ copies of \code{init_guess} to try beyond the warm-start and
 \item{resid_tol}{Non-negative numeric scalar. Constraint
 residual tolerance. Default: \code{1e-3}.}
 
-\item{max_drop_frac}{Positive numeric scalar. Drop threshold
-multiplier. Set to \code{Inf} to disable. Default: \code{Inf}.}
+\item{max_drop_frac}{Retained for API compatibility.
+Default: \code{Inf}.}
 
-\item{branch_retry_on}{Retained for API compatibility. Not used
-in the multi-start implementation.}
+\item{branch_retry_on}{Retained for API compatibility.}
 
 \item{max_consecutive_skips}{Integer. Default: \code{2L}.}
 }
@@ -66,13 +65,22 @@ global anchor that breaks chain dependency when the warm start
 has drifted.
 \item \code{max_retries} jittered copies of \code{init_guess},
 with jitter scale increasing with retry index.
+\item A final fresh attempt with the warm start, matching the
+fallback pattern of \code{traverse_profile_side()}.
 }
-The best feasible result (lowest \code{psi_residual}) is selected.
-If no feasible result is found, the warm-start result is used as a
+The best feasible result (highest \code{branch_val} among results
+with \code{psi_resid <= resid_tol}) is selected. If no feasible
+result is found, the first non-NULL infeasible result is used as a
 fallback. The warm-start chain advances only from feasible steps,
 preventing constraint failures from corrupting subsequent steps.
 
 Traversal stops when the common interval boundary is reached or the
-log-likelihood falls below \code{branch_cutoff}.
+log-likelihood falls below \code{branch_cutoff}. The first point
+below the cutoff is included, matching the behavior of
+\code{traverse_profile_side()}.
+
+Unlike the profile traversal, all starts failing is a soft skip
+rather than a hard error — branches can have gaps while the profile
+cannot.
 }
 \keyword{internal}

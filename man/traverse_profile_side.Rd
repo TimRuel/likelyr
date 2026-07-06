@@ -74,12 +74,14 @@ Starting points at each grid point:
 anchor that breaks chain dependency when the warm start has drifted.
 \item \code{max_retries} jittered copies of \code{init_guess},
 with jitter scale increasing with retry index.
+\item A final fresh attempt with the warm start as last resort.
 }
 
 Selection criterion: the feasible result with the highest
 log-likelihood. Feasibility is determined by
 \code{psi_resid <= resid_tol}. If no feasible result is found across
-all starts, the warm-start result is recorded as a fallback.
+all starts, the first infeasible result is used as a fallback,
+then a fresh warm-start attempt.
 
 Monotonicity is enforced as a hard theoretical property: the profile
 log-likelihood must be non-increasing away from the mode. A result
@@ -90,5 +92,8 @@ is issued if a monotonicity violation survives all starts.
 The warm-start chain advances only from steps that are both feasible
 and non-increasing, preventing constraint failures and upward jumps
 from corrupting subsequent steps.
+
+The first point below the cutoff is included before stopping,
+matching the behavior of \code{traverse_branch_side()}.
 }
 \keyword{internal}

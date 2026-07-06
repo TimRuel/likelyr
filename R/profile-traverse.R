@@ -22,12 +22,14 @@
 #'     anchor that breaks chain dependency when the warm start has drifted.
 #'   \item \code{max_retries} jittered copies of \code{init_guess},
 #'     with jitter scale increasing with retry index.
+#'   \item A final fresh attempt with the warm start as last resort.
 #' }
 #'
 #' Selection criterion: the feasible result with the highest
 #' log-likelihood. Feasibility is determined by
 #' \code{psi_resid <= resid_tol}. If no feasible result is found across
-#' all starts, the warm-start result is recorded as a fallback.
+#' all starts, the first infeasible result is used as a fallback,
+#' then a fresh warm-start attempt.
 #'
 #' Monotonicity is enforced as a hard theoretical property: the profile
 #' log-likelihood must be non-increasing away from the mode. A result
@@ -38,6 +40,9 @@
 #' The warm-start chain advances only from steps that are both feasible
 #' and non-increasing, preventing constraint failures and upward jumps
 #' from corrupting subsequent steps.
+#'
+#' The first point below the cutoff is included before stopping,
+#' matching the behavior of \code{traverse_branch_side()}.
 #'
 #' @param grid              ψ-grid object from \code{psi_grid_anchor()}.
 #' @param k_start           Integer. Starting grid index (+1 or -1).
@@ -86,7 +91,6 @@ traverse_profile_side <- function(
   k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
-  recent_drops <- numeric(0)
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
@@ -124,10 +128,11 @@ traverse_profile_side <- function(
   # -------------------------------------------------------------------
   # Multi-start evaluation at a single grid point.
   #
-  # Starts: warm_init, init_guess, max_retries jittered init_guess copies.
+  # Starts: warm_init, init_guess, max_retries jittered init_guess
+  # copies, and a final fresh warm-start attempt as last resort.
   # Selection: highest branch_val among feasible (psi_resid <= resid_tol)
-  #            results. Falls back to the warm-start result if no feasible
-  #            result is found.
+  # results. Falls back to the first infeasible result, then a fresh
+  # warm-start attempt.
   # -------------------------------------------------------------------
   .best_eval <- function(psi_k, warm_init) {
     starts <- c(
@@ -143,9 +148,7 @@ traverse_profile_side <- function(
 
     for (start in starts) {
       ev <- .try_start(psi_k, start)
-      if (is.null(ev)) {
-        next
-      }
+      if (is.null(ev)) next
 
       psi_resid <- abs(ev$psi_residual %||% (ev$psi_at_hat - psi_k))
       feasible <- psi_resid <= resid_tol
@@ -184,9 +187,7 @@ traverse_profile_side <- function(
             psi_residual = NA_real_,
             solver_iterations = NA_integer_
           )
-        if (verbose) {
-          .print_verbose_row(psi_k, eval)
-        }
+        if (verbose) .print_verbose_row(psi_k, eval)
         if (is.finite(eval$branch_val)) {
           df <- df |>
             dplyr::add_row(k = k_curr, psi = psi_k, loglik = eval$branch_val)
@@ -245,26 +246,18 @@ traverse_profile_side <- function(
       )
     }
 
-    # -------------------------------------------------------------------
-    # Update drop history — only genuine decreasing steps
-    # -------------------------------------------------------------------
-    drop <- current_val - eval$branch_val
-    if (drop > 0 && is.finite(drop)) {
-      recent_drops <- c(tail(recent_drops, 9L), drop)
-    }
-
     current_val <- eval$branch_val
 
-    if (verbose) {
-      .print_verbose_row(psi_k, eval)
-    }
+    if (verbose) .print_verbose_row(psi_k, eval)
 
+    # -------------------------------------------------------------------
+    # Record point, then check cutoff — include first point below cutoff
+    # to match branch traversal behavior
+    # -------------------------------------------------------------------
     df <- df |>
       dplyr::add_row(k = k_curr, psi = psi_k, loglik = current_val)
 
-    if (!is.null(cutoff) && current_val < cutoff) {
-      break
-    }
+    if (!is.null(cutoff) && current_val < cutoff) break
 
     # -------------------------------------------------------------------
     # Advance warm start only from clean steps:

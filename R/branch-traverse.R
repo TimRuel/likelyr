@@ -284,14 +284,23 @@ traverse_branch_leftright <- function(
 #'     has drifted.
 #'   \item \code{max_retries} jittered copies of \code{init_guess},
 #'     with jitter scale increasing with retry index.
+#'   \item A final fresh attempt with the warm start, matching the
+#'     fallback pattern of \code{traverse_profile_side()}.
 #' }
-#' The best feasible result (lowest \code{psi_residual}) is selected.
-#' If no feasible result is found, the warm-start result is used as a
+#' The best feasible result (highest \code{branch_val} among results
+#' with \code{psi_resid <= resid_tol}) is selected. If no feasible
+#' result is found, the first non-NULL infeasible result is used as a
 #' fallback. The warm-start chain advances only from feasible steps,
 #' preventing constraint failures from corrupting subsequent steps.
 #'
 #' Traversal stops when the common interval boundary is reached or the
-#' log-likelihood falls below \code{branch_cutoff}.
+#' log-likelihood falls below \code{branch_cutoff}. The first point
+#' below the cutoff is included, matching the behavior of
+#' \code{traverse_profile_side()}.
+#'
+#' Unlike the profile traversal, all starts failing is a soft skip
+#' rather than a hard error — branches can have gaps while the profile
+#' cannot.
 #'
 #' @param grid                  ψ-grid object.
 #' @param k_direction           Integer +1 or -1.
@@ -309,10 +318,9 @@ traverse_branch_leftright <- function(
 #'   \code{init_guess} itself. Default: \code{0L}.
 #' @param resid_tol             Non-negative numeric scalar. Constraint
 #'   residual tolerance. Default: \code{1e-3}.
-#' @param max_drop_frac         Positive numeric scalar. Drop threshold
-#'   multiplier. Set to \code{Inf} to disable. Default: \code{Inf}.
-#' @param branch_retry_on       Retained for API compatibility. Not used
-#'   in the multi-start implementation.
+#' @param max_drop_frac         Retained for API compatibility.
+#'   Default: \code{Inf}.
+#' @param branch_retry_on       Retained for API compatibility.
 #' @param max_consecutive_skips Integer. Default: \code{2L}.
 #'
 #' @keywords internal
@@ -364,8 +372,10 @@ traverse_branch_side <- function(
   }
 
   # -------------------------------------------------------------------
-  # Multi-start evaluation: warm start, global anchor, jittered anchors.
-  # Returns the best feasible result, falling back to warm start result.
+  # Multi-start evaluation: warm start, global anchor, jittered anchors,
+  # and a final fresh warm-start attempt as last resort.
+  # Returns the best feasible result, falling back to the first
+  # infeasible result, falling back to a fresh warm-start attempt.
   # -------------------------------------------------------------------
   .best_eval <- function(psi_k, warm) {
     starts <- c(
@@ -398,7 +408,7 @@ traverse_branch_side <- function(
       }
     }
 
-    best_feasible %||% fallback
+    best_feasible %||% fallback %||% .try_start(psi_k, warm)
   }
 
   repeat {
@@ -437,13 +447,14 @@ traverse_branch_side <- function(
     }
 
     # -------------------------------------------------------------------
-    # Stop if below cutoff
+    # Record point, then check cutoff — include first point below cutoff
+    # to match profile traversal behavior
     # -------------------------------------------------------------------
-    if (eval$branch_val < branch_cutoff) break
-
     df <- dplyr::add_row(df, k = k_curr, loglik = eval$branch_val)
     current_ll <- eval$branch_val
     consecutive_skips <- 0L
+
+    if (eval$branch_val < branch_cutoff) break
 
     # -------------------------------------------------------------------
     # Advance warm start only when constraint was satisfied

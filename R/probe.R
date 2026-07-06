@@ -47,9 +47,8 @@ probe <- function(
 
   alpha_target <- min(1 - traversal$confidence_levels)
   crit <- 0.5 * qchisq(1 - alpha_target, df = 1)
-  effective_crit <- crit * traversal$cutoff_buffer
-  ll_threshold <- ll_at_psi_mle - traversal$mode_gap_multiplier * effective_crit
-
+  ll_threshold <- ll_at_psi_mle - traversal$mode_gap_multiplier * crit
+  
   # -------------------------------------------------------------------
   # 1. Compute restricted grid bounds k_min, k_max
   # -------------------------------------------------------------------

@@ -14,8 +14,11 @@ calibrate_parameter(parameter, data)
 \value{
 The SAME parameter_spec object with added/updated fields:
 • \verb{$param_mle}
-• \verb{$param_lower}  (resolved from "auto" if requested)
-• \verb{$param_upper}  (resolved from "auto" if requested)
+• \verb{$param_dim}    (updated when param_dim_from_data is TRUE)
+• \verb{$param_lower}  (resolved from "auto" if requested, or reset
+when param_dim_from_data is TRUE)
+• \verb{$param_upper}  (resolved from "auto" if requested, or reset
+when param_dim_from_data is TRUE)
 }
 \description{
 Computes the analytic MLE for θ using \code{parameter$param_mle_fn(data)}
@@ -24,6 +27,11 @@ and stores it inside the parameter_spec.
 If \code{param_lower} or \code{param_upper} on the spec is the string
 \code{"auto"}, bounds are computed from \code{param_mle} after
 the MLE is known and stored back onto the spec.
+
+If \code{parameter$param_dim_from_data} is \code{TRUE}, the parameter
+dimension is re-derived from the length of \code{param_mle} rather
+than enforced from the build-time spec. This supports site-specific
+models where the parameter dimension varies across datasets.
 
 This function is called internally by \code{calibrate()}.
 }

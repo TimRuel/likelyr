@@ -149,11 +149,11 @@ view.comparison <- function(
 }
 
 # ---------------------------------------------------------------------
-# Plot (local-only)
+# Plot (local-only) — comparison
 # ---------------------------------------------------------------------
 
 #' @export
-plot.comparison <- function(x, ...) {
+plot.comparison <- function(x, display_truth = TRUE, ...) {
   .assert_local_plotting()
 
   ws <- attr(x, "workspace")
@@ -165,7 +165,8 @@ plot.comparison <- function(x, ...) {
     list(
       profile = ws$profile,
       integrated = ws$integrated
-    )
+    ),
+    display_truth = display_truth
   )
 }
 

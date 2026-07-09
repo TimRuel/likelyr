@@ -271,12 +271,12 @@ view.inference <- function(
 }
 
 # ---------------------------------------------------------------------
-# Plot (local-only)
+# Plot (local-only) — inference
 # ---------------------------------------------------------------------
 
 #' @method plot inference
 #' @export
-plot.inference <- function(x, points = FALSE, ...) {
+plot.inference <- function(x, points = FALSE, display_truth = TRUE, ...) {
   .assert_local_plotting()
 
   if (is.null(x$psi_loglik_df)) {
@@ -290,7 +290,8 @@ plot.inference <- function(x, points = FALSE, ...) {
   plot_pseudolikelihood_curve(
     inference_result = x,
     psi_loglik_df = x$psi_loglik_df,
-    points = points
+    points = points,
+    display_truth = display_truth
   )
 }
 

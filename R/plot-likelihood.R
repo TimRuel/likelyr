@@ -161,21 +161,18 @@ plot_pseudolikelihood_points <- function(result) {
 
 #' Plot single pseudolikelihood curve with inference overlays
 #'
-#' @importFrom stats qchisq
 #' @keywords internal
 #' @noRd
 plot_pseudolikelihood_curve <- function(
   inference_result,
   psi_loglik_df,
-  points = FALSE
+  points = FALSE,
+  display_truth = TRUE
 ) {
   point_estimate_df <- inference_result$point_estimate_df
   interval_estimate_df <- inference_result$interval_estimate_df
   pseudolikelihood <- attr(psi_loglik_df, "pseudolikelihood")
 
-  # Use the filtered df from inference when available — it matches the
-  # data used to compute psi_hat, keeping the curve peak aligned with
-  # the estimate. Fall back to the workspace df before infer() is run.
   psi_loglik_df_fit <- .resolve_psi_loglik_df(inference_result, psi_loglik_df)
   psi_loglik <- fit_psi_loglik(psi_loglik_df_fit)
   psi_loglik_max <- get_psi_loglik_max_point(psi_loglik)[["maximum"]]
@@ -188,11 +185,9 @@ plot_pseudolikelihood_curve <- function(
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
 
-  psi_anchors <- c(
-    ci_raw$endpoint,
-    psi_hat,
-    point_estimate_df$psi_0
-  )
+  psi_0 <- if (display_truth) point_estimate_df$psi_0 else NA_real_
+
+  psi_anchors <- c(ci_raw$endpoint, psi_hat, psi_0)
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 
   if (length(psi_anchors) == 0L) {
@@ -200,9 +195,7 @@ plot_pseudolikelihood_curve <- function(
   }
 
   padding <- diff(range(psi_anchors)) * 0.05
-  if (padding == 0) {
-    padding <- 0.01
-  }
+  if (padding == 0) padding <- 0.01
 
   psi_limits <- c(
     min(psi_anchors) - padding,
@@ -240,7 +233,7 @@ plot_pseudolikelihood_curve <- function(
 
   label_data <- data.frame(
     source = c(pseudolikelihood, "Truth"),
-    value = c(point_estimate_df$psi_hat, point_estimate_df$psi_0),
+    value = c(psi_hat, psi_0),
     label = c(
       paste0(
         "hat(psi)[",
@@ -250,6 +243,10 @@ plot_pseudolikelihood_curve <- function(
       "psi[0]"
     )
   )
+
+  if (!display_truth) {
+    label_data <- label_data |> dplyr::filter(source != "Truth")
+  }
 
   plot_base(plot = "single_curve") +
     boundary_layers +
@@ -276,7 +273,7 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::scale_color_manual(
       values = c(
         plot_point_estimate_color(pseudolikelihood),
-        plot_truth_color()
+        if (display_truth) plot_truth_color() else character(0)
       ),
       guide = "none"
     ) +
@@ -290,11 +287,11 @@ plot_pseudolikelihood_curve <- function(
     ggplot2::theme(
       legend.position = "inside",
       legend.position.inside = .legend_corner(
-        c(psi_hat, point_estimate_df$psi_0),
+        c(psi_hat, psi_0),
         psi_limits
       )$position,
       legend.justification = .legend_corner(
-        c(psi_hat, point_estimate_df$psi_0),
+        c(psi_hat, psi_0),
         psi_limits
       )$justification
     )
@@ -313,13 +310,11 @@ plot_pseudolikelihood_curve <- function(
 #'
 #' @keywords internal
 #' @noRd
-plot_pseudolikelihood_curves <- function(res_list) {
+plot_pseudolikelihood_curves <- function(res_list, display_truth = TRUE) {
   .assert_local_plotting()
 
   infer_list <- purrr::map(res_list, \(x) x$inference)
 
-  # For each result, prefer the inference df (filtered, used for
-  # estimation) over the workspace df (unfiltered, for diagnose()).
   psi_loglik_dfs <- purrr::map(res_list, \(x) {
     .resolve_psi_loglik_df(x$inference, x$psi_loglik_df)
   })
@@ -342,11 +337,13 @@ plot_pseudolikelihood_curves <- function(res_list) {
   domain_lower <- if (!is.null(psi_interval)) min(psi_interval) else -Inf
   domain_upper <- if (!is.null(psi_interval)) max(psi_interval) else Inf
 
-  psi_anchors <- c(
-    ci_all$endpoint,
-    psi_hats,
+  psi_0_vals <- if (display_truth) {
     purrr::map_dbl(infer_list, \(x) x$point_estimate_df$psi_0)
-  )
+  } else {
+    rep(NA_real_, length(infer_list))
+  }
+
+  psi_anchors <- c(ci_all$endpoint, psi_hats, psi_0_vals)
   psi_anchors <- psi_anchors[is.finite(psi_anchors)]
 
   if (length(psi_anchors) == 0L) {
@@ -354,9 +351,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
   }
 
   padding <- diff(range(psi_anchors)) * 0.05
-  if (padding == 0) {
-    padding <- 0.01
-  }
+  if (padding == 0) padding <- 0.01
 
   psi_limits <- c(
     min(psi_anchors) - padding,
@@ -389,9 +384,10 @@ plot_pseudolikelihood_curves <- function(res_list) {
     infer_list,
     \(x, key) {
       suffix <- ifelse(key == "profile", "PL", "IL")
+      psi_0 <- if (display_truth) x$point_estimate_df$psi_0 else NA_real_
       data.frame(
         source = c(key, "Truth"),
-        value = c(x$point_estimate_df$psi_hat, x$point_estimate_df$psi_0),
+        value = c(x$point_estimate_df$psi_hat, psi_0),
         label = c(paste0("hat(psi)[", suffix, "]"), "psi[0]"),
         color = c(
           plot_point_estimate_color(key, comparison = TRUE),
@@ -400,6 +396,7 @@ plot_pseudolikelihood_curves <- function(res_list) {
       )
     }
   ) |>
+    dplyr::filter(is.finite(value)) |>
     dplyr::distinct() |>
     dplyr::arrange(label)
 
@@ -448,17 +445,11 @@ plot_pseudolikelihood_curves <- function(res_list) {
     ggplot2::theme(
       legend.position = "inside",
       legend.position.inside = .legend_corner(
-        c(
-          psi_hats,
-          purrr::map_dbl(infer_list, function(x) x$point_estimate_df$psi_0)
-        ),
+        c(psi_hats, psi_0_vals),
         psi_limits
       )$position,
       legend.justification = .legend_corner(
-        c(
-          psi_hats,
-          purrr::map_dbl(infer_list, function(x) x$point_estimate_df$psi_0)
-        ),
+        c(psi_hats, psi_0_vals),
         psi_limits
       )$justification
     )

@@ -34,9 +34,6 @@
     while (size >= 2L) {
       o <- hull[size - 1L]
       a <- hull[size]
-      # Cross product of vectors (a-o) and (i-o).
-      # >= 0 means a left turn or collinear — a is below or on the line
-      # from o to i, so a is not on the upper hull and should be removed.
       cp <- (x[a] - x[o]) * (y[i] - y[o]) - (y[a] - y[o]) * (x[i] - x[o])
       if (cp >= 0) {
         size <- size - 1L
@@ -54,11 +51,11 @@
 #' Fit a smooth log-likelihood function in ψ
 #'
 #' @description
-#' Fits a smoothing spline to a discrete ψ–log-likelihood grid, then
-#' projects the result onto its Least Concave Majorant (LCM) to enforce
-#' global concavity.
+#' Fits a smoothing spline to a discrete ψ–log-likelihood grid.
+#' Optionally projects the result onto its Least Concave Majorant (LCM)
+#' to enforce global concavity.
 #'
-#' The procedure is:
+#' When \code{enforce_concavity = TRUE}, the procedure is:
 #' \enumerate{
 #'   \item Fit \code{smooth.spline} to the raw grid.
 #'   \item Evaluate the spline on a fine internal grid (500 points).
@@ -68,26 +65,23 @@
 #'   \item Return a linear interpolant through the LCM knots.
 #' }
 #'
-#' In regions where the spline is already concave, the LCM knots are
-#' dense (one per fine-grid point) and the piecewise-linear interpolant
-#' closely tracks the spline. In regions where the spline is convex —
-#' typically the far left tail at small ψ — the LCM bridges over the
-#' violation with a linear segment between the surrounding concave
-#' sections, preserving the mode and the shape of the main body of the
-#' curve.
+#' When \code{enforce_concavity = FALSE} (default), only the smoothing
+#' spline is fitted and returned directly, without LCM projection.
 #'
 #' @param psi_loglik_df A data frame containing columns:
 #'   \describe{
 #'     \item{psi}{Numeric ψ grid values.}
 #'     \item{loglik}{Corresponding log-likelihood values.}
 #'   }
+#' @param enforce_concavity Logical. Whether to project the spline onto
+#'   its LCM to enforce global concavity. Default: \code{FALSE}.
 #'
 #' @return
-#' A function \code{f(psi)} returning the smoothed, concavity-corrected
-#' log-likelihood at \code{psi}.
+#' A function \code{f(psi)} returning the smoothed log-likelihood at
+#' \code{psi}, optionally concavity-corrected.
 #'
 #' @keywords internal
-fit_psi_loglik <- function(psi_loglik_df) {
+fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
   required <- c("psi", "loglik")
   if (!all(required %in% names(psi_loglik_df))) {
     stop(
@@ -106,6 +100,18 @@ fit_psi_loglik <- function(psi_loglik_df) {
   )
 
   psi_range <- range(psi_loglik_spline$x)
+
+  if (!enforce_concavity) {
+    psi_loglik <- function(psi) {
+      stats::predict(psi_loglik_spline, psi)$y
+    }
+    attr(psi_loglik, "pseudolikelihood") <- attr(
+      psi_loglik_df,
+      "pseudolikelihood"
+    )
+    attr(psi_loglik, "psi range") <- psi_range
+    return(psi_loglik)
+  }
 
   # ------------------------------------------------------------------
   # Step 2: evaluate on fine grid
@@ -172,9 +178,6 @@ get_psi_loglik_max_point <- function(psi_loglik) {
 #' Approximates the standard error of a ψ point estimate using the observed
 #' curvature of the log-likelihood evaluated on a discrete grid.
 #'
-#' This uses a central finite-difference approximation to the second
-#' derivative and is therefore sensitive to grid resolution and smoothness.
-#'
 #' @param psi_hat Numeric ψ value (typically the MLE).
 #' @param psi_loglik_df A data frame containing ordered \code{psi} and
 #'   \code{loglik} values.
@@ -223,14 +226,20 @@ get_se_psi_hat <- function(psi_hat, psi_loglik_df) {
 #'
 #' @param psi_loglik_df A data frame with columns \code{psi} and \code{loglik}.
 #' @param psi_0 Numeric true value of the parameter of interest.
+#' @param enforce_concavity Logical. Passed to \code{fit_psi_loglik()}.
+#'   Default: \code{FALSE}.
 #'
 #' @return
 #' A tibble with columns \code{psi_0}, \code{psi_hat}, \code{error},
-#' and \code{se_psi_hat} (which is \code{NA} when the SE cannot be computed).
+#' and \code{se_psi_hat}.
 #'
 #' @keywords internal
-get_point_estimate_df <- function(psi_loglik_df, psi_0) {
-  psi_loglik <- fit_psi_loglik(psi_loglik_df)
+get_point_estimate_df <- function(
+  psi_loglik_df,
+  psi_0,
+  enforce_concavity = FALSE
+) {
+  psi_loglik <- fit_psi_loglik(psi_loglik_df, enforce_concavity = enforce_concavity)
   psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
   psi_hat <- psi_loglik_max_point[["argmax"]]
 

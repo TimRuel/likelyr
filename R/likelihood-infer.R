@@ -4,30 +4,25 @@
 
 #' Likelihood-Based Inference for a Calibrated Model
 #'
-#' @description
-#' Computes point estimates and confidence intervals from the profile
-#' and/or integrated log-likelihood curves stored on the model workspace.
-#' Inference results are folded directly onto each result object —
-#' \code{point_estimate_df}, \code{interval_estimate_df}, and
-#' \code{zero_max_psi_ll_fn} become top-level slots alongside
-#' \code{pl_df}/\code{il_df}.
-#'
-#' The filtered \code{psi_loglik_df} (after applying the \code{above_crit}
-#' mask) is stored on the inference result so that plotting uses the same
-#' data as inference. The unfiltered \code{psi_loglik_df} remains on the
-#' workspace result for use by \code{diagnose()}.
-#'
 #' @param model A calibrated \code{model} object.
 #' @param which Character vector. Subset of
 #'   \code{c("profile", "integrated")}. Default: all available.
 #' @param alpha_levels Numeric vector of significance levels. Default:
 #'   derived from \code{traversal$confidence_levels}.
+#' @param enforce_concavity Logical. Whether to project the fitted spline
+#'   onto its Least Concave Majorant before computing point and interval
+#'   estimates. Default: \code{FALSE}.
 #'
 #' @return The SAME calibrated \code{model} object with inference
 #'   results attached.
 #'
 #' @export
-infer <- function(model, which = NULL, alpha_levels = NULL) {
+infer <- function(
+  model,
+  which = NULL,
+  alpha_levels = NULL,
+  enforce_concavity = FALSE
+) {
   which <- validate_infer_input(model, which)
 
   if (is.null(alpha_levels)) {
@@ -43,7 +38,8 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
       res,
       alpha_levels = alpha_levels,
       psi_0 = psi_0,
-      psi_interval = psi_interval
+      psi_interval = psi_interval,
+      enforce_concavity = enforce_concavity
     )
     model <- .set_infer_result(model, pseudolikelihood, infer_result)
   }
@@ -64,8 +60,6 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
 #' @keywords internal
 #' @noRd
 .set_infer_result <- function(model, name, res) {
-  # res is list(result = <synthesize_inference output>,
-  #             psi_loglik_df = <filtered df>)
   inference <- new_inference_result(res$result)
   inference$psi_loglik_df <- res$psi_loglik_df
   model$workspace[[name]]$inference <- inference
@@ -84,6 +78,7 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
   alpha_levels,
   psi_0,
   psi_interval = NULL,
+  enforce_concavity = FALSE,
   ...
 ) {
   if (
@@ -104,10 +99,6 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
     stop("infer(): workspace_result is missing psi_loglik_df", call. = FALSE)
   }
 
-  # Apply above_crit filter when present. The filtered df is used for
-  # all inference computations and stored on the inference result so that
-  # plotting uses the same data. The unfiltered df remains on the
-  # workspace result for diagnose().
   psi_loglik_df_filtered <- if ("above_crit" %in% names(psi_loglik_df)) {
     psi_loglik_df |> dplyr::filter(above_crit)
   } else {
@@ -118,7 +109,8 @@ infer <- function(model, which = NULL, alpha_levels = NULL) {
     psi_loglik_df = psi_loglik_df_filtered,
     alpha_levels = alpha_levels,
     psi_0 = psi_0,
-    psi_interval = psi_interval
+    psi_interval = psi_interval,
+    enforce_concavity = enforce_concavity
   )
 
   list(
@@ -271,7 +263,7 @@ view.inference <- function(
 }
 
 # ---------------------------------------------------------------------
-# Plot (local-only) — inference
+# Plot (local-only)
 # ---------------------------------------------------------------------
 
 #' @method plot inference

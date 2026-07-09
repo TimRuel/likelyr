@@ -8,7 +8,8 @@ get_interval_estimate_df(
   psi_loglik_df,
   alpha_levels,
   psi_0 = NA_real_,
-  psi_interval = NULL
+  psi_interval = NULL,
+  enforce_concavity = FALSE
 )
 }
 \arguments{
@@ -24,9 +25,9 @@ Default: \code{NA_real_}.}
 the parameter space domain. Passed to \code{find_interval_endpoints()}
 for boundary substitution.}
 
-\item{grid_increment}{Positive numeric scalar. The ψ grid spacing.
-Passed to \code{find_interval_endpoints()} to determine whether the
-grid edge is within one step of the domain boundary.}
+\item{enforce_concavity}{Logical. Whether to project the fitted spline
+onto its LCM before inverting for interval endpoints. Default:
+\code{FALSE}.}
 }
 \value{
 Formatted data frame of confidence interval summaries.

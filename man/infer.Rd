@@ -4,7 +4,7 @@
 \alias{infer}
 \title{Likelihood-Based Inference for a Calibrated Model}
 \usage{
-infer(model, which = NULL, alpha_levels = NULL)
+infer(model, which = NULL, alpha_levels = NULL, enforce_concavity = FALSE)
 }
 \arguments{
 \item{model}{A calibrated \code{model} object.}
@@ -14,21 +14,15 @@ infer(model, which = NULL, alpha_levels = NULL)
 
 \item{alpha_levels}{Numeric vector of significance levels. Default:
 derived from \code{traversal$confidence_levels}.}
+
+\item{enforce_concavity}{Logical. Whether to project the fitted spline
+onto its Least Concave Majorant before computing point and interval
+estimates. Default: \code{FALSE}.}
 }
 \value{
 The SAME calibrated \code{model} object with inference
 results attached.
 }
 \description{
-Computes point estimates and confidence intervals from the profile
-and/or integrated log-likelihood curves stored on the model workspace.
-Inference results are folded directly onto each result object —
-\code{point_estimate_df}, \code{interval_estimate_df}, and
-\code{zero_max_psi_ll_fn} become top-level slots alongside
-\code{pl_df}/\code{il_df}.
-
-The filtered \code{psi_loglik_df} (after applying the \code{above_crit}
-mask) is stored on the inference result so that plotting uses the same
-data as inference. The unfiltered \code{psi_loglik_df} remains on the
-workspace result for use by \code{diagnose()}.
+Likelihood-Based Inference for a Calibrated Model
 }

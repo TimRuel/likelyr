@@ -4,7 +4,7 @@
 \alias{fit_psi_loglik}
 \title{Fit a smooth log-likelihood function in ψ}
 \usage{
-fit_psi_loglik(psi_loglik_df)
+fit_psi_loglik(psi_loglik_df, enforce_concavity = FALSE)
 }
 \arguments{
 \item{psi_loglik_df}{A data frame containing columns:
@@ -12,17 +12,20 @@ fit_psi_loglik(psi_loglik_df)
 \item{psi}{Numeric ψ grid values.}
 \item{loglik}{Corresponding log-likelihood values.}
 }}
+
+\item{enforce_concavity}{Logical. Whether to project the spline onto
+its LCM to enforce global concavity. Default: \code{FALSE}.}
 }
 \value{
-A function \code{f(psi)} returning the smoothed, concavity-corrected
-log-likelihood at \code{psi}.
+A function \code{f(psi)} returning the smoothed log-likelihood at
+\code{psi}, optionally concavity-corrected.
 }
 \description{
-Fits a smoothing spline to a discrete ψ–log-likelihood grid, then
-projects the result onto its Least Concave Majorant (LCM) to enforce
-global concavity.
+Fits a smoothing spline to a discrete ψ–log-likelihood grid.
+Optionally projects the result onto its Least Concave Majorant (LCM)
+to enforce global concavity.
 
-The procedure is:
+When \code{enforce_concavity = TRUE}, the procedure is:
 \enumerate{
 \item Fit \code{smooth.spline} to the raw grid.
 \item Evaluate the spline on a fine internal grid (500 points).
@@ -32,12 +35,7 @@ the spline. This is the LCM.
 \item Return a linear interpolant through the LCM knots.
 }
 
-In regions where the spline is already concave, the LCM knots are
-dense (one per fine-grid point) and the piecewise-linear interpolant
-closely tracks the spline. In regions where the spline is convex —
-typically the far left tail at small ψ — the LCM bridges over the
-violation with a linear segment between the surrounding concave
-sections, preserving the mode and the shape of the main body of the
-curve.
+When \code{enforce_concavity = FALSE} (default), only the smoothing
+spline is fitted and returned directly, without LCM projection.
 }
 \keyword{internal}

@@ -18,8 +18,5 @@ A numeric scalar giving the approximate standard error.
 \description{
 Approximates the standard error of a ψ point estimate using the observed
 curvature of the log-likelihood evaluated on a discrete grid.
-
-This uses a central finite-difference approximation to the second
-derivative and is therefore sensitive to grid resolution and smoothness.
 }
 \keyword{internal}

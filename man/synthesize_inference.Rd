@@ -4,7 +4,13 @@
 \alias{synthesize_inference}
 \title{Synthesize Likelihood-Based Inference Results}
 \usage{
-synthesize_inference(psi_loglik_df, alpha_levels, psi_0, psi_interval = NULL)
+synthesize_inference(
+  psi_loglik_df,
+  alpha_levels,
+  psi_0,
+  psi_interval = NULL,
+  enforce_concavity = FALSE
+)
 }
 \arguments{
 \item{psi_loglik_df}{A data frame containing columns \code{psi} and
@@ -14,20 +20,16 @@ synthesize_inference(psi_loglik_df, alpha_levels, psi_0, psi_interval = NULL)
 
 \item{psi_0}{Optional numeric scalar. True value of ψ.}
 
-\item{psi_interval}{Optional named list with \code{$lower} and
-\code{$upper} slots specifying declared parameter space boundaries.
-When provided, a boundary is substituted for \code{NA} if the
-likelihood grid reaches it before descending to the critical
-threshold.}
+\item{psi_interval}{Optional sets::interval object.}
+
+\item{enforce_concavity}{Logical. Whether to project the fitted spline
+onto its LCM before computing estimates. Default: \code{FALSE}.}
 }
 \value{
 A named list with \code{point_estimate_df} and
 \code{interval_estimate_df}.
 }
 \description{
-Orchestrates point estimation and confidence interval construction
-from a log-likelihood grid, returning point estimates, interval
-estimates, and the zero-maximized likelihood function needed for
-plotting.
+Synthesize Likelihood-Based Inference Results
 }
 \keyword{internal}

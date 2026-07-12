@@ -9,7 +9,8 @@ synthesize_inference(
   alpha_levels,
   psi_0,
   psi_interval = NULL,
-  enforce_concavity = FALSE
+  enforce_concavity = FALSE,
+  psi_mle = NULL
 )
 }
 \arguments{
@@ -24,6 +25,12 @@ synthesize_inference(
 
 \item{enforce_concavity}{Logical. Whether to project the fitted spline
 onto its LCM before computing estimates. Default: \code{FALSE}.}
+
+\item{psi_mle}{Optional numeric scalar. The MLE (grid anchor),
+passed to \code{get_interval_estimate_df()} so that boundary
+substitution can identify the exact theoretical last reachable
+grid point before each declared boundary. When \code{NULL}, falls
+back to a simple proximity check against the grid increment.}
 }
 \value{
 A named list with \code{point_estimate_df} and

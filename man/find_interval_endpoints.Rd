@@ -8,7 +8,8 @@ find_interval_endpoints(
   psi_loglik,
   alpha,
   psi_interval = NULL,
-  grid_increment = NULL
+  grid_increment = NULL,
+  psi_mle = NULL
 )
 }
 \arguments{
@@ -23,6 +24,9 @@ applied on each side independently.}
 \item{grid_increment}{Positive numeric scalar. The ψ grid spacing,
 used to determine whether the grid edge is close enough to the
 domain boundary to trigger boundary substitution.}
+
+\item{psi_mle}{Retained for API compatibility; not used by the
+boundary check, which relies only on \code{grid_increment}.}
 }
 \value{
 A one-row tibble with columns \code{alpha}, \code{lower},
@@ -36,10 +40,17 @@ confidence interval for \eqn{\psi} by solving for the roots of
 If \code{uniroot} fails on a side because the grid reaches a declared
 parameter space boundary before descending to the critical threshold,
 the boundary value is substituted for that endpoint. A side is
-considered to have reached its boundary when the grid edge lies within
-one \code{grid_increment} of the declared domain bound and the
-log-likelihood is still above the critical threshold at the grid edge.
-If the grid simply did not descend far enough without hitting a
-boundary, \code{NA_real_} is returned for that endpoint.
+considered to have reached its boundary when the gap between the grid
+edge and the boundary is small relative to \code{grid_increment} —
+specifically, when the grid edge is at or past the boundary (allowing
+a small negative slack for open boundaries, where the true last
+reachable point sits just inside), or when one more grid step from
+the edge would reach or cross the boundary. This avoids relying on
+reconstructing a theoretical grid index from \code{psi_mle} via
+floor/ceiling arithmetic, which is unreliable exactly in the
+near-integer cases that matter most (a tiny floating-point
+discrepancy in \code{psi_mle} can flip the computed index by a full
+step). If the grid stopped well short of the boundary for an
+unrelated reason, \code{NA_real_} is returned for that endpoint.
 }
 \keyword{internal}

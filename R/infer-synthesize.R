@@ -11,6 +11,11 @@
 #' @param psi_interval  Optional sets::interval object.
 #' @param enforce_concavity Logical. Whether to project the fitted spline
 #'   onto its LCM before computing estimates. Default: \code{FALSE}.
+#' @param psi_mle       Optional numeric scalar. The MLE (grid anchor),
+#'   passed to \code{get_interval_estimate_df()} so that boundary
+#'   substitution can identify the exact theoretical last reachable
+#'   grid point before each declared boundary. When \code{NULL}, falls
+#'   back to a simple proximity check against the grid increment.
 #'
 #' @return A named list with \code{point_estimate_df} and
 #'   \code{interval_estimate_df}.
@@ -21,7 +26,8 @@ synthesize_inference <- function(
   alpha_levels,
   psi_0,
   psi_interval = NULL,
-  enforce_concavity = FALSE
+  enforce_concavity = FALSE,
+  psi_mle = NULL
 ) {
   required <- c("psi", "loglik")
   if (!all(required %in% names(psi_loglik_df))) {
@@ -43,7 +49,8 @@ synthesize_inference <- function(
     alpha_levels = alpha_levels,
     psi_0 = psi_0,
     psi_interval = psi_interval,
-    enforce_concavity = enforce_concavity
+    enforce_concavity = enforce_concavity,
+    psi_mle = psi_mle
   )
 
   list(

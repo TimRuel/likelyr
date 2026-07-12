@@ -30,6 +30,7 @@ infer <- function(
   }
 
   psi_0 <- model$estimand$psi_0
+  psi_mle <- model$estimand$psi_mle
   psi_interval <- model$estimand$psi_interval %||% NULL
 
   for (pseudolikelihood in which) {
@@ -39,7 +40,8 @@ infer <- function(
       alpha_levels = alpha_levels,
       psi_0 = psi_0,
       psi_interval = psi_interval,
-      enforce_concavity = enforce_concavity
+      enforce_concavity = enforce_concavity,
+      psi_mle = psi_mle
     )
     model <- .set_infer_result(model, pseudolikelihood, infer_result)
   }
@@ -79,6 +81,7 @@ infer <- function(
   psi_0,
   psi_interval = NULL,
   enforce_concavity = FALSE,
+  psi_mle = NULL,
   ...
 ) {
   if (
@@ -110,7 +113,8 @@ infer <- function(
     alpha_levels = alpha_levels,
     psi_0 = psi_0,
     psi_interval = psi_interval,
-    enforce_concavity = enforce_concavity
+    enforce_concavity = enforce_concavity,
+    psi_mle = psi_mle
   )
 
   list(

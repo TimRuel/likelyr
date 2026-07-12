@@ -37,11 +37,18 @@ shift_psi_loglik <- function(psi_loglik, shift_val) {
 #' If \code{uniroot} fails on a side because the grid reaches a declared
 #' parameter space boundary before descending to the critical threshold,
 #' the boundary value is substituted for that endpoint. A side is
-#' considered to have reached its boundary when the grid edge lies within
-#' one \code{grid_increment} of the declared domain bound and the
-#' log-likelihood is still above the critical threshold at the grid edge.
-#' If the grid simply did not descend far enough without hitting a
-#' boundary, \code{NA_real_} is returned for that endpoint.
+#' considered to have reached its boundary when the gap between the grid
+#' edge and the boundary is small relative to \code{grid_increment} —
+#' specifically, when the grid edge is at or past the boundary (allowing
+#' a small negative slack for open boundaries, where the true last
+#' reachable point sits just inside), or when one more grid step from
+#' the edge would reach or cross the boundary. This avoids relying on
+#' reconstructing a theoretical grid index from \code{psi_mle} via
+#' floor/ceiling arithmetic, which is unreliable exactly in the
+#' near-integer cases that matter most (a tiny floating-point
+#' discrepancy in \code{psi_mle} can flip the computed index by a full
+#' step). If the grid stopped well short of the boundary for an
+#' unrelated reason, \code{NA_real_} is returned for that endpoint.
 #'
 #' @param psi_loglik     Function returning \eqn{\ell(\psi)}.
 #' @param alpha          Numeric scalar in (0, 1).
@@ -51,6 +58,8 @@ shift_psi_loglik <- function(psi_loglik, shift_val) {
 #' @param grid_increment Positive numeric scalar. The ψ grid spacing,
 #'   used to determine whether the grid edge is close enough to the
 #'   domain boundary to trigger boundary substitution.
+#' @param psi_mle        Retained for API compatibility; not used by the
+#'   boundary check, which relies only on \code{grid_increment}.
 #'
 #' @return A one-row tibble with columns \code{alpha}, \code{lower},
 #'   \code{upper}, and attribute \code{psi_hat}.
@@ -60,7 +69,8 @@ find_interval_endpoints <- function(
   psi_loglik,
   alpha,
   psi_interval = NULL,
-  grid_increment = NULL
+  grid_increment = NULL,
+  psi_mle = NULL
 ) {
   crit <- 0.5 * stats::qchisq(1 - alpha, df = 1)
   psi_loglik_max_point <- get_psi_loglik_max_point(psi_loglik)
@@ -71,7 +81,24 @@ find_interval_endpoints <- function(
 
   psi_range <- attr(psi_loglik, "psi range")
 
-  tol <- grid_increment %||% sqrt(.Machine$double.eps)
+  increment <- grid_increment %||% sqrt(.Machine$double.eps)
+
+  # ------------------------------------------------------------------
+  # A grid edge is treated as "at the boundary" if it's already within
+  # a hair of the boundary, or if stepping one more increment from it
+  # would reach or cross the boundary. This captures both the
+  # closed-boundary case (grid edge essentially equals the boundary)
+  # and the open-boundary case (grid edge sits one increment inside a
+  # limit point it can never actually reach), without needing to
+  # reconstruct a theoretical grid index from psi_mle.
+  # ------------------------------------------------------------------
+  .at_theoretical_boundary <- function(grid_edge, boundary) {
+    if (is.null(boundary) || !is.finite(boundary)) {
+      return(FALSE)
+    }
+    gap <- boundary - grid_edge
+    gap >= -increment * 0.01 && gap <= increment * 1.5
+  }
 
   # ------------------------------------------------------------------
   # Lower endpoint
@@ -83,9 +110,7 @@ find_interval_endpoints <- function(
     )$root,
     error = function(e) {
       psi_lower <- min(psi_interval)
-      grid_at_bound <- !is.null(psi_lower) &&
-        is.finite(psi_lower) &&
-        (psi_range[1] - psi_lower) < tol &&
+      grid_at_bound <- .at_theoretical_boundary(psi_range[1], psi_lower) &&
         psi_loglik_shifted(psi_range[1]) > 0
       if (grid_at_bound) psi_lower else NA_real_
     }
@@ -101,9 +126,7 @@ find_interval_endpoints <- function(
     )$root,
     error = function(e) {
       psi_upper <- max(psi_interval)
-      grid_at_bound <- !is.null(psi_upper) &&
-        is.finite(psi_upper) &&
-        (psi_upper - psi_range[2]) < tol &&
+      grid_at_bound <- .at_theoretical_boundary(psi_range[2], psi_upper) &&
         psi_loglik_shifted(psi_range[2]) > 0
       if (grid_at_bound) psi_upper else NA_real_
     }
@@ -207,6 +230,8 @@ format_interval_estimate_df <- function(interval_estimate_df) {
 #' @param enforce_concavity Logical. Whether to project the fitted spline
 #'   onto its LCM before inverting for interval endpoints. Default:
 #'   \code{FALSE}.
+#' @param psi_mle       Retained for API compatibility; passed through
+#'   but not used by \code{find_interval_endpoints()}'s boundary check.
 #'
 #' @return Formatted data frame of confidence interval summaries.
 #'
@@ -216,7 +241,8 @@ get_interval_estimate_df <- function(
   alpha_levels,
   psi_0 = NA_real_,
   psi_interval = NULL,
-  enforce_concavity = FALSE
+  enforce_concavity = FALSE,
+  psi_mle = NULL
 ) {
   psi_loglik <- fit_psi_loglik(
     psi_loglik_df,
@@ -234,7 +260,8 @@ get_interval_estimate_df <- function(
           psi_loglik = psi_loglik,
           alpha = alpha,
           psi_interval = psi_interval,
-          grid_increment = grid_increment
+          grid_increment = grid_increment,
+          psi_mle = psi_mle
         )
       }
     ) |>

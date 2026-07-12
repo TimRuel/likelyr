@@ -9,7 +9,8 @@ get_interval_estimate_df(
   alpha_levels,
   psi_0 = NA_real_,
   psi_interval = NULL,
-  enforce_concavity = FALSE
+  enforce_concavity = FALSE,
+  psi_mle = NULL
 )
 }
 \arguments{
@@ -28,6 +29,9 @@ for boundary substitution.}
 \item{enforce_concavity}{Logical. Whether to project the fitted spline
 onto its LCM before inverting for interval endpoints. Default:
 \code{FALSE}.}
+
+\item{psi_mle}{Retained for API compatibility; passed through
+but not used by \code{find_interval_endpoints()}'s boundary check.}
 }
 \value{
 Formatted data frame of confidence interval summaries.

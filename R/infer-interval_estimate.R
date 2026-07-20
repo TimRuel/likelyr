@@ -19,7 +19,9 @@
 #' @keywords internal
 shift_psi_loglik <- function(psi_loglik, shift_val) {
   psi_loglik_shifted <- function(psi) psi_loglik(psi) + shift_val
-  attr(psi_loglik_shifted, "psi_range") <- attr(psi_loglik, "psi_range")
+  # NB: fit_psi_loglik() stores the range under "psi range" (with a
+  # space); match that key so the shifted function actually carries it.
+  attr(psi_loglik_shifted, "psi range") <- attr(psi_loglik, "psi range")
   psi_loglik_shifted
 }
 
@@ -101,36 +103,86 @@ find_interval_endpoints <- function(
   }
 
   # ------------------------------------------------------------------
+  # Fine scan grid for locating threshold crossings.
+  #
+  # On jagged log-likelihoods the shifted curve can cross zero several
+  # times per side. A single uniroot() bracket over the whole side
+  # returns SOME crossing (whichever bisection happens to land on), which
+  # tends to be an INNER crossing and yields a too-narrow interval. We
+  # instead scan a fine grid, find every sign change, and bracket the
+  # OUTERMOST crossing on each side — the widest LR interval consistent
+  # with the fitted curve (the conservative choice under the default
+  # enforce_concavity = FALSE). psi_loglik_shifted is vectorized.
+  # ------------------------------------------------------------------
+  scan_step <- if (is.finite(increment) && increment > 0) {
+    increment / 2
+  } else {
+    (psi_range[2] - psi_range[1]) / 1000
+  }
+  n_scan <- as.integer((psi_range[2] - psi_range[1]) / scan_step) + 1L
+  n_scan <- min(20001L, max(1001L, n_scan))
+  psi_scan <- seq(psi_range[1], psi_range[2], length.out = n_scan)
+  f_scan <- psi_loglik_shifted(psi_scan)
+
+  # Indices i where the shifted curve changes sign on [psi_scan[i], psi_scan[i+1]]
+  fa <- f_scan[-length(f_scan)]
+  fb <- f_scan[-1]
+  sign_change <- which(is.finite(fa) & is.finite(fb) & (fa * fb < 0))
+
+  .outermost_root <- function(side) {
+    if (length(sign_change) == 0L) {
+      return(NULL)
+    }
+    cand <- if (side == "lower") {
+      sign_change[psi_scan[sign_change + 1L] <= psi_hat]
+    } else {
+      sign_change[psi_scan[sign_change] >= psi_hat]
+    }
+    if (length(cand) == 0L) {
+      return(NULL)
+    }
+    i <- if (side == "lower") min(cand) else max(cand)
+    tryCatch(
+      stats::uniroot(
+        f = psi_loglik_shifted,
+        interval = c(psi_scan[i], psi_scan[i + 1L])
+      )$root,
+      error = function(e) NULL
+    )
+  }
+
+  # Boundary substitution: if a side never crosses the threshold within
+  # the grid but the grid edge sits at a declared domain boundary while
+  # still above threshold, report the boundary value. Guarded so a NULL
+  # psi_interval or a non-finite comparison never triggers if(NA).
+  .boundary_sub <- function(side) {
+    if (is.null(psi_interval)) {
+      return(NA_real_)
+    }
+    if (side == "lower") {
+      edge <- psi_range[1]
+      bnd <- suppressWarnings(min(psi_interval))
+    } else {
+      edge <- psi_range[2]
+      bnd <- suppressWarnings(max(psi_interval))
+    }
+    if (!is.finite(bnd)) {
+      return(NA_real_)
+    }
+    at_bound <- isTRUE(.at_theoretical_boundary(edge, bnd)) &&
+      isTRUE(psi_loglik_shifted(edge) > 0)
+    if (isTRUE(at_bound)) bnd else NA_real_
+  }
+
+  # ------------------------------------------------------------------
   # Lower endpoint
   # ------------------------------------------------------------------
-  lower <- tryCatch(
-    stats::uniroot(
-      f = psi_loglik_shifted,
-      interval = c(psi_range[1], psi_hat)
-    )$root,
-    error = function(e) {
-      psi_lower <- min(psi_interval)
-      grid_at_bound <- .at_theoretical_boundary(psi_range[1], psi_lower) &&
-        psi_loglik_shifted(psi_range[1]) > 0
-      if (grid_at_bound) psi_lower else NA_real_
-    }
-  )
+  lower <- .outermost_root("lower") %||% .boundary_sub("lower")
 
   # ------------------------------------------------------------------
   # Upper endpoint
   # ------------------------------------------------------------------
-  upper <- tryCatch(
-    stats::uniroot(
-      f = psi_loglik_shifted,
-      interval = c(psi_hat, psi_range[2])
-    )$root,
-    error = function(e) {
-      psi_upper <- max(psi_interval)
-      grid_at_bound <- .at_theoretical_boundary(psi_range[2], psi_upper) &&
-        psi_loglik_shifted(psi_range[2]) > 0
-      if (grid_at_bound) psi_upper else NA_real_
-    }
-  )
+  upper <- .outermost_root("upper") %||% .boundary_sub("upper")
 
   ci_endpoints <- tibble::tibble(alpha = alpha, lower = lower, upper = upper)
   attr(ci_endpoints, "psi_hat") <- psi_hat

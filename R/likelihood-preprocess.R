@@ -35,6 +35,8 @@
 #'     \item \code{"mode_on_psi_boundary"}
 #'     \item \code{"mode_locator_failed"}
 #'     \item \code{"mode_eval_failed_after_snap"}
+#'     \item \code{"mode_nonfinite"}
+#'     \item \code{"mode_infeasible"}
 #'     \item \code{"mode_too_low"}
 #'     \item \code{"oscillation"}
 #'     \item \code{"mode_shift_exhausted"}
@@ -84,24 +86,11 @@ preprocess.model <- function(
     )
   }
 
-  # Calibrate absolute drop cap from profile curvature
-  profile_df <- model$workspace$profile$psi_loglik_df
-  profile_ll <- profile_df$loglik[order(profile_df$psi)]
-  profile_drops <- diff(-profile_ll)
-  profile_drops <- profile_drops[profile_drops > 0]
-
-  typical_drop <- if (length(profile_drops) > 0L) {
-    median(profile_drops)
-  } else {
-    # fallback: use chi-squared cutoff fraction
-    0.5 * qchisq(0.95, df = 1) * 0.05
-  }
-
-  model$traversal$max_drop_cap <- model$traversal$cap_multiplier * typical_drop
-
-  model$workspace$profile$ll_at_psi_mle <- max(
-    model$workspace$profile$psi_loglik_df$loglik
-  )
+  # NOTE: profile() already calibrated model$traversal$max_drop_cap and
+  # model$workspace$profile$ll_at_psi_mle from the profile curve (so that
+  # probe()/sieve() can run standalone). We deliberately do NOT recompute
+  # them here — doing so previously duplicated the exact same logic and
+  # invited drift. probe() errors clearly if either is unset.
 
   # ------------------------------------------------------------------
   # 2. Sieve
@@ -133,14 +122,25 @@ preprocess.model <- function(
 
   # ------------------------------------------------------------------
   # 3. Common interval
+  #
+  # Union the profile extent with the accepted branch seed modes so the
+  # interval covers branches that peak beyond the profile (see P1).
   # ------------------------------------------------------------------
   psi_interval <- model$estimand$psi_interval %||% NULL
+
+  branch_seeds <- model$workspace$integrated$cache$branch_seeds %||% list()
+  branch_modes <- vapply(
+    branch_seeds,
+    function(s) s$psi_mode %||% NA_real_,
+    numeric(1)
+  )
 
   common_interval <- compute_common_interval(
     psi_loglik_df = model$workspace$profile$psi_loglik_df,
     psi_interval = psi_interval,
     increment = model$traversal$increment,
-    interval_buffer = model$traversal$interval_buffer %||% 1.0
+    interval_buffer = model$traversal$interval_buffer %||% 1.0,
+    branch_modes = branch_modes
   )
 
   if (verbose) {

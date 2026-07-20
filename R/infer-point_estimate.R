@@ -92,6 +92,42 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
   }
 
   # ------------------------------------------------------------------
+  # Step 0: drop non-finite rows.
+  #
+  # smooth.spline() errors on NA/NaN/Inf in x or y. Jagged / pathological
+  # integrated branches routinely produce non-finite loglik at some grid
+  # points (failed solves, -Inf branch values), which would otherwise
+  # abort the entire fit. Drop them, preserving the pseudolikelihood
+  # attribute (which plain data-frame subsetting would strip).
+  # ------------------------------------------------------------------
+  pseudolik_attr <- attr(psi_loglik_df, "pseudolikelihood")
+
+  finite_rows <- is.finite(psi_loglik_df$psi) &
+    is.finite(psi_loglik_df$loglik)
+
+  if (!all(finite_rows)) {
+    n_dropped <- sum(!finite_rows)
+    warning(
+      "fit_psi_loglik(): dropping ",
+      n_dropped,
+      " non-finite (psi, loglik) row",
+      if (n_dropped > 1L) "s" else "",
+      " before spline fit.",
+      call. = FALSE
+    )
+    psi_loglik_df <- psi_loglik_df[finite_rows, , drop = FALSE]
+    attr(psi_loglik_df, "pseudolikelihood") <- pseudolik_attr
+  }
+
+  if (nrow(psi_loglik_df) < 4L) {
+    stop(
+      "fit_psi_loglik(): fewer than 4 finite (psi, loglik) points remain ",
+      "after filtering; cannot fit a smoothing spline.",
+      call. = FALSE
+    )
+  }
+
+  # ------------------------------------------------------------------
   # Step 1: fit smooth spline to raw grid
   # ------------------------------------------------------------------
   psi_loglik_spline <- stats::smooth.spline(

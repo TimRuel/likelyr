@@ -1,3 +1,29 @@
+#' Probe a Candidate Omega-Hat for a Usable Branch Seed
+#'
+#' @description
+#' Locates a candidate omega-hat's branch mode, checks it for numerical
+#' validity and (adaptively) competitiveness, and — if it survives — sweeps
+#' \code{n_adjacent} grid points on each side to produce a seed ready for
+#' \code{traverse_branch()}. Called by \code{sieve()}; not exported.
+#'
+#' @param model A calibrated \code{model} object, post-\code{preprocess()}.
+#' @param omega_hat Numeric vector. The candidate nuisance direction.
+#' @param n_adjacent Non-negative integer. Grid points to evaluate on each
+#'   side of the mode. Defaults to \code{model$traversal$n_adjacent}.
+#' @param max_mode_shifts Non-negative integer. Cap on mode re-centering
+#'   during the adjacent sweep. Defaults to
+#'   \code{model$traversal$max_mode_shifts}.
+#' @param k_recent Non-negative integer. Recent-drops window for the jump
+#'   check. Defaults to \code{model$traversal$k_recent}.
+#' @param drop_multiplier Positive numeric scalar. Jump-detection
+#'   multiplier. Defaults to \code{model$traversal$drop_multiplier}.
+#' @param rejection_reasons Optional character vector of checks to
+#'   enforce; see \code{\link{traversal_spec}} for recognized values.
+#' @param running_best Numeric scalar. The best (highest) \code{ll_mode}
+#'   observed so far during the enclosing \code{sieve()} run, used only by
+#'   the \code{"mode_uncompetitive"} gate. Default \code{-Inf} makes every
+#'   finite \code{ll_mode} pass, i.e. the gate is a no-op unless the caller
+#'   participates in the running-best bookkeeping (as \code{sieve()} does).
 #' @importFrom stats qchisq median
 #' @importFrom utils tail
 #' @keywords internal
@@ -8,7 +34,8 @@ probe <- function(
   max_mode_shifts = NULL,
   k_recent = NULL,
   drop_multiplier = NULL,
-  rejection_reasons = NULL
+  rejection_reasons = NULL,
+  running_best = -Inf
 ) {
   traversal <- model$traversal
   estimand <- model$estimand
@@ -20,6 +47,7 @@ probe <- function(
   max_mode_shifts <- max_mode_shifts %||% traversal$max_mode_shifts
   k_recent <- k_recent %||% traversal$k_recent
   drop_multiplier <- drop_multiplier %||% traversal$drop_multiplier
+  resid_tol <- traversal$resid_tol %||% 1e-3
   rejection_reasons <- rejection_reasons %||% model$traversal$rejection_reasons
 
   # NULL means all reasons active; otherwise only listed reasons cause rejection
@@ -123,14 +151,16 @@ probe <- function(
     error = function(e) NULL
   )
 
+  # A located mode is mandatory: every step below (snap, adjacent sweep,
+  # seed edges) dereferences it. A locator failure is therefore a HARD
+  # reject, NOT subject to rejection_reasons filtering — otherwise a NULL
+  # mode_result propagates into numeric(0) / min(numeric(0)) downstream.
   if (is.null(mode_result) || mode_result$status != "success") {
-    if (.should_reject("mode_locator_failed")) {
-      return(list(
-        accepted = FALSE,
-        reason = "mode_locator_failed",
-        omega_hat = omega_hat
-      ))
-    }
+    return(list(
+      accepted = FALSE,
+      reason = "mode_locator_failed",
+      omega_hat = omega_hat
+    ))
   }
 
   psi_mode <- mode_result$psi_hat
@@ -191,7 +221,10 @@ probe <- function(
   branch_evaluator <- traversal$branch_binder(omega_hat)
 
   mode_eval <- .eval_safe(branch_evaluator, psi_mode, param_mode)
-  if (is.null(mode_eval) && .should_reject("mode_eval_failed_after_snap")) {
+  # Hard reject (not filterable): without a mode evaluation there is no
+  # param_mode / ll_mode to build a seed from, so guarding this on
+  # rejection_reasons would let NULL propagate into the sweep below.
+  if (is.null(mode_eval)) {
     return(list(
       accepted = FALSE,
       reason = "mode_eval_failed_after_snap",
@@ -204,7 +237,85 @@ probe <- function(
   ll_mode <- mode_eval$branch_val
 
   # -------------------------------------------------------------------
-  # 4b. Reject if branch mode log-likelihood is too far below profile MLE
+  # 4a-B. Numerical-validity gate: the mode log-likelihood must be finite.
+  #
+  # A NaN / -Inf branch_val is a computational failure, not a shape. Left
+  # unchecked it propagates into the drop/threshold comparisons below as
+  # NA and surfaces as an opaque "probe_error". This is a validity gate,
+  # not a niceness screen.
+  # -------------------------------------------------------------------
+  if (!is.finite(ll_mode) && .should_reject("mode_nonfinite")) {
+    return(list(
+      accepted = FALSE,
+      reason = "mode_nonfinite",
+      psi_mode = psi_mode,
+      ll_mode = ll_mode,
+      omega_hat = omega_hat
+    ))
+  }
+
+  # -------------------------------------------------------------------
+  # 4a-A. Numerical-validity gate: the mode solve must satisfy the
+  # equality constraint psi(theta) = psi_mode. If auglag returned an
+  # infeasible point, ll_mode is the log-likelihood at the WRONG psi and
+  # the whole seed is numerically bogus. This is the principled
+  # replacement for the crude mode_on_psi_boundary screen: a genuine
+  # boundary-peaking branch whose solve is FEASIBLE is kept; only an
+  # actually-failed solve is rejected. Also logs solver non-convergence
+  # (maxeval hit) as a diagnostic without rejecting on it (gate C).
+  # -------------------------------------------------------------------
+  mode_resid <- abs(
+    mode_eval$psi_residual %||% (mode_eval$psi_at_hat - psi_mode)
+  )
+  if (isTRUE(mode_resid > resid_tol) && .should_reject("mode_infeasible")) {
+    return(list(
+      accepted = FALSE,
+      reason = "mode_infeasible",
+      psi_mode = psi_mode,
+      psi_residual = mode_resid,
+      omega_hat = omega_hat
+    ))
+  }
+
+  # -------------------------------------------------------------------
+  # 4b. Relevance gate: is this branch's peak within reach of the best
+  # branch seen so far this sieve() run? A branch whose OWN mode already
+  # sits more than effective_crit below running_best can never contribute
+  # above the log-sum-exp noise floor at any psi (same reasoning
+  # branch_extent = "global" uses post-hoc in generate() — this is that
+  # same test applied pre-emptively, before paying for the adjacent sweep
+  # below or a full traverse_branch() in generate()).
+  #
+  # This is NOT a validity gate: ll_mode was successfully, informatively
+  # measured. sieve() must still count a mode_uncompetitive rejection
+  # toward R in aggregate() — discarding a known-low measurement from BOTH
+  # the sum (correctly, its contribution is negligible) AND the count
+  # would inflate the aggregate (the mode_too_low screen's undiagnosed
+  # flaw, see the 2026-07-18 ablation). Contrast with mode_nonfinite /
+  # mode_infeasible / mode_locator_failed above: those are measurement
+  # FAILURES (nothing was learned), correctly excluded from R entirely.
+  # -------------------------------------------------------------------
+  effective_crit <- crit * traversal$cutoff_buffer
+  if (
+    ll_mode < (running_best - effective_crit) &&
+      .should_reject("mode_uncompetitive")
+  ) {
+    return(list(
+      accepted = FALSE,
+      reason = "mode_uncompetitive",
+      psi_mode = psi_mode,
+      ll_mode = ll_mode,
+      running_best = running_best,
+      effective_crit = effective_crit,
+      omega_hat = omega_hat
+    ))
+  }
+
+  # -------------------------------------------------------------------
+  # 4c. Legacy: reject if branch mode log-likelihood is too far below
+  # profile MLE (fixed, profile-relative threshold — off by default in
+  # favor of the adaptive mode_uncompetitive gate above; retained for
+  # backward compatibility).
   # -------------------------------------------------------------------
   if (ll_mode < ll_threshold && .should_reject("mode_too_low")) {
     return(list(

@@ -24,6 +24,8 @@ values:
 \item \code{"mode_on_psi_boundary"}
 \item \code{"mode_locator_failed"}
 \item \code{"mode_eval_failed_after_snap"}
+\item \code{"mode_nonfinite"}
+\item \code{"mode_infeasible"}
 \item \code{"mode_too_low"}
 \item \code{"oscillation"}
 \item \code{"mode_shift_exhausted"}

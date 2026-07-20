@@ -137,6 +137,39 @@ generate.model <- function(
     )
   }
 
+  # branch_extent = "global": stop each branch effective_crit below the
+  # AGGREGATE max, estimated as the max branch-mode log-likelihood across
+  # seeds. max(ll_modes) underestimates the true aggregate max (a
+  # log-sum-exp over branches), so the cutoff sits slightly low and each
+  # branch is traversed a touch further than strictly needed — the safe
+  # direction (never truncates the CI region). NULL => per-branch legacy.
+  branch_extent <- traversal$branch_extent %||% "per_branch"
+  global_cutoff <- NULL
+  if (identical(branch_extent, "global")) {
+    ll_modes <- vapply(
+      branch_seeds,
+      function(s) s$ll_mode %||% NA_real_,
+      numeric(1)
+    )
+    ll_modes <- ll_modes[is.finite(ll_modes)]
+    if (length(ll_modes) > 0L) {
+      alpha_target <- min(1 - traversal$confidence_levels)
+      crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
+      effective_crit <- crit * (traversal$cutoff_buffer %||% 1.5)
+      global_cutoff <- max(ll_modes) - effective_crit
+      if (verbose) {
+        cat(
+          "[generate] branch_extent = global | agg-max est = ",
+          round(max(ll_modes), 3),
+          " | global cutoff = ",
+          round(global_cutoff, 3),
+          "\n",
+          sep = ""
+        )
+      }
+    }
+  }
+
   results <- foreach::foreach(
     r = seq_len(n_seeds),
     .options.future = list(
@@ -153,7 +186,8 @@ generate.model <- function(
         branch_seed = branch_seed,
         traversal = traversal,
         grid = grid,
-        branch_evaluator = branch_evaluator
+        branch_evaluator = branch_evaluator,
+        global_cutoff = global_cutoff
       )
 
       if (verbose && !is_parallel) {

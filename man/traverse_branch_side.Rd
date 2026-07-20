@@ -17,6 +17,7 @@ traverse_branch_side(
   resid_tol = 0.001,
   max_drop_frac = Inf,
   branch_retry_on = character(0),
+  branch_selection = "envelope",
   max_consecutive_skips = 2L
 )
 }
@@ -51,6 +52,22 @@ residual tolerance. Default: \code{1e-3}.}
 Default: \code{Inf}.}
 
 \item{branch_retry_on}{Retained for API compatibility.}
+
+\item{branch_selection}{Character scalar controlling how
+\code{.best_eval} chooses among the multi-start results.
+\describe{
+\item{\code{"envelope"}}{(default) Take the highest-\code{branch_val}
+feasible result over \emph{all} starts (warm, anchor, jitters);
+fall back to the first infeasible result if none are feasible.
+Traces the global upper envelope — discontinuous where competing
+optima cross.}
+\item{\code{"continuation"}}{Prefer the chained warm start whenever
+it is feasible, using the anchor and jitters only to \emph{rescue}
+a failed/infeasible warm start. If no feasible result is found the
+point is soft-skipped rather than recorded as an off-constraint
+value. Rides a single principal branch — continuous, and does not
+inject infeasible points.}
+}}
 
 \item{max_consecutive_skips}{Integer. Default: \code{2L}.}
 }

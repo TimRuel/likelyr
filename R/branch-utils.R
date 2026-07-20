@@ -238,9 +238,13 @@ check_drop <- function(
 #' Derives the common ψ support interval to be used across all Monte
 #' Carlo branches, ensuring full overlap and valid CI estimation.
 #'
-#' The interval starts from the profile likelihood extent, optionally
-#' expanded by \code{interval_buffer}, then intersected with
-#' \code{psi_interval}.
+#' The base span is the union of the profile likelihood extent with the
+#' range of accepted branch seed modes (\code{branch_modes}). Branches can
+#' peak — and carry log-likelihood mass — at ψ values beyond the profile's
+#' own extent; bounding the common interval by the profile alone would
+#' truncate those IL tails and bias the aggregated curve and its CIs. The
+#' union is then optionally expanded by \code{interval_buffer} about its
+#' centre and intersected with \code{psi_interval}.
 #'
 #' Additionally, if the profile reached a finite parameter space boundary
 #' without dropping to its cutoff — detected by checking whether
@@ -256,9 +260,13 @@ check_drop <- function(
 #' @param increment       Positive numeric scalar. Grid spacing, used as
 #'   the tolerance for boundary proximity detection.
 #' @param interval_buffer Positive numeric scalar. Multiplicative
-#'   expansion factor applied to the profile half-width before
+#'   expansion factor applied to the base span half-width before
 #'   intersecting with \code{psi_interval}. A value of \code{1.0}
-#'   uses the profile extent as-is. Default: \code{1.0}.
+#'   uses the span as-is. Default: \code{1.0}.
+#' @param branch_modes    Optional numeric vector of accepted branch seed
+#'   modes (ψ values). Their finite range is unioned with the profile
+#'   extent to form the base span, so branches peaking beyond the profile
+#'   are covered. Default: \code{numeric(0)} (profile extent only).
 #'
 #' @return A named list with:
 #'   \itemize{
@@ -275,7 +283,8 @@ compute_common_interval <- function(
   psi_loglik_df,
   psi_interval = NULL,
   increment,
-  interval_buffer = 1.0
+  interval_buffer = 1.0,
+  branch_modes = numeric(0)
 ) {
   if (is.null(psi_loglik_df) || nrow(psi_loglik_df) == 0L) {
     stop(
@@ -288,8 +297,21 @@ compute_common_interval <- function(
   profile_lower <- min(psi_loglik_df$psi)
   profile_upper <- max(psi_loglik_df$psi)
 
-  center <- (profile_lower + profile_upper) / 2
-  half_width <- (profile_upper - profile_lower) / 2
+  # Base span = profile extent unioned with the accepted branch seed
+  # modes. Boundary snapping below still keys off the PROFILE extent
+  # (profile_lower/profile_upper), since "the profile ran into the domain
+  # boundary" is a profile property, not a seed-mode one.
+  span_lower <- profile_lower
+  span_upper <- profile_upper
+
+  finite_modes <- branch_modes[is.finite(branch_modes)]
+  if (length(finite_modes) > 0L) {
+    span_lower <- min(span_lower, min(finite_modes))
+    span_upper <- max(span_upper, max(finite_modes))
+  }
+
+  center <- (span_lower + span_upper) / 2
+  half_width <- (span_upper - span_lower) / 2
 
   psi_lower <- center - half_width * interval_buffer
   psi_upper <- center + half_width * interval_buffer

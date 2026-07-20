@@ -50,7 +50,18 @@ aggregate.model <- function(model, verbose = FALSE, ...) {
     )
   }
 
-  R <- length(branches)
+  # R is the true number of INFORMATIVELY-MEASURED nuisance draws, not
+  # just the number of branches that got fully traversed. sieve() (v3,
+  # 2026-07-20) pre-screens for competitiveness: a "mode_uncompetitive"
+  # rejection means the branch's peak was validly measured and known to
+  # be negligible, so it's correctly excluded from `branches` (no full
+  # traversal needed) — but it must still count in R, or dividing an
+  # (essentially unchanged) numerator by an artificially small denominator
+  # silently inflates the aggregate, exactly the flaw that made the old
+  # mode_too_low screen net-harmful (2026-07-18 ablation). Falls back to
+  # length(branches) when cache$n_valid is absent (e.g. hand-built
+  # branch_seeds bypassing sieve()), which recovers the pre-v3 behavior.
+  R <- model$workspace$integrated$cache$n_valid %||% length(branches)
 
   # -------------------------------------------------------------------
   # 1. Build ψ × R matrix
@@ -77,8 +88,16 @@ aggregate.model <- function(model, verbose = FALSE, ...) {
   effective_crit <- crit * model$traversal$cutoff_buffer
 
   n_support <- rowSums(is.finite(branch_mat))
-  loglik <- matrixStats::rowLogSumExps(branch_mat, na.rm = TRUE) -
-    log(n_support)
+
+  # Standard Monte Carlo integrated likelihood: divide by the CONSTANT
+  # number of branches R, not the per-point support (audit A2). A branch
+  # absent at a psi point was trimmed >effective_crit (~10 nats) below its
+  # own mode, so its true contribution there is < ~1e-4 relative — the
+  # standard exp(-Inf)=0 convention. Dividing by n_support instead
+  # averaged over survivors, stepping the tail UP and distorting the
+  # above_crit CI mask. n_support is retained below purely as a diagnostic.
+  # (This also removes the n_support==0 -> NaN edge, cf. audit A9.)
+  loglik <- matrixStats::rowLogSumExps(branch_mat, na.rm = TRUE) - log(R)
 
   rel_loglik <- loglik - max(loglik, na.rm = TRUE)
 
@@ -93,17 +112,25 @@ aggregate.model <- function(model, verbose = FALSE, ...) {
 
   # -------------------------------------------------------------------
   # 3. Floor check
+  #
+  # Low median support signals branches that are too short ONLY under
+  # per-branch extent. Under branch_extent = "global" branches are
+  # deliberately trimmed at the shared aggregate-relevant cutoff, so low
+  # support is expected and harmless (the aggregate still reaches its CI
+  # cutoff — that is the point of the global rule). Skip the warning there.
   # -------------------------------------------------------------------
   med_support <- median(n_support)
+  branch_extent <- model$traversal$branch_extent %||% "per_branch"
 
-  if (med_support < min_branches) {
+  if (med_support < min_branches && !identical(branch_extent, "global")) {
     warning(
       "aggregate(): median branch support (",
       round(med_support, 1),
       ") is below min_branches (",
       min_branches,
       ").\n",
-      "Consider running preprocess() with a larger buffer.",
+      "Consider running preprocess() with a larger buffer, or ",
+      "branch_extent = 'global'.",
       call. = FALSE
     )
   }

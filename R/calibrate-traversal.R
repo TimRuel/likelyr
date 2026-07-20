@@ -31,6 +31,20 @@ calibrate_traversal <- function(
   traversal$psi_interval <- estimand$psi_interval %||% NULL
 
   # -------------------------------------------------------------------
+  # 1b. Inherit the solver's jitter-retry budget for integrated branches.
+  #
+  # traverse_branch_*() read traversal$max_retries to decide how many
+  # jittered warm-start restarts to attempt per grid point (the
+  # .best_eval multistart in traverse_branch_side). Historically this
+  # slot was never populated, so it defaulted to 0 and IL branches never
+  # got the multistart the profile path already receives via
+  # solver$max_retries. Inheriting it here enables the traversal-side
+  # smoothing lever for jagged branches. An explicit traversal value
+  # (if the user set one) takes precedence.
+  # -------------------------------------------------------------------
+  traversal$max_retries <- traversal$max_retries %||% solver$max_retries
+
+  # -------------------------------------------------------------------
   # 2. Build branch binder — shared by locate_mode and sieve()
   # -------------------------------------------------------------------
   traversal$branch_binder <- branch_binder_constructor(

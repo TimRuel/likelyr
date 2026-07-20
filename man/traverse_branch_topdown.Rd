@@ -4,7 +4,13 @@
 \alias{traverse_branch_topdown}
 \title{Traverse a Branch Outward from a Pre-Located Mode}
 \usage{
-traverse_branch_topdown(branch_seed, traversal, grid, branch_evaluator)
+traverse_branch_topdown(
+  branch_seed,
+  traversal,
+  grid,
+  branch_evaluator,
+  global_cutoff = NULL
+)
 }
 \arguments{
 \item{branch_seed}{A named list from \code{probe()}, containing:
@@ -23,6 +29,12 @@ interval boundaries that stop traversal.}
 
 \item{branch_evaluator}{Function \code{(psi, param_init) ->
 list(param_hat, branch_val, psi_residual)}.}
+
+\item{global_cutoff}{Optional numeric scalar. When supplied
+(\code{branch_extent = "global"}), each branch stops when its
+\code{branch_val} falls below this shared threshold instead of a
+per-branch \code{ll_mode - effective_crit}. \code{NULL} (default)
+restores per-branch behavior.}
 }
 \description{
 Picks up where \code{probe()} left off: reads pre-evaluated points

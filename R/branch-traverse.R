@@ -46,6 +46,11 @@
 #'   interval boundaries that stop traversal.
 #' @param branch_evaluator Function \code{(psi, param_init) ->
 #'   list(param_hat, branch_val, psi_residual)}.
+#' @param global_cutoff Optional numeric scalar. When supplied
+#'   (\code{branch_extent = "global"}), each branch stops when its
+#'   \code{branch_val} falls below this shared threshold instead of a
+#'   per-branch \code{ll_mode - effective_crit}. \code{NULL} (default)
+#'   restores per-branch behavior.
 #'
 #' @return A list with:
 #'   \itemize{
@@ -59,7 +64,8 @@ traverse_branch <- function(
   branch_seed,
   traversal,
   grid,
-  branch_evaluator
+  branch_evaluator,
+  global_cutoff = NULL
 ) {
   method <- traversal$traversal_method %||% "topdown"
 
@@ -69,13 +75,15 @@ traverse_branch <- function(
       branch_seed = branch_seed,
       traversal = traversal,
       grid = grid,
-      branch_evaluator = branch_evaluator
+      branch_evaluator = branch_evaluator,
+      global_cutoff = global_cutoff
     ),
     leftright = traverse_branch_leftright(
       branch_seed = branch_seed,
       traversal = traversal,
       grid = grid,
-      branch_evaluator = branch_evaluator
+      branch_evaluator = branch_evaluator,
+      global_cutoff = global_cutoff
     ),
     stop(
       "Unknown traversal_method: '",
@@ -106,7 +114,8 @@ traverse_branch_topdown <- function(
   branch_seed,
   traversal,
   grid,
-  branch_evaluator
+  branch_evaluator,
+  global_cutoff = NULL
 ) {
   psi_mode <- branch_seed$psi_mode
   probe_evals_df <- branch_seed$probe_evals_df
@@ -116,7 +125,15 @@ traverse_branch_topdown <- function(
   alpha_target <- min(1 - traversal$confidence_levels)
   crit <- 0.5 * stats::qchisq(1 - alpha_target, df = 1)
   effective_crit <- crit * traversal$cutoff_buffer
-  branch_cutoff <- branch_seed$ll_mode - effective_crit
+  # branch_extent = "global": stop where the branch falls effective_crit
+  # below the AGGREGATE max (shared across branches), so each branch is
+  # computed only where it can still matter to the log-sum-exp average.
+  # Otherwise stop relative to this branch's own mode (legacy).
+  branch_cutoff <- if (!is.null(global_cutoff)) {
+    global_cutoff
+  } else {
+    branch_seed$ll_mode - effective_crit
+  }
 
   psi_interval <- traversal$psi_interval %||% NULL
 
@@ -124,6 +141,7 @@ traverse_branch_topdown <- function(
   resid_tol <- traversal$resid_tol %||% 1e-3
   max_drop_frac <- traversal$max_drop_frac %||% Inf
   branch_retry_on <- traversal$branch_retry_on %||% character(0)
+  branch_selection <- traversal$branch_selection %||% "envelope"
 
   probe_evals_df_left <- probe_evals_df |> dplyr::filter(side == "left")
   probe_evals_df_right <- probe_evals_df |> dplyr::filter(side == "right")
@@ -157,7 +175,8 @@ traverse_branch_topdown <- function(
       max_retries = max_retries,
       resid_tol = resid_tol,
       max_drop_frac = max_drop_frac,
-      branch_retry_on = branch_retry_on
+      branch_retry_on = branch_retry_on,
+      branch_selection = branch_selection
     )
   }
 
@@ -179,7 +198,8 @@ traverse_branch_topdown <- function(
       max_retries = max_retries,
       resid_tol = resid_tol,
       max_drop_frac = max_drop_frac,
-      branch_retry_on = branch_retry_on
+      branch_retry_on = branch_retry_on,
+      branch_selection = branch_selection
     )
   }
 
@@ -213,7 +233,8 @@ traverse_branch_leftright <- function(
   branch_seed,
   traversal,
   grid,
-  branch_evaluator
+  branch_evaluator,
+  global_cutoff = NULL
 ) {
   omega_hat <- branch_seed$omega_hat
   psi_lower <- grid$psi_lower
@@ -254,7 +275,11 @@ traverse_branch_leftright <- function(
   i_mode <- which.max(df$loglik)
   ll_mode <- df$loglik[i_mode]
   psi_hat <- df$psi[i_mode]
-  branch_cutoff <- ll_mode - effective_crit
+  branch_cutoff <- if (!is.null(global_cutoff)) {
+    global_cutoff
+  } else {
+    ll_mode - effective_crit
+  }
 
   branch_df <- df |>
     dplyr::filter(loglik > branch_cutoff) |>
@@ -321,6 +346,21 @@ traverse_branch_leftright <- function(
 #' @param max_drop_frac         Retained for API compatibility.
 #'   Default: \code{Inf}.
 #' @param branch_retry_on       Retained for API compatibility.
+#' @param branch_selection      Character scalar controlling how
+#'   \code{.best_eval} chooses among the multi-start results.
+#'   \describe{
+#'     \item{\code{"envelope"}}{(default) Take the highest-\code{branch_val}
+#'       feasible result over \emph{all} starts (warm, anchor, jitters);
+#'       fall back to the first infeasible result if none are feasible.
+#'       Traces the global upper envelope — discontinuous where competing
+#'       optima cross.}
+#'     \item{\code{"continuation"}}{Prefer the chained warm start whenever
+#'       it is feasible, using the anchor and jitters only to \emph{rescue}
+#'       a failed/infeasible warm start. If no feasible result is found the
+#'       point is soft-skipped rather than recorded as an off-constraint
+#'       value. Rides a single principal branch — continuous, and does not
+#'       inject infeasible points.}
+#'   }
 #' @param max_consecutive_skips Integer. Default: \code{2L}.
 #'
 #' @keywords internal
@@ -337,6 +377,7 @@ traverse_branch_side <- function(
   resid_tol = 1e-3,
   max_drop_frac = Inf,
   branch_retry_on = character(0),
+  branch_selection = "envelope",
   max_consecutive_skips = 2L
 ) {
   k_curr <- k_start
@@ -371,20 +412,28 @@ traverse_branch_side <- function(
     ev
   }
 
+  .is_feasible <- function(ev) {
+    if (is.null(ev)) {
+      return(FALSE)
+    }
+    abs(ev$psi_residual %||% (ev$psi_at_hat - psi_k)) <= resid_tol
+  }
+
+  .jitter_starts <- function() {
+    lapply(seq_len(max_retries), function(i) {
+      init_guess + stats::rnorm(length(init_guess), sd = 0.3 * i)
+    })
+  }
+
   # -------------------------------------------------------------------
-  # Multi-start evaluation: warm start, global anchor, jittered anchors,
-  # and a final fresh warm-start attempt as last resort.
-  # Returns the best feasible result, falling back to the first
-  # infeasible result, falling back to a fresh warm-start attempt.
+  # "envelope" (default / legacy): warm start, global anchor, jittered
+  # anchors, and a final fresh warm-start attempt as last resort.
+  # Returns the best FEASIBLE result over all starts, falling back to the
+  # first infeasible result, then to a fresh warm-start attempt. Traces
+  # the global upper envelope — discontinuous at competing-optima crossings.
   # -------------------------------------------------------------------
-  .best_eval <- function(psi_k, warm) {
-    starts <- c(
-      list(warm),
-      list(init_guess),
-      lapply(seq_len(max_retries), function(i) {
-        init_guess + stats::rnorm(length(init_guess), sd = 0.3 * i)
-      })
-    )
+  .best_eval_envelope <- function(psi_k, warm) {
+    starts <- c(list(warm), list(init_guess), .jitter_starts())
 
     best_feasible <- NULL
     fallback <- NULL
@@ -393,10 +442,7 @@ traverse_branch_side <- function(
       ev <- .try_start(psi_k, start)
       if (is.null(ev)) next
 
-      psi_resid <- abs(ev$psi_residual %||% (ev$psi_at_hat - psi_k))
-      feasible <- psi_resid <= resid_tol
-
-      if (feasible) {
+      if (.is_feasible(ev)) {
         if (
           is.null(best_feasible) ||
             ev$branch_val > best_feasible$branch_val
@@ -409,6 +455,39 @@ traverse_branch_side <- function(
     }
 
     best_feasible %||% fallback %||% .try_start(psi_k, warm)
+  }
+
+  # -------------------------------------------------------------------
+  # "continuation": prefer the chained warm start whenever it is feasible
+  # (ride the principal branch, do NOT hop to a higher competing optimum).
+  # Use the anchor + jitters only to RESCUE a failed/infeasible warm start.
+  # Returns NULL (soft skip) when nothing feasible is found, so no
+  # off-constraint value is ever recorded. Continuous and smoother; the
+  # trade-off is that it tracks a local branch, not the global maximum.
+  # -------------------------------------------------------------------
+  .best_eval_continuation <- function(psi_k, warm) {
+    ev_warm <- .try_start(psi_k, warm)
+    if (.is_feasible(ev_warm)) {
+      return(ev_warm)
+    }
+
+    best_feasible <- NULL
+    for (start in c(list(init_guess), .jitter_starts())) {
+      ev <- .try_start(psi_k, start)
+      if (.is_feasible(ev)) {
+        if (is.null(best_feasible) || ev$branch_val > best_feasible$branch_val) {
+          best_feasible <- ev
+        }
+      }
+    }
+
+    best_feasible
+  }
+
+  .best_eval <- if (identical(branch_selection, "continuation")) {
+    .best_eval_continuation
+  } else {
+    .best_eval_envelope
   }
 
   repeat {

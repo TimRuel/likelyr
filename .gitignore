@@ -13,3 +13,5 @@ inst/doc
 !man/figures/*.png
 *.svg
 dev/
+NOTES-architecture.md
+Rplots.pdf

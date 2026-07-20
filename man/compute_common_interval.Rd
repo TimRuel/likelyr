@@ -8,7 +8,8 @@ compute_common_interval(
   psi_loglik_df,
   psi_interval = NULL,
   increment,
-  interval_buffer = 1
+  interval_buffer = 1,
+  branch_modes = numeric(0)
 )
 }
 \arguments{
@@ -21,9 +22,14 @@ columns (i.e. \code{model$workspace$profile$psi_loglik_df}).}
 the tolerance for boundary proximity detection.}
 
 \item{interval_buffer}{Positive numeric scalar. Multiplicative
-expansion factor applied to the profile half-width before
+expansion factor applied to the base span half-width before
 intersecting with \code{psi_interval}. A value of \code{1.0}
-uses the profile extent as-is. Default: \code{1.0}.}
+uses the span as-is. Default: \code{1.0}.}
+
+\item{branch_modes}{Optional numeric vector of accepted branch seed
+modes (ψ values). Their finite range is unioned with the profile
+extent to form the base span, so branches peaking beyond the profile
+are covered. Default: \code{numeric(0)} (profile extent only).}
 }
 \value{
 A named list with:
@@ -40,9 +46,13 @@ was snapped to the domain boundary
 Derives the common ψ support interval to be used across all Monte
 Carlo branches, ensuring full overlap and valid CI estimation.
 
-The interval starts from the profile likelihood extent, optionally
-expanded by \code{interval_buffer}, then intersected with
-\code{psi_interval}.
+The base span is the union of the profile likelihood extent with the
+range of accepted branch seed modes (\code{branch_modes}). Branches can
+peak — and carry log-likelihood mass — at ψ values beyond the profile's
+own extent; bounding the common interval by the profile alone would
+truncate those IL tails and bias the aggregated curve and its CIs. The
+union is then optionally expanded by \code{interval_buffer} about its
+centre and intersected with \code{psi_interval}.
 
 Additionally, if the profile reached a finite parameter space boundary
 without dropping to its cutoff — detected by checking whether

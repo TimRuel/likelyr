@@ -22,6 +22,9 @@ traversal_spec(
   resid_tol = 0.001,
   profile_retry_on = c("monotonicity", "constraint", "drop"),
   branch_retry_on = character(0),
+  max_retries = NULL,
+  branch_selection = "envelope",
+  branch_extent = "per_branch",
   use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
@@ -108,6 +111,48 @@ chain. Default: \code{1e-3}.}
 jitter retries during profile traversal. Any subset of
 \code{c("monotonicity", "constraint", "drop")}. Default: all three.}
 
+\item{branch_retry_on}{Character vector. Which violations trigger
+jitter retries during integrated-likelihood branch traversal.
+Default: \code{character(0)} (none).}
+
+\item{max_retries}{Optional non-negative integer scalar. Number of
+jittered warm-start restarts attempted per grid point during
+integrated-likelihood branch traversal (the \code{.best_eval}
+multistart in \code{traverse_branch_side()}). When \code{NULL}
+(default), \code{calibrate_traversal()} inherits the solver's
+\code{max_retries} so branches and the profile share a retry budget.
+Under \code{branch_selection = "envelope"} a large budget drives
+branches toward the (discontinuous) global envelope, so prefer small
+values there; under \code{"continuation"} the extra starts only
+rescue a failed warm start, so a larger budget is harmless.}
+
+\item{branch_selection}{Character scalar. How the branch sweep chooses
+among multi-start results. \code{"envelope"} (default) takes the
+highest feasible \code{branch_val} over all starts — the historical
+behavior, which traces the global upper envelope and is discontinuous
+where competing optima cross. \code{"continuation"} prefers the
+chained warm start whenever feasible (riding a single principal
+branch), using restarts only to rescue a failed warm start and
+soft-skipping points where no feasible solve exists rather than
+recording an off-constraint value. \code{"continuation"} yields
+smoother branches at the cost of tracking a local rather than global
+optimum. Ignored by \code{traversal_method = "leftright"}, which is
+always a pure continuation.}
+
+\item{branch_extent}{Character scalar controlling how far each branch is
+traversed outward from its mode. \code{"per_branch"} (default) stops
+each branch when it falls \code{effective_crit} below its \emph{own}
+mode. \code{"global"} stops it when it falls \code{effective_crit}
+below the \emph{aggregate} maximum (estimated as the max branch-mode
+log-likelihood across seeds) — i.e. it computes each branch only where
+it can still matter to the log-sum-exp average, which is both more
+efficient (low-mode branches barely traverse) and makes the aggregated
+curve reach its CI cutoff by construction. The aggregate-max estimate
+underestimates the true aggregate max, so \code{"global"} errs toward
+traversing slightly too far (safe: it never truncates the CI region).
+Requires the aggregate-max estimate to be supplied at generate time;
+falls back to \code{"per_branch"} behavior when it is not.}
+
 \item{use_mode_locator_for_profile}{Logical. When \code{TRUE} and
 \code{mode_locator_fn} is supplied, the mode locator is called with
 the profile reference \code{omega_hat} to find the true profile
@@ -126,7 +171,25 @@ enables all checks. Recognized values:
 \item \code{"mode_on_psi_boundary"}
 \item \code{"mode_locator_failed"}
 \item \code{"mode_eval_failed_after_snap"}
-\item \code{"mode_too_low"}
+\item \code{"mode_nonfinite"} — numerical-validity gate: mode
+log-likelihood is NaN/Inf.
+\item \code{"mode_infeasible"} — numerical-validity gate: mode solve
+violated the equality constraint (\code{|psi_residual| > resid_tol});
+the principled replacement for \code{"mode_on_psi_boundary"}.
+\item \code{"mode_uncompetitive"} — relevance gate (distinct from the
+validity gates above): rejects a validly-located branch whose
+\code{ll_mode} sits more than \code{effective_crit} (the same
+\code{cutoff_buffer}-scaled threshold \code{branch_extent =
+      "global"} uses) below the best \code{ll_mode} seen so far during
+\code{sieve()}. Unlike the other gates, a rejection here still
+counts toward the branch's contribution to \code{R} in
+\code{aggregate()} — the branch was validly measured, just known to
+be numerically negligible, which is different from a validity
+failure where nothing was measured at all. See \code{sieve()}.
+\item \code{"mode_too_low"} — legacy fixed-threshold relevance gate
+(profile-relative, not adaptive to the accumulating ensemble).
+Prefer \code{"mode_uncompetitive"}; retained for backward
+compatibility.
 \item \code{"oscillation"}
 \item \code{"mode_shift_exhausted"}
 \item \code{"jump_left"}

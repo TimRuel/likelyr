@@ -236,6 +236,9 @@ generate.model <- function(
   profile_retry_on <- traversal$profile_retry_on %||%
     c("monotonicity", "constraint", "drop")
   max_retries <- solver$max_retries %||% 4L
+  profile_selection <- traversal$profile_selection %||% "envelope"
+  adopt_mult <- traversal$adopt_mult %||% 1.2
+  k_recent <- traversal$k_recent %||% 3L
 
   # -------------------------------------------------------------------
   # Locate the profile mode.
@@ -337,6 +340,9 @@ generate.model <- function(
     max_drop_frac = max_drop_frac,
     resid_tol = resid_tol,
     profile_retry_on = profile_retry_on,
+    selection = profile_selection,
+    adopt_mult = adopt_mult,
+    k_recent = k_recent,
     verbose = verbose
   )
 
@@ -353,6 +359,9 @@ generate.model <- function(
     max_drop_frac = max_drop_frac,
     resid_tol = resid_tol,
     profile_retry_on = profile_retry_on,
+    selection = profile_selection,
+    adopt_mult = adopt_mult,
+    k_recent = k_recent,
     verbose = verbose
   )
 

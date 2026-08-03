@@ -146,6 +146,31 @@
 #'     \item \code{"jump_left"}
 #'     \item \code{"jump_right"}
 #'   }
+#' @param profile_selection Character scalar controlling how the profile
+#'   traversal treats a monotonicity-violating candidate (\code{branch_val}
+#'   higher than the current chain value). Unlike a branch, the profile's
+#'   recorded value IS the objective being directly optimized at each ψ, so
+#'   its true value is provably non-increasing away from the mode — a
+#'   violation is trustworthy evidence that the current warm-start chain is
+#'   stuck on a suboptimal constrained optimum, not just numerical noise.
+#'   \code{"envelope"} (default) is the historical behavior: record the
+#'   violating value (it IS the higher of the two, so still the best
+#'   available estimate at that ψ) but never advance the warm-start chain
+#'   from it, so the next point reverts to the pre-violation trajectory —
+#'   this can leave an isolated "hitch": one point pops up, the next snaps
+#'   back down. \code{"adopt"} additionally allows the chain to permanently
+#'   switch onto the better branch when the improvement is large relative
+#'   to recent local step sizes (\code{> adopt_mult * median} of the last
+#'   \code{k_recent} declining steps) — small, ambiguous improvements
+#'   (indistinguishable from solver noise) still fall back to the
+#'   \code{"envelope"} behavior and are not adopted. Validated
+#'   2026-08-03: a naive "always adopt" policy over-corrected on small
+#'   violations and could land on a worse branch further out; the
+#'   magnitude threshold is required.
+#' @param adopt_mult Positive numeric scalar. Only used when
+#'   \code{profile_selection = "adopt"}. An improvement is adopted only if
+#'   it exceeds \code{adopt_mult} times the median of the last
+#'   \code{k_recent} accepted declining step sizes. Default: \code{1.2}.
 #' @param name Optional descriptive name.
 #' @param ... Additional metadata stored but unused internally.
 #'
@@ -172,6 +197,8 @@ traversal_spec <- function(
   max_retries = NULL,
   branch_selection = "envelope",
   branch_extent = "per_branch",
+  profile_selection = "envelope",
+  adopt_mult = 1.2,
   use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
@@ -197,6 +224,8 @@ traversal_spec <- function(
     profile_retry_on = profile_retry_on,
     branch_retry_on = branch_retry_on,
     max_retries = max_retries,
+    profile_selection = profile_selection,
+    adopt_mult = adopt_mult,
     branch_selection = branch_selection,
     branch_extent = branch_extent,
     use_mode_locator_for_profile = use_mode_locator_for_profile,
@@ -400,6 +429,19 @@ new_traversal_spec <- function(x) .new_spec(x, "traversal_spec")
     c("per_branch", "global")
   )
 
+  # profile_selection ---------------------------------------------------
+  x$profile_selection <- match.arg(
+    x$profile_selection,
+    c("envelope", "adopt")
+  )
+
+  # adopt_mult ----------------------------------------------------------
+  if (
+    !is.numeric(x$adopt_mult) || length(x$adopt_mult) != 1L || x$adopt_mult <= 0
+  ) {
+    stop("adopt_mult must be a positive numeric scalar.", call. = FALSE)
+  }
+
   # max_retries -------------------------------------------------------
   if (!is.null(x$max_retries)) {
     if (
@@ -558,6 +600,13 @@ print.traversal_spec <- function(x, ...) {
     "\n",
     sep = ""
   )
+  cat(
+    "- profile_selection:             ",
+    x$profile_selection %||% "envelope",
+    "\n",
+    sep = ""
+  )
+  cat("- adopt_mult:                    ", x$adopt_mult %||% 1.2, "\n", sep = "")
   if (!is.null(x$rejection_reasons)) {
     cat(
       "- rejection_reasons:             ",

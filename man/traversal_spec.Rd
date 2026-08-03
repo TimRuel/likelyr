@@ -25,6 +25,8 @@ traversal_spec(
   max_retries = NULL,
   branch_selection = "envelope",
   branch_extent = "per_branch",
+  profile_selection = "envelope",
+  adopt_mult = 1.2,
   use_mode_locator_for_profile = FALSE,
   rejection_reasons = NULL,
   name = NULL,
@@ -152,6 +154,33 @@ underestimates the true aggregate max, so \code{"global"} errs toward
 traversing slightly too far (safe: it never truncates the CI region).
 Requires the aggregate-max estimate to be supplied at generate time;
 falls back to \code{"per_branch"} behavior when it is not.}
+
+\item{profile_selection}{Character scalar controlling how the profile
+traversal treats a monotonicity-violating candidate (\code{branch_val}
+higher than the current chain value). Unlike a branch, the profile's
+recorded value IS the objective being directly optimized at each ψ, so
+its true value is provably non-increasing away from the mode — a
+violation is trustworthy evidence that the current warm-start chain is
+stuck on a suboptimal constrained optimum, not just numerical noise.
+\code{"envelope"} (default) is the historical behavior: record the
+violating value (it IS the higher of the two, so still the best
+available estimate at that ψ) but never advance the warm-start chain
+from it, so the next point reverts to the pre-violation trajectory —
+this can leave an isolated "hitch": one point pops up, the next snaps
+back down. \code{"adopt"} additionally allows the chain to permanently
+switch onto the better branch when the improvement is large relative
+to recent local step sizes (\code{> adopt_mult * median} of the last
+\code{k_recent} declining steps) — small, ambiguous improvements
+(indistinguishable from solver noise) still fall back to the
+\code{"envelope"} behavior and are not adopted. Validated
+2026-08-03: a naive "always adopt" policy over-corrected on small
+violations and could land on a worse branch further out; the
+magnitude threshold is required.}
+
+\item{adopt_mult}{Positive numeric scalar. Only used when
+\code{profile_selection = "adopt"}. An improvement is adopted only if
+it exceeds \code{adopt_mult} times the median of the last
+\code{k_recent} accepted declining step sizes. Default: \code{1.2}.}
 
 \item{use_mode_locator_for_profile}{Logical. When \code{TRUE} and
 \code{mode_locator_fn} is supplied, the mode locator is called with

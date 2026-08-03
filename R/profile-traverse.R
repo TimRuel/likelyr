@@ -66,6 +66,21 @@
 #'   residual tolerance for feasibility determination. Default: \code{1e-3}.
 #' @param profile_retry_on  Retained for API compatibility. Monotonicity
 #'   is always enforced; this argument is ignored.
+#' @param selection         Character scalar. \code{"envelope"} (default)
+#'   records a monotonicity-violating point (it's the higher, and thus
+#'   still the best available, of the two) but never advances the
+#'   warm-start chain from it, so the next point reverts to the
+#'   pre-violation trajectory. \code{"adopt"} additionally permits the
+#'   chain to switch onto the violating branch when the improvement
+#'   clearly exceeds recent local step sizes (see \code{adopt_mult}) —
+#'   see \code{\link{traversal_spec}} for the full rationale.
+#' @param adopt_mult        Positive numeric scalar. Only used when
+#'   \code{selection = "adopt"}. An improvement is adopted only if it
+#'   exceeds \code{adopt_mult} times the median of the last
+#'   \code{k_recent} accepted declining step sizes. Default: \code{1.2}.
+#' @param k_recent          Non-negative integer. Only used when
+#'   \code{selection = "adopt"}. Window size for the local step-size
+#'   reference. Default: \code{3L}.
 #' @param verbose           Logical. Print a row per grid point.
 #'   Default: \code{FALSE}.
 #'
@@ -85,12 +100,16 @@ traverse_profile_side <- function(
   max_drop_frac = 10.0,
   resid_tol = 1e-3,
   profile_retry_on = c("monotonicity", "constraint", "drop"),
+  selection = "envelope",
+  adopt_mult = 1.2,
+  k_recent = 3L,
   verbose = FALSE
 ) {
   k_direction <- sign(k_start)
   k_curr <- k_start
   current_par <- init_guess
   current_val <- Inf
+  recent_steps <- numeric(0) # |step| of recent accepted declining advances
 
   psi_lower <- grid$psi_lower
   psi_upper <- grid$psi_upper
@@ -231,16 +250,21 @@ traverse_profile_side <- function(
     }
 
     # -------------------------------------------------------------------
-    # Hard monotonicity check
+    # Hard monotonicity check. The profile's recorded value is the
+    # objective directly optimized at this psi, so — unlike a branch — a
+    # violation is trustworthy evidence the chain is stuck on a
+    # suboptimal constrained optimum, not just noise (see
+    # traversal_spec()'s profile_selection docs).
     # -------------------------------------------------------------------
-    monotonicity_ok <- eval$branch_val <= current_val + 1e-6
+    improvement <- eval$branch_val - current_val
+    monotonicity_ok <- improvement <= 1e-6
 
     if (!monotonicity_ok) {
       warning(
         sprintf(
           "traverse_profile_side(): monotonicity violation at k=%d after all starts (delta = %.6f).",
           k_curr,
-          eval$branch_val - current_val
+          improvement
         ),
         call. = FALSE
       )
@@ -260,15 +284,36 @@ traverse_profile_side <- function(
     if (!is.null(cutoff) && current_val < cutoff) break
 
     # -------------------------------------------------------------------
-    # Advance warm start only from clean steps:
-    #   feasible (psi_resid <= resid_tol) AND non-increasing
+    # Advance the warm-start chain.
+    #   - Clean step (feasible AND non-increasing): always advance, and
+    #     record its size as the local step-size reference.
+    #   - Violating step under selection = "adopt": advance (permanently
+    #     switch onto the better branch) only if the improvement clearly
+    #     exceeds recent local step sizes — a small one is
+    #     indistinguishable from solver noise and is left alone
+    #     (envelope behavior), matching the 2026-08-03 validation that a
+    #     no-threshold "always adopt" policy could land on a worse branch.
+    #   - Violating step under selection = "envelope" (default), or
+    #     infeasible: never advance — unchanged legacy behavior.
     # -------------------------------------------------------------------
     psi_resid_final <- abs(
       eval$psi_residual %||% (eval$psi_at_hat - psi_k)
     )
+    feasible <- psi_resid_final <= resid_tol
 
-    if (psi_resid_final <= resid_tol && monotonicity_ok) {
+    if (feasible && monotonicity_ok) {
+      step_size <- abs(improvement)
+      if (step_size > 0) {
+        recent_steps <- c(utils::tail(recent_steps, k_recent - 1L), step_size)
+      }
       current_par <- eval$param_hat
+    } else if (feasible && !monotonicity_ok && identical(selection, "adopt")) {
+      ref_step <- if (length(recent_steps) >= 3L) stats::median(recent_steps) else NA_real_
+      threshold <- if (is.finite(ref_step) && ref_step > 0) adopt_mult * ref_step else Inf
+      if (improvement > threshold) {
+        current_par <- eval$param_hat
+        recent_steps <- numeric(0) # reset the reference window on the new branch
+      }
     }
 
     k_curr <- k_curr + k_direction

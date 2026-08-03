@@ -17,6 +17,9 @@ traverse_profile_side(
   max_drop_frac = 10,
   resid_tol = 0.001,
   profile_retry_on = c("monotonicity", "constraint", "drop"),
+  selection = "envelope",
+  adopt_mult = 1.2,
+  k_recent = 3L,
   verbose = FALSE
 )
 }
@@ -54,6 +57,24 @@ residual tolerance for feasibility determination. Default: \code{1e-3}.}
 
 \item{profile_retry_on}{Retained for API compatibility. Monotonicity
 is always enforced; this argument is ignored.}
+
+\item{selection}{Character scalar. \code{"envelope"} (default)
+records a monotonicity-violating point (it's the higher, and thus
+still the best available, of the two) but never advances the
+warm-start chain from it, so the next point reverts to the
+pre-violation trajectory. \code{"adopt"} additionally permits the
+chain to switch onto the violating branch when the improvement
+clearly exceeds recent local step sizes (see \code{adopt_mult}) —
+see \code{\link{traversal_spec}} for the full rationale.}
+
+\item{adopt_mult}{Positive numeric scalar. Only used when
+\code{selection = "adopt"}. An improvement is adopted only if it
+exceeds \code{adopt_mult} times the median of the last
+\code{k_recent} accepted declining step sizes. Default: \code{1.2}.}
+
+\item{k_recent}{Non-negative integer. Only used when
+\code{selection = "adopt"}. Window size for the local step-size
+reference. Default: \code{3L}.}
 
 \item{verbose}{Logical. Print a row per grid point.
 Default: \code{FALSE}.}

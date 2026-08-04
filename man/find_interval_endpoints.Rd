@@ -40,12 +40,15 @@ confidence interval for \eqn{\psi} by solving for the roots of
 If \code{uniroot} fails on a side because the grid reaches a declared
 parameter space boundary before descending to the critical threshold,
 the boundary value is substituted for that endpoint. A side is
-considered to have reached its boundary when the gap between the grid
-edge and the boundary is small relative to \code{grid_increment} —
-specifically, when the grid edge is at or past the boundary (allowing
-a small negative slack for open boundaries, where the true last
-reachable point sits just inside), or when one more grid step from
-the edge would reach or cross the boundary. This avoids relying on
+considered to have reached its boundary when the grid edge is within
+\code{1.5 * grid_increment} of the boundary, on either side — whether
+the grid stopped just short of the boundary (the common case; e.g. an
+open boundary that's a limit point the grid can never actually reach,
+or a closed boundary the traversal ran out of solvable room before
+reaching — the latter occurs when the underlying constraint geometry
+degenerates near the boundary, e.g. Simpson's index level set shrinks
+to a point as psi -> 1/J) or landed slightly past it (floating-point
+slack in how the traversal grid is anchored). This avoids relying on
 reconstructing a theoretical grid index from \code{psi_mle} via
 floor/ceiling arithmetic, which is unreliable exactly in the
 near-integer cases that matter most (a tiny floating-point

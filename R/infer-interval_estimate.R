@@ -39,12 +39,15 @@ shift_psi_loglik <- function(psi_loglik, shift_val) {
 #' If \code{uniroot} fails on a side because the grid reaches a declared
 #' parameter space boundary before descending to the critical threshold,
 #' the boundary value is substituted for that endpoint. A side is
-#' considered to have reached its boundary when the gap between the grid
-#' edge and the boundary is small relative to \code{grid_increment} —
-#' specifically, when the grid edge is at or past the boundary (allowing
-#' a small negative slack for open boundaries, where the true last
-#' reachable point sits just inside), or when one more grid step from
-#' the edge would reach or cross the boundary. This avoids relying on
+#' considered to have reached its boundary when the grid edge is within
+#' \code{1.5 * grid_increment} of the boundary, on either side — whether
+#' the grid stopped just short of the boundary (the common case; e.g. an
+#' open boundary that's a limit point the grid can never actually reach,
+#' or a closed boundary the traversal ran out of solvable room before
+#' reaching — the latter occurs when the underlying constraint geometry
+#' degenerates near the boundary, e.g. Simpson's index level set shrinks
+#' to a point as psi -> 1/J) or landed slightly past it (floating-point
+#' slack in how the traversal grid is anchored). This avoids relying on
 #' reconstructing a theoretical grid index from \code{psi_mle} via
 #' floor/ceiling arithmetic, which is unreliable exactly in the
 #' near-integer cases that matter most (a tiny floating-point
@@ -86,20 +89,29 @@ find_interval_endpoints <- function(
   increment <- grid_increment %||% sqrt(.Machine$double.eps)
 
   # ------------------------------------------------------------------
-  # A grid edge is treated as "at the boundary" if it's already within
-  # a hair of the boundary, or if stepping one more increment from it
-  # would reach or cross the boundary. This captures both the
-  # closed-boundary case (grid edge essentially equals the boundary)
-  # and the open-boundary case (grid edge sits one increment inside a
-  # limit point it can never actually reach), without needing to
-  # reconstruct a theoretical grid index from psi_mle.
+  # A grid edge is treated as "at the boundary" if it's within 1.5 grid
+  # increments of the boundary, on EITHER side. Symmetric on purpose
+  # (2026-08-04 fix — was asymmetric: -0.01 * increment vs +1.5 *
+  # increment): the original tolerance assumed a closed boundary is
+  # always reached essentially exactly (the traversal's own
+  # eval-at-boundary step usually arranges this), but that assumption
+  # breaks when the constraint geometry degenerates near the boundary
+  # (branches/profile can't solve arbitrarily close to it — observed on
+  # the Simpson's-index application, where the level set's radius
+  # shrinks to zero as psi -> 1/J) and the grid genuinely stops short.
+  # A grid that stops well short of the boundary for an unrelated reason
+  # still correctly falls outside this tolerance and returns NA_real_
+  # below, preserving the original safety behavior. Symmetric tolerance
+  # also naturally covers the open-boundary case (grid edge sits inside
+  # a limit point it can never reach) without needing to reconstruct a
+  # theoretical grid index from psi_mle.
   # ------------------------------------------------------------------
   .at_theoretical_boundary <- function(grid_edge, boundary) {
     if (is.null(boundary) || !is.finite(boundary)) {
       return(FALSE)
     }
     gap <- boundary - grid_edge
-    gap >= -increment * 0.01 && gap <= increment * 1.5
+    abs(gap) <= increment * 1.5
   }
 
   # ------------------------------------------------------------------

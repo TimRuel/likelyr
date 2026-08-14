@@ -45,7 +45,8 @@ Imports:
     scales,
     tidyr,
     yaml,
-    sets
+    sets,
+    mgcv
 Suggests:
     rmarkdown,
     testthat (>= 3.0.0),

@@ -25,10 +25,55 @@ Fits a smoothing spline to a discrete ψ–log-likelihood grid.
 Optionally projects the result onto its Least Concave Majorant (LCM)
 to enforce global concavity.
 
+The smoothing step is \code{stats::smooth.spline()} — plain GCV
+smoothing splines, no new dependency — fed a grid that's been
+pre-treated in two ways (both @keywords internal helpers above):
+\enumerate{
+\item \strong{Isolated interior outliers} (a single grid point that
+dips/spikes and the very next point snaps right back — a solver
+hitch, not a real feature) get down-weighted to 0 via
+\code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
+\item \strong{Domain edges} get padded via
+\code{.pad_boundary_by_trend()} so \code{smooth.spline()}'s
+natural boundary condition doesn't fight genuine steep curvature
+sitting at a closed domain edge.
+}
+Both are no-ops on a curve that doesn't need them: a clean interior
+gets weight 1 everywhere, and padding that merely continues an
+already-smooth trend doesn't change the fit near the edge.
+
+\strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
+smoothing-parameter selection isn't robust to a single-point solver
+hitch (can under-smooth around just that point) and has no way to
+treat a domain edge differently from the interior (the boundary
+overshoot above). A first fix attempt replaced \code{smooth.spline()}
+entirely with \code{mgcv::gam(..., method = "REML")}; it was shipped,
+then reverted the same day — REML's single GLOBAL smoothing parameter
+pulled every curve toward one flatness level, and on a real 20-site
+batch that made several genuinely-clean curves visibly WIGGLIER, not
+smoother, a failure the pre-ship validation script's coarse
+whole-curve roughness metric didn't catch. A second attempt (global
+Tukey-biweight IRLS re-weighting) also failed: comparing every point
+to ONE whole-curve residual scale flagged real curvature as noise in
+steep regions and left it untouched in flat ones. The current design
+fixes both failure modes locally instead of changing the global
+fitting philosophy — \code{smooth.spline()} remains the actual
+engine throughout, matching prior real-world reliability with it.
+Validated against all 40 real profile/integrated curves in a
+Simpson's-index batch (\code{exp_v6}): every known boundary-wiggle
+curve resolved (roughness reduced 10-80x, near-boundary sign changes
+collapsed to the single natural turn), the one known single-point
+interior hitch resolved (roughness reduced ~340x) with only that one
+point flagged (not its neighbors), and 30/40 curves were completely
+untouched (bit-for-bit identical fit) — confirmed both by targeted
+metrics and by direct visual comparison against the raw points, not
+by an aggregate score alone.
+
 When \code{enforce_concavity = TRUE}, the procedure is:
 \enumerate{
-\item Fit \code{smooth.spline} to the raw grid.
-\item Evaluate the spline on a fine internal grid (500 points).
+\item Fit \code{smooth.spline} to the (weighted, padded) grid.
+\item Evaluate the spline on a fine internal grid (500 points),
+restricted to the TRUE ψ range (padding never appears here).
 \item Compute the upper convex hull of the fine-grid evaluations —
 the tightest concave piecewise-linear function lying at or above
 the spline. This is the LCM.

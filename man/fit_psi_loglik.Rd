@@ -41,9 +41,11 @@ resumes climbing, without ever reversing direction outright (so a
 plain sign-reversal check misses it). Over exactly that
 (data-driven, not fixed-width) extent, the raw points are trusted
 directly via a monotone Hermite interpolant
-(\code{stats::splinefun(..., method = "monoH.FC")}),
-smoothstep-blended into the spline's own prediction so there's no
-seam.
+(\code{stats::splinefun(..., method = "monoH.FC")}), at FULL
+weight across nearly the whole corrected span — only the final
+20\% is smoothstep-blended back to the spline, so there's no seam
+at the hand-off but the interpolant (which matches real data
+exactly) dominates almost everywhere it's engaged.
 }
 Both are no-ops on a curve that doesn't need them: a clean interior
 gets weight 1 everywhere, and an edge with no detected re-acceleration
@@ -93,22 +95,38 @@ than the fit) was also rejected — ordinary point-to-point
 sampling noise in the raw grid trips a slope-ratio check on its
 own, flagging curves (mostly profile curves) the fit already
 handled fine.
+\item Smoothstep-blending the interpolant against the spline across
+the ENTIRE corrected span (rather than mostly at full interpolant
+weight with a narrow hand-off). Correctly detected and bounded
+the artifact's extent, but partway through a wide corrected span
+the blend weight had already decayed enough to let some of the
+spline's own residual wiggle leak back in — confirmed directly:
+the raw data over that span had ZERO direction changes, yet the
+blended output still showed some, and deviated from the raw
+points by an order of magnitude more than the interpolant alone
+would. Narrowing the hand-off to the final 20\% of the span (the
+current design) fixed it.
 }
 The current design fixes all of the above: the correction only
 engages where the FITTED CURVE ITSELF shows a re-acceleration (not
-unconditionally, and not from raw-data noise alone), and it never
-touches \code{smooth.spline()}'s own fit computation (no padding —
-the correction is a display-time override, not new data), so nothing
-more than a few points near a genuinely misbehaving edge is ever
-affected. Validated against all 40 real profile/integrated curves in
-a Simpson's-index batch (\code{exp_v6}), including 8 curves found to
-have a subtle shelf artifact the prior (sign-reversal) design missed
-entirely: every one resolved, the one known single-point interior
-hitch and the original boundary-wiggle cases all remained fixed, and
-only one curve showed a sign-change count change elsewhere (traced to
-a genuine small dip/rise already present in that curve's raw data,
-negligible visually) — confirmed by targeted metrics AND direct
-visual comparison against the raw points on every case, not an
+unconditionally, and not from raw-data noise alone), it never touches
+\code{smooth.spline()}'s own fit computation (no padding — the
+correction is a display-time override, not new data), and the
+interpolant is trusted at full weight across nearly the whole
+corrected span rather than being progressively diluted by the
+spline's own (still partially unresolved) behavior. Validated against
+all 40 real profile/integrated curves in a Simpson's-index batch
+(\code{exp_v6}), including 8 curves found to have a subtle shelf
+artifact the prior (sign-reversal) design missed entirely, plus 2
+further curves whose artifact spanned a wider, multi-part region a
+whole-span blend still let leak through: every one resolved, the
+known single-point interior hitch and the original boundary-wiggle
+cases all remained fixed, and the only sign-change count changes
+elsewhere traced to genuine sharp-but-real features in those curves'
+own raw data (confirmed by direct point-by-point comparison — the
+corrected fit tracks them MORE closely than plain
+\code{smooth.spline()}, not less) — confirmed by targeted metrics AND
+direct visual comparison against the raw points on every case, not an
 aggregate roughness score alone (which was in fact actively
 misleading earlier in this investigation: a fit that respects a
 genuinely sharp-but-monotonic rise in the raw data can show a LARGER

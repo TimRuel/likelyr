@@ -213,9 +213,11 @@
 #'     plain sign-reversal check misses it). Over exactly that
 #'     (data-driven, not fixed-width) extent, the raw points are trusted
 #'     directly via a monotone Hermite interpolant
-#'     (\code{stats::splinefun(..., method = "monoH.FC")}),
-#'     smoothstep-blended into the spline's own prediction so there's no
-#'     seam.
+#'     (\code{stats::splinefun(..., method = "monoH.FC")}), at FULL
+#'     weight across nearly the whole corrected span — only the final
+#'     20% is smoothstep-blended back to the spline, so there's no seam
+#'     at the hand-off but the interpolant (which matches real data
+#'     exactly) dominates almost everywhere it's engaged.
 #' }
 #' Both are no-ops on a curve that doesn't need them: a clean interior
 #' gets weight 1 everywhere, and an edge with no detected re-acceleration
@@ -265,22 +267,38 @@
 #'     sampling noise in the raw grid trips a slope-ratio check on its
 #'     own, flagging curves (mostly profile curves) the fit already
 #'     handled fine.
+#'   \item Smoothstep-blending the interpolant against the spline across
+#'     the ENTIRE corrected span (rather than mostly at full interpolant
+#'     weight with a narrow hand-off). Correctly detected and bounded
+#'     the artifact's extent, but partway through a wide corrected span
+#'     the blend weight had already decayed enough to let some of the
+#'     spline's own residual wiggle leak back in — confirmed directly:
+#'     the raw data over that span had ZERO direction changes, yet the
+#'     blended output still showed some, and deviated from the raw
+#'     points by an order of magnitude more than the interpolant alone
+#'     would. Narrowing the hand-off to the final 20% of the span (the
+#'     current design) fixed it.
 #' }
 #' The current design fixes all of the above: the correction only
 #' engages where the FITTED CURVE ITSELF shows a re-acceleration (not
-#' unconditionally, and not from raw-data noise alone), and it never
-#' touches \code{smooth.spline()}'s own fit computation (no padding —
-#' the correction is a display-time override, not new data), so nothing
-#' more than a few points near a genuinely misbehaving edge is ever
-#' affected. Validated against all 40 real profile/integrated curves in
-#' a Simpson's-index batch (\code{exp_v6}), including 8 curves found to
-#' have a subtle shelf artifact the prior (sign-reversal) design missed
-#' entirely: every one resolved, the one known single-point interior
-#' hitch and the original boundary-wiggle cases all remained fixed, and
-#' only one curve showed a sign-change count change elsewhere (traced to
-#' a genuine small dip/rise already present in that curve's raw data,
-#' negligible visually) — confirmed by targeted metrics AND direct
-#' visual comparison against the raw points on every case, not an
+#' unconditionally, and not from raw-data noise alone), it never touches
+#' \code{smooth.spline()}'s own fit computation (no padding — the
+#' correction is a display-time override, not new data), and the
+#' interpolant is trusted at full weight across nearly the whole
+#' corrected span rather than being progressively diluted by the
+#' spline's own (still partially unresolved) behavior. Validated against
+#' all 40 real profile/integrated curves in a Simpson's-index batch
+#' (\code{exp_v6}), including 8 curves found to have a subtle shelf
+#' artifact the prior (sign-reversal) design missed entirely, plus 2
+#' further curves whose artifact spanned a wider, multi-part region a
+#' whole-span blend still let leak through: every one resolved, the
+#' known single-point interior hitch and the original boundary-wiggle
+#' cases all remained fixed, and the only sign-change count changes
+#' elsewhere traced to genuine sharp-but-real features in those curves'
+#' own raw data (confirmed by direct point-by-point comparison — the
+#' corrected fit tracks them MORE closely than plain
+#' \code{smooth.spline()}, not less) — confirmed by targeted metrics AND
+#' direct visual comparison against the raw points on every case, not an
 #' aggregate roughness score alone (which was in fact actively
 #' misleading earlier in this investigation: a fit that respects a
 #' genuinely sharp-but-monotonic rise in the raw data can show a LARGER
@@ -416,31 +434,64 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
     NULL
   }
 
-  x_left_bound <- if (left_needed) x[n_left] else NA_real_
-  x_right_bound <- if (right_needed) x[n - n_right + 1L] else NA_real_
   x0 <- x[1]
   xn <- x[n]
+
+  # Full interpolant weight across nearly the entire corrected span, with
+  # only a NARROW smoothstep hand-off (final `handoff_frac`) back to the
+  # spline right at its outer edge. A single smoothstep blend spanning
+  # the WHOLE corrected span (tried first) still let some of the
+  # spline's own residual wiggle leak through in the middle of the
+  # span — the interpolant's weight there was already well below 1,
+  # even though the raw data it's built from has no such wiggle at all.
+  # Narrowing the hand-off to just the final stretch means the
+  # interpolant — which matches real data exactly — dominates almost
+  # everywhere it's engaged.
+  handoff_frac <- 0.2
+
+  x_left_bound <- if (left_needed) x[n_left] else NA_real_
+  x_left_handoff_start <- if (left_needed) {
+    x0 + (1 - handoff_frac) * (x_left_bound - x0)
+  } else {
+    NA_real_
+  }
+  x_right_bound <- if (right_needed) x[n - n_right + 1L] else NA_real_
+  x_right_handoff_start <- if (right_needed) {
+    xn - (1 - handoff_frac) * (xn - x_right_bound)
+  } else {
+    NA_real_
+  }
 
   .corrected_fit <- function(psi) {
     y_out <- .spline_at(psi)
 
     if (left_needed) {
-      in_left <- psi <= x_left_bound
-      if (any(in_left)) {
-        t <- (psi[in_left] - x0) / (x_left_bound - x0)
-        w_local <- 1 - .smoothstep(t) # 1 at true edge, 0 at artifact's inner edge
-        y_out[in_left] <- w_local * left_interp(psi[in_left]) +
-          (1 - w_local) * y_out[in_left]
+      full_zone <- psi <= x_left_handoff_start
+      if (any(full_zone)) {
+        y_out[full_zone] <- left_interp(psi[full_zone])
+      }
+      handoff_zone <- psi > x_left_handoff_start & psi <= x_left_bound
+      if (any(handoff_zone)) {
+        t <- (psi[handoff_zone] - x_left_handoff_start) /
+          (x_left_bound - x_left_handoff_start)
+        w_local <- 1 - .smoothstep(t)
+        y_out[handoff_zone] <- w_local * left_interp(psi[handoff_zone]) +
+          (1 - w_local) * y_out[handoff_zone]
       }
     }
 
     if (right_needed) {
-      in_right <- psi >= x_right_bound
-      if (any(in_right)) {
-        t <- (xn - psi[in_right]) / (xn - x_right_bound)
+      full_zone <- psi >= x_right_handoff_start
+      if (any(full_zone)) {
+        y_out[full_zone] <- right_interp(psi[full_zone])
+      }
+      handoff_zone <- psi < x_right_handoff_start & psi >= x_right_bound
+      if (any(handoff_zone)) {
+        t <- (x_right_handoff_start - psi[handoff_zone]) /
+          (x_right_handoff_start - x_right_bound)
         w_local <- 1 - .smoothstep(t)
-        y_out[in_right] <- w_local * right_interp(psi[in_right]) +
-          (1 - w_local) * y_out[in_right]
+        y_out[handoff_zone] <- w_local * right_interp(psi[handoff_zone]) +
+          (1 - w_local) * y_out[handoff_zone]
       }
     }
 

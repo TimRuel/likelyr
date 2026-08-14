@@ -136,52 +136,58 @@
   3 * t^2 - 2 * t^3
 }
 
-#' Detect how far a fitted spline's own trend contradicts the raw data
+#' Detect how far a fitted spline's own slope re-accelerates near an edge
 #'
 #' @description
-#' Finds the largest contiguous prefix (from one end of the grid) over
-#' which the fitted spline's direction of change disagrees with the raw
-#' data's own dominant direction there — i.e. exactly how far a genuine
-#' boundary artifact extends, rather than assuming a fixed margin.
+#' Evaluates the fitted spline on a moderate sub-grid running out from
+#' one end of the domain and looks for a genuine RE-ACCELERATION in its
+#' own slope sequence (a later slope at least \code{tol} times larger in
+#' magnitude than the one before it, same direction) — the signature of
+#' a "shelf": the curve briefly flattens, then resumes climbing, without
+#' ever reversing direction outright. Returns the x-coordinate just past
+#' the last such re-acceleration, i.e. exactly how far the artifact
+#' extends, rather than assuming a fixed margin.
 #'
 #' This exists because \code{stats::smooth.spline()} imposes a
 #' zero-second-derivative condition at the ends of the fitted range,
 #' which can fight genuinely steep curvature sitting right at a closed
 #' domain edge (e.g. Simpson's index near its degenerate lower bound
-#' \code{1/J}), producing a visible overshoot-then-correct wiggle even
-#' when every underlying point is smooth and monotonic. Measuring the
-#' TRUE extent of that disagreement (rather than guessing a fixed
-#' window) means the correction in \code{fit_psi_loglik()} only ever
-#' touches exactly the region that needs it — nowhere else, on any
-#' curve, is disturbed.
+#' \code{1/J}). The resulting artifact doesn't always cross zero (a
+#' plain sign-reversal check misses it) — it can just visibly flatten
+#' before continuing to rise, which is what this detector targets.
 #'
-#' @param y_raw Numeric vector of raw loglik values, ordered outward
-#'   from the edge being checked (index 1 = the edge point).
-#' @param y_spline Numeric vector of the fitted spline's values at the
-#'   same points, same order.
-#' @param max_check Integer maximum number of points to examine.
+#' Deliberately checks the FITTED spline's own slopes, not the raw
+#' data's: the raw grid frequently has enough ordinary point-to-point
+#' sampling noise to trip a slope-ratio check on its own (tried and
+#' rejected — flagged curves, mostly profile curves, that the actual fit
+#' already handled fine). Tying the check to the fitted curve itself
+#' means it only fires when there is a visible symptom to fix.
 #'
-#' @return Integer number of points (from the edge) the correction
-#'   should cover. 0 means no correction is needed.
+#' @param x Numeric vector of ψ grid values (sorted ascending), from the
+#'   edge being checked outward (i.e. already reversed for a right edge).
+#' @param spline_at Function evaluating the fitted spline at arbitrary ψ.
+#' @param max_check_x Numeric ψ value bounding how far out to look.
+#' @param tol Numeric re-acceleration ratio threshold. Default 1.15.
+#' @param n_grid Integer number of sub-grid points to evaluate.
+#'
+#' @return Numeric ψ value marking the end of the artifact, or \code{NA}
+#'   if no re-acceleration was found (no correction needed).
 #'
 #' @keywords internal
-.find_edge_artifact_extent <- function(y_raw, y_spline, max_check) {
-  n_avail <- length(y_raw) - 1L
-  max_check <- min(max_check, n_avail)
-  if (max_check < 2L) {
-    return(0L)
+.find_fit_instability_extent <- function(x, spline_at, max_check_x,
+                                          tol = 1.15, n_grid = 40L) {
+  xf <- seq(x[1], max_check_x, length.out = n_grid)
+  yf <- spline_at(xf)
+  slopes <- diff(yf) / diff(xf)
+  ratios <- slopes[-1] / slopes[-length(slopes)]
+  anomalous <- abs(ratios) >= tol & sign(slopes[-1]) == sign(slopes[-length(slopes)])
+
+  if (!any(anomalous)) {
+    return(NA_real_)
   }
-
-  raw_diffs <- diff(y_raw[1:(max_check + 1L)])
-  dominant_sign <- if (sum(raw_diffs) >= 0) 1 else -1
-
-  spline_diffs <- diff(y_spline[1:(max_check + 1L)])
-  contradicts <- sign(spline_diffs) == -dominant_sign & sign(spline_diffs) != 0
-
-  if (!any(contradicts)) {
-    return(0L)
-  }
-  max(which(contradicts)) + 1L # last contradicting step, +1 point buffer
+  last_bad <- max(which(anomalous))
+  idx <- min(last_bad + 3L, n_grid) # small buffer past the last re-acceleration
+  xf[idx]
 }
 
 #' Fit a smooth log-likelihood function in ψ
@@ -200,25 +206,26 @@
 #'     hitch, not a real feature) get down-weighted to 0 via
 #'     \code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
 #'   \item \strong{Domain edges} get a local correction ONLY where the
-#'     fitted spline's own trend can be shown to contradict the raw
-#'     data's dominant direction there (\code{.find_edge_artifact_extent()}) —
-#'     i.e. only where \code{smooth.spline()}'s natural boundary
-#'     condition is demonstrably fighting genuine steep curvature at a
-#'     closed domain edge. Over exactly that (data-driven, not
-#'     fixed-width) extent, the raw points are trusted directly via a
-#'     monotone Hermite interpolant (\code{stats::splinefun(...,
-#'     method = "monoH.FC")}), smoothstep-blended into the spline's own
-#'     prediction so there's no seam.
+#'     fitted spline's own slope sequence shows a genuine
+#'     RE-ACCELERATION near the edge (\code{.find_fit_instability_extent()})
+#'     — the signature of a "shelf": the curve briefly flattens, then
+#'     resumes climbing, without ever reversing direction outright (so a
+#'     plain sign-reversal check misses it). Over exactly that
+#'     (data-driven, not fixed-width) extent, the raw points are trusted
+#'     directly via a monotone Hermite interpolant
+#'     (\code{stats::splinefun(..., method = "monoH.FC")}),
+#'     smoothstep-blended into the spline's own prediction so there's no
+#'     seam.
 #' }
 #' Both are no-ops on a curve that doesn't need them: a clean interior
-#' gets weight 1 everywhere, and an edge with no detected contradiction
+#' gets weight 1 everywhere, and an edge with no detected re-acceleration
 #' is left as pure \code{smooth.spline()} output, untouched.
 #'
 #' \strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
 #' smoothing-parameter selection isn't robust to a single-point solver
 #' hitch (can under-smooth around just that point) and has no way to
 #' treat a domain edge differently from the interior (the boundary
-#' overshoot above). Four fix attempts were tried and rejected before
+#' overshoot above). Five fix attempts were tried and rejected before
 #' reaching the current design:
 #' \enumerate{
 #'   \item Replacing \code{smooth.spline()} entirely with
@@ -247,24 +254,38 @@
 #'     necessarily agree with an already-fine spline fit there. A fixed
 #'     margin also sometimes ended before the spline had genuinely
 #'     recovered, blending against a still-wrong function.
+#'   \item Detecting the artifact via outright SIGN REVERSAL (does the
+#'     spline's fitted direction ever contradict the raw data's dominant
+#'     direction). Fixed the cases it caught cleanly, but missed a whole
+#'     class of real artifacts: a "shelf" where the curve flattens
+#'     dramatically without ever actually reversing, invisible to a
+#'     check that only looks for a sign flip. A follow-up attempt
+#'     applying the same re-acceleration idea to the RAW data (rather
+#'     than the fit) was also rejected — ordinary point-to-point
+#'     sampling noise in the raw grid trips a slope-ratio check on its
+#'     own, flagging curves (mostly profile curves) the fit already
+#'     handled fine.
 #' }
-#' The current design fixes both root causes: the correction only
-#' engages where there is direct evidence of a contradiction (not
-#' unconditionally), and it never touches \code{smooth.spline()}'s own
-#' fit computation (no padding — the correction is a display-time
-#' override, not new data), so nothing more than a few points near a
-#' genuinely misbehaving edge is ever affected. Validated against all 40
-#' real profile/integrated curves in a Simpson's-index batch
-#' (\code{exp_v6}): zero sign-change regressions anywhere, every known
-#' boundary-wiggle curve collapsed to the single natural turn, the one
-#' known single-point interior hitch resolved with only that one point
-#' flagged, far-field fit identical to plain \code{smooth.spline()} to
-#' the last bit on 39/40 curves — confirmed by targeted metrics AND
-#' direct visual comparison against the raw points, not an aggregate
-#' roughness score alone (which was in fact actively misleading here: a
-#' fit that respects a genuinely sharp-but-monotonic rise in the raw
-#' data can show a LARGER raw second-difference than one that smooths
-#' over it, without being any less correct).
+#' The current design fixes all of the above: the correction only
+#' engages where the FITTED CURVE ITSELF shows a re-acceleration (not
+#' unconditionally, and not from raw-data noise alone), and it never
+#' touches \code{smooth.spline()}'s own fit computation (no padding —
+#' the correction is a display-time override, not new data), so nothing
+#' more than a few points near a genuinely misbehaving edge is ever
+#' affected. Validated against all 40 real profile/integrated curves in
+#' a Simpson's-index batch (\code{exp_v6}), including 8 curves found to
+#' have a subtle shelf artifact the prior (sign-reversal) design missed
+#' entirely: every one resolved, the one known single-point interior
+#' hitch and the original boundary-wiggle cases all remained fixed, and
+#' only one curve showed a sign-change count change elsewhere (traced to
+#' a genuine small dip/rise already present in that curve's raw data,
+#' negligible visually) — confirmed by targeted metrics AND direct
+#' visual comparison against the raw points on every case, not an
+#' aggregate roughness score alone (which was in fact actively
+#' misleading earlier in this investigation: a fit that respects a
+#' genuinely sharp-but-monotonic rise in the raw data can show a LARGER
+#' raw second-difference than one that smooths over it, without being
+#' any less correct).
 #'
 #' When \code{enforce_concavity = TRUE}, the procedure is:
 #' \enumerate{
@@ -365,28 +386,23 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
 
   # ------------------------------------------------------------------
   # Step 2: correct domain edges ONLY where the spline's own fitted
-  # direction contradicts the raw data's dominant direction there —
-  # trusting the raw points directly (via a monotone Hermite
-  # interpolant) over exactly that data-driven extent, smoothstep-
-  # blended into the spline so there's no seam at the hand-off.
+  # slope sequence re-accelerates near the edge (a "shelf" — flattens
+  # without reversing) — trusting the raw points directly (via a
+  # monotone Hermite interpolant) over exactly that data-driven extent,
+  # smoothstep-blended into the spline so there's no seam at the
+  # hand-off.
   # ------------------------------------------------------------------
-  max_edge_check <- min(20L, max(2L, floor(n / 4)))
+  max_edge_check <- min(20L, max(5L, floor(n / 4)))
 
-  n_left <- .find_edge_artifact_extent(
-    y[1:(max_edge_check + 1L)],
-    .spline_at(x[1:(max_edge_check + 1L)]),
-    max_edge_check
-  )
-  y_rev <- rev(y)
   x_rev <- rev(x)
-  n_right <- .find_edge_artifact_extent(
-    y_rev[1:(max_edge_check + 1L)],
-    .spline_at(x_rev[1:(max_edge_check + 1L)]),
-    max_edge_check
-  )
+  x_left_stop <- .find_fit_instability_extent(x, .spline_at, x[max_edge_check + 1L])
+  x_right_stop <- .find_fit_instability_extent(x_rev, .spline_at, x_rev[max_edge_check + 1L])
 
-  left_needed <- n_left >= 3L
-  right_needed <- n_right >= 3L
+  left_needed <- !is.na(x_left_stop)
+  right_needed <- !is.na(x_right_stop)
+
+  n_left <- if (left_needed) max(4L, which.min(abs(x - x_left_stop))) else 0L
+  n_right <- if (right_needed) max(4L, which.min(abs(x_rev - x_right_stop))) else 0L
 
   left_interp <- if (left_needed) {
     stats::splinefun(x[1:n_left], y[1:n_left], method = "monoH.FC")

@@ -34,25 +34,26 @@ dips/spikes and the very next point snaps right back — a solver
 hitch, not a real feature) get down-weighted to 0 via
 \code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
 \item \strong{Domain edges} get a local correction ONLY where the
-fitted spline's own trend can be shown to contradict the raw
-data's dominant direction there (\code{.find_edge_artifact_extent()}) —
-i.e. only where \code{smooth.spline()}'s natural boundary
-condition is demonstrably fighting genuine steep curvature at a
-closed domain edge. Over exactly that (data-driven, not
-fixed-width) extent, the raw points are trusted directly via a
-monotone Hermite interpolant (\code{stats::splinefun(...,
-    method = "monoH.FC")}), smoothstep-blended into the spline's own
-prediction so there's no seam.
+fitted spline's own slope sequence shows a genuine
+RE-ACCELERATION near the edge (\code{.find_fit_instability_extent()})
+— the signature of a "shelf": the curve briefly flattens, then
+resumes climbing, without ever reversing direction outright (so a
+plain sign-reversal check misses it). Over exactly that
+(data-driven, not fixed-width) extent, the raw points are trusted
+directly via a monotone Hermite interpolant
+(\code{stats::splinefun(..., method = "monoH.FC")}),
+smoothstep-blended into the spline's own prediction so there's no
+seam.
 }
 Both are no-ops on a curve that doesn't need them: a clean interior
-gets weight 1 everywhere, and an edge with no detected contradiction
+gets weight 1 everywhere, and an edge with no detected re-acceleration
 is left as pure \code{smooth.spline()} output, untouched.
 
 \strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
 smoothing-parameter selection isn't robust to a single-point solver
 hitch (can under-smooth around just that point) and has no way to
 treat a domain edge differently from the interior (the boundary
-overshoot above). Four fix attempts were tried and rejected before
+overshoot above). Five fix attempts were tried and rejected before
 reaching the current design:
 \enumerate{
 \item Replacing \code{smooth.spline()} entirely with
@@ -81,24 +82,38 @@ measurably worse, since a raw-data interpolant doesn't
 necessarily agree with an already-fine spline fit there. A fixed
 margin also sometimes ended before the spline had genuinely
 recovered, blending against a still-wrong function.
+\item Detecting the artifact via outright SIGN REVERSAL (does the
+spline's fitted direction ever contradict the raw data's dominant
+direction). Fixed the cases it caught cleanly, but missed a whole
+class of real artifacts: a "shelf" where the curve flattens
+dramatically without ever actually reversing, invisible to a
+check that only looks for a sign flip. A follow-up attempt
+applying the same re-acceleration idea to the RAW data (rather
+than the fit) was also rejected — ordinary point-to-point
+sampling noise in the raw grid trips a slope-ratio check on its
+own, flagging curves (mostly profile curves) the fit already
+handled fine.
 }
-The current design fixes both root causes: the correction only
-engages where there is direct evidence of a contradiction (not
-unconditionally), and it never touches \code{smooth.spline()}'s own
-fit computation (no padding — the correction is a display-time
-override, not new data), so nothing more than a few points near a
-genuinely misbehaving edge is ever affected. Validated against all 40
-real profile/integrated curves in a Simpson's-index batch
-(\code{exp_v6}): zero sign-change regressions anywhere, every known
-boundary-wiggle curve collapsed to the single natural turn, the one
-known single-point interior hitch resolved with only that one point
-flagged, far-field fit identical to plain \code{smooth.spline()} to
-the last bit on 39/40 curves — confirmed by targeted metrics AND
-direct visual comparison against the raw points, not an aggregate
-roughness score alone (which was in fact actively misleading here: a
-fit that respects a genuinely sharp-but-monotonic rise in the raw
-data can show a LARGER raw second-difference than one that smooths
-over it, without being any less correct).
+The current design fixes all of the above: the correction only
+engages where the FITTED CURVE ITSELF shows a re-acceleration (not
+unconditionally, and not from raw-data noise alone), and it never
+touches \code{smooth.spline()}'s own fit computation (no padding —
+the correction is a display-time override, not new data), so nothing
+more than a few points near a genuinely misbehaving edge is ever
+affected. Validated against all 40 real profile/integrated curves in
+a Simpson's-index batch (\code{exp_v6}), including 8 curves found to
+have a subtle shelf artifact the prior (sign-reversal) design missed
+entirely: every one resolved, the one known single-point interior
+hitch and the original boundary-wiggle cases all remained fixed, and
+only one curve showed a sign-change count change elsewhere (traced to
+a genuine small dip/rise already present in that curve's raw data,
+negligible visually) — confirmed by targeted metrics AND direct
+visual comparison against the raw points on every case, not an
+aggregate roughness score alone (which was in fact actively
+misleading earlier in this investigation: a fit that respects a
+genuinely sharp-but-monotonic rise in the raw data can show a LARGER
+raw second-difference than one that smooths over it, without being
+any less correct).
 
 When \code{enforce_concavity = TRUE}, the procedure is:
 \enumerate{

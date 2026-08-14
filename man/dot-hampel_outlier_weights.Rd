@@ -4,7 +4,7 @@
 \alias{.hampel_outlier_weights}
 \title{Down-weight isolated interior outlier points (Hampel filter)}
 \usage{
-.hampel_outlier_weights(y, half_window = 3L, n_sigma = 3, edge_exclude = 8L)
+.hampel_outlier_weights(y, half_window = 3L, n_sigma = 3, edge_exclude = 3L)
 }
 \arguments{
 \item{y}{Numeric vector of loglik values, in \code{psi} order.}
@@ -39,11 +39,17 @@ residual scale can't tell steep real curvature apart from a solver
 hitch. See \code{fit_psi_loglik()}'s documentation for the full
 history.
 
-Edge points are deliberately excluded (via \code{edge_exclude}) and
-left to \code{.pad_boundary_by_trend()} instead — a data point sitting
-hard against a domain boundary can legitimately look like a "local
-outlier" purely from steep boundary geometry (e.g. Simpson's index
-near its degenerate lower bound), and that's not the kind of solver
-hitch this filter is meant to catch.
+Edge points are deliberately excluded (via \code{edge_exclude}, kept
+small — just enough to skip the one or two points immediately at a
+domain boundary) and left to the edge-blend logic in
+\code{fit_psi_loglik()} instead: a data point sitting hard against a
+domain boundary can legitimately look like a "local outlier" purely
+from steep boundary geometry (e.g. Simpson's index near its
+degenerate lower bound), which isn't the kind of solver hitch this
+filter is meant to catch. \code{edge_exclude} is deliberately much
+smaller than the edge-blend margin below — shrinking it from an
+earlier, wider default was necessary after it was found to also
+exclude a genuine single-point interior hitch sitting close enough to
+an edge to fall inside the wider exclusion zone.
 }
 \keyword{internal}

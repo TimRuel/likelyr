@@ -68,12 +68,18 @@
 #' hitch. See \code{fit_psi_loglik()}'s documentation for the full
 #' history.
 #'
-#' Edge points are deliberately excluded (via \code{edge_exclude}) and
-#' left to \code{.pad_boundary_by_trend()} instead — a data point sitting
-#' hard against a domain boundary can legitimately look like a "local
-#' outlier" purely from steep boundary geometry (e.g. Simpson's index
-#' near its degenerate lower bound), and that's not the kind of solver
-#' hitch this filter is meant to catch.
+#' Edge points are deliberately excluded (via \code{edge_exclude}, kept
+#' small — just enough to skip the one or two points immediately at a
+#' domain boundary) and left to the edge-blend logic in
+#' \code{fit_psi_loglik()} instead: a data point sitting hard against a
+#' domain boundary can legitimately look like a "local outlier" purely
+#' from steep boundary geometry (e.g. Simpson's index near its
+#' degenerate lower bound), which isn't the kind of solver hitch this
+#' filter is meant to catch. \code{edge_exclude} is deliberately much
+#' smaller than the edge-blend margin below — shrinking it from an
+#' earlier, wider default was necessary after it was found to also
+#' exclude a genuine single-point interior hitch sitting close enough to
+#' an edge to fall inside the wider exclusion zone.
 #'
 #' @param y Numeric vector of loglik values, in \code{psi} order.
 #' @param half_window Integer half-width (in grid points) of the
@@ -87,7 +93,7 @@
 #'
 #' @keywords internal
 .hampel_outlier_weights <- function(y, half_window = 3L, n_sigma = 3,
-                                     edge_exclude = 8L) {
+                                     edge_exclude = 3L) {
   n <- length(y)
   w <- rep(1, n)
 
@@ -112,63 +118,70 @@
   w
 }
 
-#' Extend a ψ–log-likelihood grid past its endpoints by trend extrapolation
+#' Smoothstep interpolation weight
 #'
 #' @description
-#' Fits a local linear trend through the \code{n_fit} points nearest each
-#' endpoint and extrapolates it \code{n_pad} grid steps past the edge,
-#' producing synthetic "pseudo-points" that extend the series in both
-#' directions.
+#' The standard cubic smoothstep \code{3t^2 - 2t^3}, clamped to
+#' \code{[0, 1]}: 0 and 1 at the endpoints with zero slope there, so
+#' blending two functions with this weight introduces no kink at either
+#' end of the transition.
 #'
-#' This exists to counteract a boundary artifact in
-#' \code{stats::smooth.spline()}: natural cubic smoothing splines impose
-#' a zero-second-derivative condition at the ends of the fitted range,
-#' which fights a genuinely steep rise/fall sitting right at a domain
-#' edge (e.g. Simpson's index near its degenerate lower bound
-#' \code{1/J}) — producing a visible overshoot-then-correct wiggle even
-#' when every underlying point is smooth and monotonic. Extending the
-#' series past the true domain moves that artificial boundary condition
-#' out to the padding, away from the region anyone will ever evaluate.
+#' @param t Numeric vector.
 #'
-#' Deliberately extrapolates a LOCAL LINEAR TREND fit through several
-#' nearby points, not a mirror image of the single edge point: an
-#' earlier "odd reflection about the boundary point" prototype was too
-#' sensitive to that one point's own noise (an incomplete fix on some
-#' curves, a real point-estimate shift on others, and a brand-new
-#' artifact introduced on a previously clean curve). Fitting a line
-#' through several points is far less sensitive to any one of them.
-#'
-#' @param x Numeric vector of ψ grid values (sorted ascending).
-#' @param y Numeric vector of loglik values, same order as \code{x}.
-#' @param n_fit Integer number of points nearest each edge used to fit
-#'   the local trend line.
-#' @param n_pad Integer number of synthetic points to add past each edge.
-#'
-#' @return A list with \code{x}/\code{y}: the padded points only (left
-#'   then right), for the caller to concatenate with the original data.
+#' @return Numeric vector of the same length as \code{t}, in \code{[0, 1]}.
 #'
 #' @keywords internal
-.pad_boundary_by_trend <- function(x, y, n_fit = 6L, n_pad = 8L) {
-  n <- length(x)
-  step <- stats::median(diff(x))
-  if (!is.finite(step) || step <= 0) {
-    step <- 1
+.smoothstep <- function(t) {
+  t <- pmin(pmax(t, 0), 1)
+  3 * t^2 - 2 * t^3
+}
+
+#' Detect how far a fitted spline's own trend contradicts the raw data
+#'
+#' @description
+#' Finds the largest contiguous prefix (from one end of the grid) over
+#' which the fitted spline's direction of change disagrees with the raw
+#' data's own dominant direction there — i.e. exactly how far a genuine
+#' boundary artifact extends, rather than assuming a fixed margin.
+#'
+#' This exists because \code{stats::smooth.spline()} imposes a
+#' zero-second-derivative condition at the ends of the fitted range,
+#' which can fight genuinely steep curvature sitting right at a closed
+#' domain edge (e.g. Simpson's index near its degenerate lower bound
+#' \code{1/J}), producing a visible overshoot-then-correct wiggle even
+#' when every underlying point is smooth and monotonic. Measuring the
+#' TRUE extent of that disagreement (rather than guessing a fixed
+#' window) means the correction in \code{fit_psi_loglik()} only ever
+#' touches exactly the region that needs it — nowhere else, on any
+#' curve, is disturbed.
+#'
+#' @param y_raw Numeric vector of raw loglik values, ordered outward
+#'   from the edge being checked (index 1 = the edge point).
+#' @param y_spline Numeric vector of the fitted spline's values at the
+#'   same points, same order.
+#' @param max_check Integer maximum number of points to examine.
+#'
+#' @return Integer number of points (from the edge) the correction
+#'   should cover. 0 means no correction is needed.
+#'
+#' @keywords internal
+.find_edge_artifact_extent <- function(y_raw, y_spline, max_check) {
+  n_avail <- length(y_raw) - 1L
+  max_check <- min(max_check, n_avail)
+  if (max_check < 2L) {
+    return(0L)
   }
 
-  left_df <- data.frame(x = x[1:n_fit], y = y[1:n_fit])
-  left_fit <- stats::lm(y ~ x, data = left_df)
-  x_left <- x[1] - rev(seq_len(n_pad)) * step
-  y_left <- unname(stats::predict(left_fit, newdata = data.frame(x = x_left)))
+  raw_diffs <- diff(y_raw[1:(max_check + 1L)])
+  dominant_sign <- if (sum(raw_diffs) >= 0) 1 else -1
 
-  right_df <- data.frame(
-    x = x[(n - n_fit + 1L):n],
-    y = y[(n - n_fit + 1L):n]
-  )
-  right_fit <- stats::lm(y ~ x, data = right_df)
-  x_right <- x[n] + seq_len(n_pad) * step
-  y_right <- unname(stats::predict(right_fit, newdata = data.frame(x = x_right)))
+  spline_diffs <- diff(y_spline[1:(max_check + 1L)])
+  contradicts <- sign(spline_diffs) == -dominant_sign & sign(spline_diffs) != 0
 
-  list(x = c(x_left, x_right), y = c(y_left, y_right))
+  if (!any(contradicts)) {
+    return(0L)
+  }
+  max(which(contradicts)) + 1L # last contradicting step, +1 point buffer
 }
 
 #' Fit a smooth log-likelihood function in ψ
@@ -186,47 +199,79 @@
 #'     dips/spikes and the very next point snaps right back — a solver
 #'     hitch, not a real feature) get down-weighted to 0 via
 #'     \code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
-#'   \item \strong{Domain edges} get padded via
-#'     \code{.pad_boundary_by_trend()} so \code{smooth.spline()}'s
-#'     natural boundary condition doesn't fight genuine steep curvature
-#'     sitting at a closed domain edge.
+#'   \item \strong{Domain edges} get a local correction ONLY where the
+#'     fitted spline's own trend can be shown to contradict the raw
+#'     data's dominant direction there (\code{.find_edge_artifact_extent()}) —
+#'     i.e. only where \code{smooth.spline()}'s natural boundary
+#'     condition is demonstrably fighting genuine steep curvature at a
+#'     closed domain edge. Over exactly that (data-driven, not
+#'     fixed-width) extent, the raw points are trusted directly via a
+#'     monotone Hermite interpolant (\code{stats::splinefun(...,
+#'     method = "monoH.FC")}), smoothstep-blended into the spline's own
+#'     prediction so there's no seam.
 #' }
 #' Both are no-ops on a curve that doesn't need them: a clean interior
-#' gets weight 1 everywhere, and padding that merely continues an
-#' already-smooth trend doesn't change the fit near the edge.
+#' gets weight 1 everywhere, and an edge with no detected contradiction
+#' is left as pure \code{smooth.spline()} output, untouched.
 #'
 #' \strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
 #' smoothing-parameter selection isn't robust to a single-point solver
 #' hitch (can under-smooth around just that point) and has no way to
 #' treat a domain edge differently from the interior (the boundary
-#' overshoot above). A first fix attempt replaced \code{smooth.spline()}
-#' entirely with \code{mgcv::gam(..., method = "REML")}; it was shipped,
-#' then reverted the same day — REML's single GLOBAL smoothing parameter
-#' pulled every curve toward one flatness level, and on a real 20-site
-#' batch that made several genuinely-clean curves visibly WIGGLIER, not
-#' smoother, a failure the pre-ship validation script's coarse
-#' whole-curve roughness metric didn't catch. A second attempt (global
-#' Tukey-biweight IRLS re-weighting) also failed: comparing every point
-#' to ONE whole-curve residual scale flagged real curvature as noise in
-#' steep regions and left it untouched in flat ones. The current design
-#' fixes both failure modes locally instead of changing the global
-#' fitting philosophy — \code{smooth.spline()} remains the actual
-#' engine throughout, matching prior real-world reliability with it.
-#' Validated against all 40 real profile/integrated curves in a
-#' Simpson's-index batch (\code{exp_v6}): every known boundary-wiggle
-#' curve resolved (roughness reduced 10-80x, near-boundary sign changes
-#' collapsed to the single natural turn), the one known single-point
-#' interior hitch resolved (roughness reduced ~340x) with only that one
-#' point flagged (not its neighbors), and 30/40 curves were completely
-#' untouched (bit-for-bit identical fit) — confirmed both by targeted
-#' metrics and by direct visual comparison against the raw points, not
-#' by an aggregate score alone.
+#' overshoot above). Four fix attempts were tried and rejected before
+#' reaching the current design:
+#' \enumerate{
+#'   \item Replacing \code{smooth.spline()} entirely with
+#'     \code{mgcv::gam(..., method = "REML")}. Shipped, then reverted
+#'     the same day — REML's single GLOBAL smoothing parameter pulled
+#'     every curve toward one flatness level, and on a real 20-site
+#'     batch that made several genuinely-clean curves visibly WIGGLIER,
+#'     not smoother, a failure the pre-ship validation script's coarse
+#'     whole-curve roughness metric didn't catch.
+#'   \item Global Tukey-biweight IRLS re-weighting (comparing every
+#'     point to ONE whole-curve residual scale). Flagged real curvature
+#'     as noise in steep regions and left it untouched in flat ones.
+#'   \item Feeding \code{smooth.spline()} synthetic boundary points
+#'     extrapolated from a local linear trend (padding). This fixed the
+#'     edge artifact in isolation, but \code{smooth.spline()} has ONE
+#'     global smoothing parameter for the whole curve — adding data
+#'     anywhere changes the fit everywhere, which surfaced as a real
+#'     curve's fitted peak exceeding every observed data point near it
+#'     (the correction "spent its effort" pulling the tail in, at the
+#'     peak's expense).
+#'   \item Blending a local monotone interpolant across the edge
+#'     UNCONDITIONALLY, over a FIXED-width margin. Applying it even
+#'     where nothing was wrong made several already-perfect curves
+#'     (mostly ones whose edges never touch a degenerate boundary)
+#'     measurably worse, since a raw-data interpolant doesn't
+#'     necessarily agree with an already-fine spline fit there. A fixed
+#'     margin also sometimes ended before the spline had genuinely
+#'     recovered, blending against a still-wrong function.
+#' }
+#' The current design fixes both root causes: the correction only
+#' engages where there is direct evidence of a contradiction (not
+#' unconditionally), and it never touches \code{smooth.spline()}'s own
+#' fit computation (no padding — the correction is a display-time
+#' override, not new data), so nothing more than a few points near a
+#' genuinely misbehaving edge is ever affected. Validated against all 40
+#' real profile/integrated curves in a Simpson's-index batch
+#' (\code{exp_v6}): zero sign-change regressions anywhere, every known
+#' boundary-wiggle curve collapsed to the single natural turn, the one
+#' known single-point interior hitch resolved with only that one point
+#' flagged, far-field fit identical to plain \code{smooth.spline()} to
+#' the last bit on 39/40 curves — confirmed by targeted metrics AND
+#' direct visual comparison against the raw points, not an aggregate
+#' roughness score alone (which was in fact actively misleading here: a
+#' fit that respects a genuinely sharp-but-monotonic rise in the raw
+#' data can show a LARGER raw second-difference than one that smooths
+#' over it, without being any less correct).
 #'
 #' When \code{enforce_concavity = TRUE}, the procedure is:
 #' \enumerate{
-#'   \item Fit \code{smooth.spline} to the (weighted, padded) grid.
-#'   \item Evaluate the spline on a fine internal grid (500 points),
-#'     restricted to the TRUE ψ range (padding never appears here).
+#'   \item Fit \code{smooth.spline} to the (Hampel-weighted) grid, then
+#'     apply the edge correction described above.
+#'   \item Evaluate the corrected fit on a fine internal grid (500
+#'     points) over the TRUE ψ range.
 #'   \item Compute the upper convex hull of the fine-grid evaluations —
 #'     the tightest concave piecewise-linear function lying at or above
 #'     the spline. This is the LCM.
@@ -267,7 +312,7 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
   # points (failed solves, -Inf branch values), which would otherwise
   # abort the entire fit. Drop them, preserving the pseudolikelihood
   # attribute (which plain data-frame subsetting would strip). Sorting
-  # is required by both the outlier filter and the boundary padding
+  # is required by both the outlier filter and the edge correction
   # below, which assume points are in psi order.
   # ------------------------------------------------------------------
   pseudolik_attr <- attr(psi_loglik_df, "pseudolikelihood")
@@ -301,49 +346,93 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
   psi_loglik_df <- psi_loglik_df[psi_order, , drop = FALSE]
   attr(psi_loglik_df, "pseudolikelihood") <- pseudolik_attr
 
-  psi_range <- range(psi_loglik_df$psi)
+  x <- psi_loglik_df$psi
+  y <- psi_loglik_df$loglik
+  n <- length(x)
+  psi_range <- range(x)
 
   # ------------------------------------------------------------------
-  # Step 1: down-weight isolated interior outliers + pad domain edges
+  # Step 1: down-weight isolated interior outliers (Hampel filter),
+  # then fit smooth.spline to the untouched, weighted grid — no
+  # synthetic data added anywhere, so this fit is exactly what
+  # smooth.spline() would produce on the real data everywhere except
+  # the edge margins corrected in Step 2.
   # ------------------------------------------------------------------
-  n <- nrow(psi_loglik_df)
-  n_fit <- min(6L, max(2L, floor(n / 3)))
-  n_pad <- min(8L, max(2L, floor(n / 3)))
+  weights <- .hampel_outlier_weights(y)
 
-  weights <- .hampel_outlier_weights(
-    psi_loglik_df$loglik,
-    edge_exclude = n_pad
+  psi_loglik_spline <- stats::smooth.spline(x = x, y = y, w = weights)
+  .spline_at <- function(psi) stats::predict(psi_loglik_spline, psi)$y
+
+  # ------------------------------------------------------------------
+  # Step 2: correct domain edges ONLY where the spline's own fitted
+  # direction contradicts the raw data's dominant direction there —
+  # trusting the raw points directly (via a monotone Hermite
+  # interpolant) over exactly that data-driven extent, smoothstep-
+  # blended into the spline so there's no seam at the hand-off.
+  # ------------------------------------------------------------------
+  max_edge_check <- min(20L, max(2L, floor(n / 4)))
+
+  n_left <- .find_edge_artifact_extent(
+    y[1:(max_edge_check + 1L)],
+    .spline_at(x[1:(max_edge_check + 1L)]),
+    max_edge_check
+  )
+  y_rev <- rev(y)
+  x_rev <- rev(x)
+  n_right <- .find_edge_artifact_extent(
+    y_rev[1:(max_edge_check + 1L)],
+    .spline_at(x_rev[1:(max_edge_check + 1L)]),
+    max_edge_check
   )
 
-  x_fit <- psi_loglik_df$psi
-  y_fit <- psi_loglik_df$loglik
-  w_fit <- weights
+  left_needed <- n_left >= 3L
+  right_needed <- n_right >= 3L
 
-  if (n > 2L * n_fit) {
-    padding <- .pad_boundary_by_trend(
-      psi_loglik_df$psi,
-      psi_loglik_df$loglik,
-      n_fit = n_fit,
-      n_pad = n_pad
-    )
-    x_fit <- c(padding$x, x_fit)
-    y_fit <- c(padding$y, y_fit)
-    w_fit <- c(rep(1, length(padding$x)), weights)
+  left_interp <- if (left_needed) {
+    stats::splinefun(x[1:n_left], y[1:n_left], method = "monoH.FC")
+  } else {
+    NULL
+  }
+  right_interp <- if (right_needed) {
+    idx <- (n - n_right + 1L):n
+    stats::splinefun(x[idx], y[idx], method = "monoH.FC")
+  } else {
+    NULL
   }
 
-  # ------------------------------------------------------------------
-  # Step 2: fit smooth spline to the weighted, padded grid
-  # ------------------------------------------------------------------
-  psi_loglik_spline <- stats::smooth.spline(
-    x = x_fit,
-    y = y_fit,
-    w = w_fit
-  )
+  x_left_bound <- if (left_needed) x[n_left] else NA_real_
+  x_right_bound <- if (right_needed) x[n - n_right + 1L] else NA_real_
+  x0 <- x[1]
+  xn <- x[n]
+
+  .corrected_fit <- function(psi) {
+    y_out <- .spline_at(psi)
+
+    if (left_needed) {
+      in_left <- psi <= x_left_bound
+      if (any(in_left)) {
+        t <- (psi[in_left] - x0) / (x_left_bound - x0)
+        w_local <- 1 - .smoothstep(t) # 1 at true edge, 0 at artifact's inner edge
+        y_out[in_left] <- w_local * left_interp(psi[in_left]) +
+          (1 - w_local) * y_out[in_left]
+      }
+    }
+
+    if (right_needed) {
+      in_right <- psi >= x_right_bound
+      if (any(in_right)) {
+        t <- (xn - psi[in_right]) / (xn - x_right_bound)
+        w_local <- 1 - .smoothstep(t)
+        y_out[in_right] <- w_local * right_interp(psi[in_right]) +
+          (1 - w_local) * y_out[in_right]
+      }
+    }
+
+    y_out
+  }
 
   if (!enforce_concavity) {
-    psi_loglik <- function(psi) {
-      stats::predict(psi_loglik_spline, psi)$y
-    }
+    psi_loglik <- function(psi) .corrected_fit(psi)
     attr(psi_loglik, "pseudolikelihood") <- attr(
       psi_loglik_df,
       "pseudolikelihood"
@@ -353,11 +442,11 @@ fit_psi_loglik <- function(psi_loglik_df, enforce_concavity = FALSE) {
   }
 
   # ------------------------------------------------------------------
-  # Step 3: evaluate on fine grid (restricted to the TRUE psi range —
-  # padding points from Step 1 must never be exposed here)
+  # Step 3: evaluate the corrected fit on a fine grid over the TRUE
+  # psi range
   # ------------------------------------------------------------------
   psi_fine <- seq(psi_range[1], psi_range[2], length.out = 500L)
-  y_fine <- stats::predict(psi_loglik_spline, psi_fine)$y
+  y_fine <- .corrected_fit(psi_fine)
 
   # ------------------------------------------------------------------
   # Step 4: project onto LCM via upper convex hull

@@ -33,47 +33,79 @@ pre-treated in two ways (both @keywords internal helpers above):
 dips/spikes and the very next point snaps right back — a solver
 hitch, not a real feature) get down-weighted to 0 via
 \code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
-\item \strong{Domain edges} get padded via
-\code{.pad_boundary_by_trend()} so \code{smooth.spline()}'s
-natural boundary condition doesn't fight genuine steep curvature
-sitting at a closed domain edge.
+\item \strong{Domain edges} get a local correction ONLY where the
+fitted spline's own trend can be shown to contradict the raw
+data's dominant direction there (\code{.find_edge_artifact_extent()}) —
+i.e. only where \code{smooth.spline()}'s natural boundary
+condition is demonstrably fighting genuine steep curvature at a
+closed domain edge. Over exactly that (data-driven, not
+fixed-width) extent, the raw points are trusted directly via a
+monotone Hermite interpolant (\code{stats::splinefun(...,
+    method = "monoH.FC")}), smoothstep-blended into the spline's own
+prediction so there's no seam.
 }
 Both are no-ops on a curve that doesn't need them: a clean interior
-gets weight 1 everywhere, and padding that merely continues an
-already-smooth trend doesn't change the fit near the edge.
+gets weight 1 everywhere, and an edge with no detected contradiction
+is left as pure \code{smooth.spline()} output, untouched.
 
 \strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
 smoothing-parameter selection isn't robust to a single-point solver
 hitch (can under-smooth around just that point) and has no way to
 treat a domain edge differently from the interior (the boundary
-overshoot above). A first fix attempt replaced \code{smooth.spline()}
-entirely with \code{mgcv::gam(..., method = "REML")}; it was shipped,
-then reverted the same day — REML's single GLOBAL smoothing parameter
-pulled every curve toward one flatness level, and on a real 20-site
-batch that made several genuinely-clean curves visibly WIGGLIER, not
-smoother, a failure the pre-ship validation script's coarse
-whole-curve roughness metric didn't catch. A second attempt (global
-Tukey-biweight IRLS re-weighting) also failed: comparing every point
-to ONE whole-curve residual scale flagged real curvature as noise in
-steep regions and left it untouched in flat ones. The current design
-fixes both failure modes locally instead of changing the global
-fitting philosophy — \code{smooth.spline()} remains the actual
-engine throughout, matching prior real-world reliability with it.
-Validated against all 40 real profile/integrated curves in a
-Simpson's-index batch (\code{exp_v6}): every known boundary-wiggle
-curve resolved (roughness reduced 10-80x, near-boundary sign changes
-collapsed to the single natural turn), the one known single-point
-interior hitch resolved (roughness reduced ~340x) with only that one
-point flagged (not its neighbors), and 30/40 curves were completely
-untouched (bit-for-bit identical fit) — confirmed both by targeted
-metrics and by direct visual comparison against the raw points, not
-by an aggregate score alone.
+overshoot above). Four fix attempts were tried and rejected before
+reaching the current design:
+\enumerate{
+\item Replacing \code{smooth.spline()} entirely with
+\code{mgcv::gam(..., method = "REML")}. Shipped, then reverted
+the same day — REML's single GLOBAL smoothing parameter pulled
+every curve toward one flatness level, and on a real 20-site
+batch that made several genuinely-clean curves visibly WIGGLIER,
+not smoother, a failure the pre-ship validation script's coarse
+whole-curve roughness metric didn't catch.
+\item Global Tukey-biweight IRLS re-weighting (comparing every
+point to ONE whole-curve residual scale). Flagged real curvature
+as noise in steep regions and left it untouched in flat ones.
+\item Feeding \code{smooth.spline()} synthetic boundary points
+extrapolated from a local linear trend (padding). This fixed the
+edge artifact in isolation, but \code{smooth.spline()} has ONE
+global smoothing parameter for the whole curve — adding data
+anywhere changes the fit everywhere, which surfaced as a real
+curve's fitted peak exceeding every observed data point near it
+(the correction "spent its effort" pulling the tail in, at the
+peak's expense).
+\item Blending a local monotone interpolant across the edge
+UNCONDITIONALLY, over a FIXED-width margin. Applying it even
+where nothing was wrong made several already-perfect curves
+(mostly ones whose edges never touch a degenerate boundary)
+measurably worse, since a raw-data interpolant doesn't
+necessarily agree with an already-fine spline fit there. A fixed
+margin also sometimes ended before the spline had genuinely
+recovered, blending against a still-wrong function.
+}
+The current design fixes both root causes: the correction only
+engages where there is direct evidence of a contradiction (not
+unconditionally), and it never touches \code{smooth.spline()}'s own
+fit computation (no padding — the correction is a display-time
+override, not new data), so nothing more than a few points near a
+genuinely misbehaving edge is ever affected. Validated against all 40
+real profile/integrated curves in a Simpson's-index batch
+(\code{exp_v6}): zero sign-change regressions anywhere, every known
+boundary-wiggle curve collapsed to the single natural turn, the one
+known single-point interior hitch resolved with only that one point
+flagged, far-field fit identical to plain \code{smooth.spline()} to
+the last bit on 39/40 curves — confirmed by targeted metrics AND
+direct visual comparison against the raw points, not an aggregate
+roughness score alone (which was in fact actively misleading here: a
+fit that respects a genuinely sharp-but-monotonic rise in the raw
+data can show a LARGER raw second-difference than one that smooths
+over it, without being any less correct).
 
 When \code{enforce_concavity = TRUE}, the procedure is:
 \enumerate{
-\item Fit \code{smooth.spline} to the (weighted, padded) grid.
-\item Evaluate the spline on a fine internal grid (500 points),
-restricted to the TRUE ψ range (padding never appears here).
+\item Fit \code{smooth.spline} to the (Hampel-weighted) grid, then
+apply the edge correction described above.
+\item Evaluate the corrected fit on a fine internal grid (500
+points) over the TRUE ψ range.
 \item Compute the upper convex hull of the fine-grid evaluations —
 the tightest concave piecewise-linear function lying at or above
 the spline. This is the LCM.

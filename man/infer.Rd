@@ -4,7 +4,7 @@
 \alias{infer}
 \title{Likelihood-Based Inference for a Calibrated Model}
 \usage{
-infer(model, which = NULL, alpha_levels = NULL, enforce_concavity = FALSE)
+infer(model, which = NULL, alpha_levels = NULL, enforce_concavity = TRUE)
 }
 \arguments{
 \item{model}{A calibrated \code{model} object.}
@@ -17,7 +17,13 @@ derived from \code{traversal$confidence_levels}.}
 
 \item{enforce_concavity}{Logical. Whether to project the fitted spline
 onto its Least Concave Majorant before computing point and interval
-estimates. Default: \code{FALSE}.}
+estimates. Default: \code{TRUE} — profile and integrated
+log-likelihoods in a scalar parameter of interest are theoretically
+single-peaked (concave), and enforcing that removes any local
+non-concavity (an isolated solver hitch, a boundary artifact) with
+a mathematical guarantee, regardless of its cause. See
+\code{fit_psi_loglik()}'s documentation for the full history of why
+this replaced an elaborate artifact-detection pipeline.}
 }
 \value{
 The SAME calibrated \code{model} object with inference

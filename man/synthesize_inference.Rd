@@ -9,7 +9,7 @@ synthesize_inference(
   alpha_levels,
   psi_0,
   psi_interval = NULL,
-  enforce_concavity = FALSE,
+  enforce_concavity = TRUE,
   psi_mle = NULL
 )
 }
@@ -24,7 +24,7 @@ synthesize_inference(
 \item{psi_interval}{Optional sets::interval object.}
 
 \item{enforce_concavity}{Logical. Whether to project the fitted spline
-onto its LCM before computing estimates. Default: \code{FALSE}.}
+onto its LCM before computing estimates. Default: \code{TRUE}.}
 
 \item{psi_mle}{Optional numeric scalar. The MLE (grid anchor),
 passed to \code{get_interval_estimate_df()} so that boundary

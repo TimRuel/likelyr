@@ -4,7 +4,7 @@
 \alias{fit_psi_loglik}
 \title{Fit a smooth log-likelihood function in ψ}
 \usage{
-fit_psi_loglik(psi_loglik_df, enforce_concavity = FALSE)
+fit_psi_loglik(psi_loglik_df, enforce_concavity = TRUE)
 }
 \arguments{
 \item{psi_loglik_df}{A data frame containing columns:
@@ -14,138 +14,65 @@ fit_psi_loglik(psi_loglik_df, enforce_concavity = FALSE)
 }}
 
 \item{enforce_concavity}{Logical. Whether to project the spline onto
-its LCM to enforce global concavity. Default: \code{FALSE}.}
+its LCM to enforce global concavity. Default: \code{TRUE}.}
 }
 \value{
 A function \code{f(psi)} returning the smoothed log-likelihood at
 \code{psi}, optionally concavity-corrected.
 }
 \description{
-Fits a smoothing spline to a discrete ψ–log-likelihood grid.
-Optionally projects the result onto its Least Concave Majorant (LCM)
-to enforce global concavity.
+Fits a smoothing spline to a discrete ψ–log-likelihood grid, weighted
+to down-weight isolated interior outliers (see
+\code{.hampel_outlier_weights()}). By default, projects the result
+onto its Least Concave Majorant (LCM) to enforce global concavity.
 
-The smoothing step is \code{stats::smooth.spline()} — plain GCV
-smoothing splines, no new dependency — fed a grid that's been
-pre-treated in two ways (both @keywords internal helpers above):
-\enumerate{
-\item \strong{Isolated interior outliers} (a single grid point that
-dips/spikes and the very next point snaps right back — a solver
-hitch, not a real feature) get down-weighted to 0 via
-\code{.hampel_outlier_weights()}, a LOCAL (windowed) detector.
-\item \strong{Domain edges} get a local correction ONLY where the
-fitted spline's own slope sequence shows a genuine
-RE-ACCELERATION near the edge (\code{.find_fit_instability_extent()})
-— the signature of a "shelf": the curve briefly flattens, then
-resumes climbing, without ever reversing direction outright (so a
-plain sign-reversal check misses it). Over exactly that
-(data-driven, not fixed-width) extent, the raw points are trusted
-directly via a monotone Hermite interpolant
-(\code{stats::splinefun(..., method = "monoH.FC")}), at FULL
-weight across nearly the whole corrected span — only the final
-20\% is smoothstep-blended back to the spline, so there's no seam
-at the hand-off but the interpolant (which matches real data
-exactly) dominates almost everywhere it's engaged.
-}
-Both are no-ops on a curve that doesn't need them: a clean interior
-gets weight 1 everywhere, and an edge with no detected re-acceleration
-is left as pure \code{smooth.spline()} output, untouched.
+\strong{History (2026-08-14/15):} an isolated interior outlier or a
+domain edge sitting against a closed boundary (e.g. Simpson's index
+near its degenerate lower bound \code{1/J}) can make
+\code{stats::smooth.spline()}'s GCV-selected fit dip, flatten, or
+overshoot locally — visually a "hitch", a "shelf", or a boundary
+wiggle depending on exactly where and how it happens. SIX fix
+attempts tried to detect and patch these artifacts directly (in
+order: replacing \code{smooth.spline()} with \code{mgcv::gam(...,
+REML)}; global Tukey-biweight IRLS re-weighting; feeding
+\code{smooth.spline()} synthetic boundary points; blending a
+monotone interpolant across the edge unconditionally over a
+fixed-width margin; detecting the artifact via outright sign
+reversal; blending the interpolant against the spline via a single
+smoothstep spanning the whole corrected span). Each fixed the
+specific cases that motivated it and then missed, or was fooled by,
+the next case: a global correction can't distinguish genuine local
+curvature from a local defect (attempts 1-3); correcting
+unconditionally, over a fixed region, or based on a sign check
+instead of a magnitude check let real problems through or created
+new ones (attempts 4-6).
 
-\strong{History (2026-08-14):} \code{smooth.spline()}'s automatic GCV
-smoothing-parameter selection isn't robust to a single-point solver
-hitch (can under-smooth around just that point) and has no way to
-treat a domain edge differently from the interior (the boundary
-overshoot above). Five fix attempts were tried and rejected before
-reaching the current design:
-\enumerate{
-\item Replacing \code{smooth.spline()} entirely with
-\code{mgcv::gam(..., method = "REML")}. Shipped, then reverted
-the same day — REML's single GLOBAL smoothing parameter pulled
-every curve toward one flatness level, and on a real 20-site
-batch that made several genuinely-clean curves visibly WIGGLIER,
-not smoother, a failure the pre-ship validation script's coarse
-whole-curve roughness metric didn't catch.
-\item Global Tukey-biweight IRLS re-weighting (comparing every
-point to ONE whole-curve residual scale). Flagged real curvature
-as noise in steep regions and left it untouched in flat ones.
-\item Feeding \code{smooth.spline()} synthetic boundary points
-extrapolated from a local linear trend (padding). This fixed the
-edge artifact in isolation, but \code{smooth.spline()} has ONE
-global smoothing parameter for the whole curve — adding data
-anywhere changes the fit everywhere, which surfaced as a real
-curve's fitted peak exceeding every observed data point near it
-(the correction "spent its effort" pulling the tail in, at the
-peak's expense).
-\item Blending a local monotone interpolant across the edge
-UNCONDITIONALLY, over a FIXED-width margin. Applying it even
-where nothing was wrong made several already-perfect curves
-(mostly ones whose edges never touch a degenerate boundary)
-measurably worse, since a raw-data interpolant doesn't
-necessarily agree with an already-fine spline fit there. A fixed
-margin also sometimes ended before the spline had genuinely
-recovered, blending against a still-wrong function.
-\item Detecting the artifact via outright SIGN REVERSAL (does the
-spline's fitted direction ever contradict the raw data's dominant
-direction). Fixed the cases it caught cleanly, but missed a whole
-class of real artifacts: a "shelf" where the curve flattens
-dramatically without ever actually reversing, invisible to a
-check that only looks for a sign flip. A follow-up attempt
-applying the same re-acceleration idea to the RAW data (rather
-than the fit) was also rejected — ordinary point-to-point
-sampling noise in the raw grid trips a slope-ratio check on its
-own, flagging curves (mostly profile curves) the fit already
-handled fine.
-\item Smoothstep-blending the interpolant against the spline across
-the ENTIRE corrected span (rather than mostly at full interpolant
-weight with a narrow hand-off). Correctly detected and bounded
-the artifact's extent, but partway through a wide corrected span
-the blend weight had already decayed enough to let some of the
-spline's own residual wiggle leak back in — confirmed directly:
-the raw data over that span had ZERO direction changes, yet the
-blended output still showed some, and deviated from the raw
-points by an order of magnitude more than the interpolant alone
-would. Narrowing the hand-off to the final 20\% of the span (the
-current design) fixed it.
-}
-The current design fixes all of the above: the correction only
-engages where the FITTED CURVE ITSELF shows a re-acceleration (not
-unconditionally, and not from raw-data noise alone), it never touches
-\code{smooth.spline()}'s own fit computation (no padding — the
-correction is a display-time override, not new data), and the
-interpolant is trusted at full weight across nearly the whole
-corrected span rather than being progressively diluted by the
-spline's own (still partially unresolved) behavior. Validated against
-all 40 real profile/integrated curves in a Simpson's-index batch
-(\code{exp_v6}), including 8 curves found to have a subtle shelf
-artifact the prior (sign-reversal) design missed entirely, plus 2
-further curves whose artifact spanned a wider, multi-part region a
-whole-span blend still let leak through: every one resolved, the
-known single-point interior hitch and the original boundary-wiggle
-cases all remained fixed, and the only sign-change count changes
-elsewhere traced to genuine sharp-but-real features in those curves'
-own raw data (confirmed by direct point-by-point comparison — the
-corrected fit tracks them MORE closely than plain
-\code{smooth.spline()}, not less) — confirmed by targeted metrics AND
-direct visual comparison against the raw points on every case, not an
-aggregate roughness score alone (which was in fact actively
-misleading earlier in this investigation: a fit that respects a
-genuinely sharp-but-monotonic rise in the raw data can show a LARGER
-raw second-difference than one that smooths over it, without being
-any less correct).
+All of that machinery turned out to be unnecessary. Every one of
+those artifacts — an outlier dip, a shelf, a boundary wiggle — is
+geometrically the same thing: a point (or short run of points) lying
+locally BELOW the chord connecting its neighbors, i.e. a local
+violation of concavity. Profile and integrated log-likelihoods in a
+scalar parameter of interest are theoretically single-peaked
+(concave), so enforcing that isn't an assumption being imposed on
+the data — it's the shape the object being estimated is already
+supposed to have. The LCM (\code{enforce_concavity = TRUE}, the
+default) removes any such violation by construction, with a
+mathematical guarantee (no detector can be fooled, because there is
+no detector — the hull just never touches a point below its
+neighbors' chord), while still touching every point where the data
+is already concave, getting as close to a real feature (like a
+domain boundary) as the data supports. Re-validated against all 40
+real profile/integrated curves from the Simpson's-index batch that
+drove the six earlier attempts (\code{exp_v6}): every curve came out
+globally concave, \code{psi_hat} matched the elaborate six-attempt
+pipeline to within 0.0003 everywhere, and several curves that
+pipeline never fully resolved (a residual wobble the last attempt
+left behind) came out completely clean under plain LCM projection —
+confirmed by direct visual comparison, not just an aggregate score.
 
-When \code{enforce_concavity = TRUE}, the procedure is:
-\enumerate{
-\item Fit \code{smooth.spline} to the (Hampel-weighted) grid, then
-apply the edge correction described above.
-\item Evaluate the corrected fit on a fine internal grid (500
-points) over the TRUE ψ range.
-\item Compute the upper convex hull of the fine-grid evaluations —
-the tightest concave piecewise-linear function lying at or above
-the spline. This is the LCM.
-\item Return a linear interpolant through the LCM knots.
-}
-
-When \code{enforce_concavity = FALSE} (default), only the smoothing
-spline is fitted and returned directly, without LCM projection.
+When \code{enforce_concavity = FALSE}, only the Hampel-weighted
+smoothing spline is fitted and returned directly, without LCM
+projection — no protection against edge artifacts in this mode; use
+it only when a non-concave-enforced view is specifically wanted.
 }
 \keyword{internal}

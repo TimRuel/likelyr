@@ -11,7 +11,13 @@
 #'   derived from \code{traversal$confidence_levels}.
 #' @param enforce_concavity Logical. Whether to project the fitted spline
 #'   onto its Least Concave Majorant before computing point and interval
-#'   estimates. Default: \code{FALSE}.
+#'   estimates. Default: \code{TRUE} — profile and integrated
+#'   log-likelihoods in a scalar parameter of interest are theoretically
+#'   single-peaked (concave), and enforcing that removes any local
+#'   non-concavity (an isolated solver hitch, a boundary artifact) with
+#'   a mathematical guarantee, regardless of its cause. See
+#'   \code{fit_psi_loglik()}'s documentation for the full history of why
+#'   this replaced an elaborate artifact-detection pipeline.
 #'
 #' @return The SAME calibrated \code{model} object with inference
 #'   results attached.
@@ -21,7 +27,7 @@ infer <- function(
   model,
   which = NULL,
   alpha_levels = NULL,
-  enforce_concavity = FALSE
+  enforce_concavity = TRUE
 ) {
   which <- validate_infer_input(model, which)
 
@@ -80,7 +86,7 @@ infer <- function(
   alpha_levels,
   psi_0,
   psi_interval = NULL,
-  enforce_concavity = FALSE,
+  enforce_concavity = TRUE,
   psi_mle = NULL,
   ...
 ) {

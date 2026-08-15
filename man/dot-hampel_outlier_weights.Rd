@@ -41,15 +41,14 @@ history.
 
 Edge points are deliberately excluded (via \code{edge_exclude}, kept
 small — just enough to skip the one or two points immediately at a
-domain boundary) and left to the edge-blend logic in
-\code{fit_psi_loglik()} instead: a data point sitting hard against a
-domain boundary can legitimately look like a "local outlier" purely
-from steep boundary geometry (e.g. Simpson's index near its
-degenerate lower bound), which isn't the kind of solver hitch this
-filter is meant to catch. \code{edge_exclude} is deliberately much
-smaller than the edge-blend margin below — shrinking it from an
-earlier, wider default was necessary after it was found to also
-exclude a genuine single-point interior hitch sitting close enough to
-an edge to fall inside the wider exclusion zone.
+domain boundary): a data point sitting hard against a domain boundary
+can legitimately look like a "local outlier" purely from steep
+boundary geometry (e.g. Simpson's index near its degenerate lower
+bound), which isn't the kind of solver hitch this filter is meant to
+catch — any remaining edge irregularity that this filter correctly
+leaves alone is instead handled by concavity enforcement in
+\code{fit_psi_loglik()} (see its documentation for why that turned
+out to be a far more robust fix than trying to detect and patch edge
+artifacts directly).
 }
 \keyword{internal}

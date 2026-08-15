@@ -4,7 +4,7 @@
 \alias{get_point_estimate_df}
 \title{Compute point estimate and standard error from a ψ log-likelihood grid}
 \usage{
-get_point_estimate_df(psi_loglik_df, psi_0, enforce_concavity = FALSE)
+get_point_estimate_df(psi_loglik_df, psi_0, enforce_concavity = TRUE)
 }
 \arguments{
 \item{psi_loglik_df}{A data frame with columns \code{psi} and \code{loglik}.}
@@ -12,7 +12,7 @@ get_point_estimate_df(psi_loglik_df, psi_0, enforce_concavity = FALSE)
 \item{psi_0}{Numeric true value of the parameter of interest.}
 
 \item{enforce_concavity}{Logical. Passed to \code{fit_psi_loglik()}.
-Default: \code{FALSE}.}
+Default: \code{TRUE}.}
 }
 \value{
 A tibble with columns \code{psi_0}, \code{psi_hat}, \code{error},

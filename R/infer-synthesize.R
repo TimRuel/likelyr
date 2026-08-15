@@ -10,7 +10,7 @@
 #' @param psi_0         Optional numeric scalar. True value of ψ.
 #' @param psi_interval  Optional sets::interval object.
 #' @param enforce_concavity Logical. Whether to project the fitted spline
-#'   onto its LCM before computing estimates. Default: \code{FALSE}.
+#'   onto its LCM before computing estimates. Default: \code{TRUE}.
 #' @param psi_mle       Optional numeric scalar. The MLE (grid anchor),
 #'   passed to \code{get_interval_estimate_df()} so that boundary
 #'   substitution can identify the exact theoretical last reachable
@@ -26,7 +26,7 @@ synthesize_inference <- function(
   alpha_levels,
   psi_0,
   psi_interval = NULL,
-  enforce_concavity = FALSE,
+  enforce_concavity = TRUE,
   psi_mle = NULL
 ) {
   required <- c("psi", "loglik")

@@ -117,14 +117,17 @@ find_interval_endpoints <- function(
   # ------------------------------------------------------------------
   # Fine scan grid for locating threshold crossings.
   #
-  # On jagged log-likelihoods the shifted curve can cross zero several
-  # times per side. A single uniroot() bracket over the whole side
-  # returns SOME crossing (whichever bisection happens to land on), which
-  # tends to be an INNER crossing and yields a too-narrow interval. We
-  # instead scan a fine grid, find every sign change, and bracket the
-  # OUTERMOST crossing on each side — the widest LR interval consistent
-  # with the fitted curve (the conservative choice under the default
-  # enforce_concavity = FALSE). psi_loglik_shifted is vectorized.
+  # On jagged log-likelihoods (enforce_concavity = FALSE) the shifted
+  # curve can cross zero several times per side. A single uniroot()
+  # bracket over the whole side returns SOME crossing (whichever
+  # bisection happens to land on), which tends to be an INNER crossing
+  # and yields a too-narrow interval. We instead scan a fine grid, find
+  # every sign change, and bracket the OUTERMOST crossing on each side —
+  # the widest LR interval consistent with the fitted curve. Under the
+  # default enforce_concavity = TRUE the fitted curve is globally
+  # concave and crosses at most once per side, so this reduces to the
+  # single obvious root there — still correct, just no longer doing any
+  # real work in the common case. psi_loglik_shifted is vectorized.
   # ------------------------------------------------------------------
   scan_step <- if (is.finite(increment) && increment > 0) {
     increment / 2
@@ -293,7 +296,7 @@ format_interval_estimate_df <- function(interval_estimate_df) {
 #'   for boundary substitution.
 #' @param enforce_concavity Logical. Whether to project the fitted spline
 #'   onto its LCM before inverting for interval endpoints. Default:
-#'   \code{FALSE}.
+#'   \code{TRUE}.
 #' @param psi_mle       Retained for API compatibility; passed through
 #'   but not used by \code{find_interval_endpoints()}'s boundary check.
 #'
@@ -305,7 +308,7 @@ get_interval_estimate_df <- function(
   alpha_levels,
   psi_0 = NA_real_,
   psi_interval = NULL,
-  enforce_concavity = FALSE,
+  enforce_concavity = TRUE,
   psi_mle = NULL
 ) {
   psi_loglik <- fit_psi_loglik(
